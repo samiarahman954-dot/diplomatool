@@ -1,0 +1,177 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Diploma Builder Tool Design System - Academic Elegance */
+
+@layer base {
+  :root {
+    /* Core Background & Text */
+    --background: 210 20% 98%;
+    --foreground: 215 25% 15%;
+
+    /* Card System */
+    --card: 0 0% 100%;
+    --card-foreground: 215 25% 15%;
+
+    /* Popover System */
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 25% 15%;
+
+    /* Academic Navy Primary */
+    --primary: 215 45% 20%;
+    --primary-foreground: 0 0% 98%;
+    --primary-hover: 215 45% 25%;
+
+    /* Soft Secondary */
+    --secondary: 210 15% 92%;
+    --secondary-foreground: 215 25% 25%;
+
+    /* Muted Elements */
+    --muted: 210 15% 95%;
+    --muted-foreground: 215 15% 45%;
+
+    /* Elegant Accent */
+    --accent: 210 15% 94%;
+    --accent-foreground: 215 25% 20%;
+
+    /* Form Elements */
+    --border: 210 20% 88%;
+    --input: 210 20% 94%;
+    --ring: 215 45% 20%;
+
+    /* Academic Gold */
+    --gold: 43 74% 55%;
+    --gold-light: 43 74% 65%;
+    --gold-dark: 43 74% 45%;
+
+    /* Premium Colors */
+    --premium: 215 45% 18%;
+    --premium-light: 215 35% 25%;
+    --luxury: 43 84% 48%;
+
+    /* Gradients */
+    --gradient-academic: linear-gradient(135deg, hsl(215 45% 20%), hsl(215 45% 25%));
+    --gradient-gold: linear-gradient(135deg, hsl(43 74% 55%), hsl(43 74% 65%));
+    --gradient-subtle: linear-gradient(180deg, hsl(210 20% 98%), hsl(210 15% 95%));
+    --gradient-diploma: linear-gradient(135deg, hsl(0 0% 98%), hsl(210 15% 96%));
+
+    /* Shadows */
+    --shadow-elegant: 0 4px 20px -4px hsl(215 45% 20% / 0.1);
+    --shadow-premium: 0 8px 40px -8px hsl(215 45% 20% / 0.15);
+    --shadow-gold: 0 4px 20px -4px hsl(43 74% 55% / 0.2);
+
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-inter;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-playfair;
+  }
+}
+
+@layer components {
+  .btn-academic {
+    @apply bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--primary-hover))] 
+           text-primary-foreground px-6 py-3 rounded-lg font-medium
+           shadow-[var(--shadow-elegant)] hover:shadow-[var(--shadow-premium)]
+           transition-[var(--transition-smooth)] hover:scale-105;
+  }
+
+  .btn-gold {
+    @apply bg-gradient-to-r from-[hsl(var(--gold))] to-[hsl(var(--gold-light))]
+           text-primary px-6 py-3 rounded-lg font-medium
+           shadow-[var(--shadow-gold)] hover:shadow-[var(--shadow-premium)]
+           transition-[var(--transition-smooth)] hover:scale-105;
+  }
+
+  .card-elegant {
+    @apply bg-card border border-border rounded-xl
+           shadow-[var(--shadow-elegant)] hover:shadow-[var(--shadow-premium)]
+           transition-[var(--transition-smooth)];
+  }
+
+  .diploma-preview {
+    @apply bg-gradient-to-br from-[hsl(var(--card))] to-[hsl(var(--accent))]
+           border-2 border-[hsl(var(--gold))] rounded-lg
+           shadow-[var(--shadow-premium)] p-8;
+  }
+
+  .input-elegant {
+    @apply border-2 border-input bg-input/50 rounded-lg px-4 py-3
+           focus:border-[hsl(var(--ring))] focus:bg-background
+           transition-[var(--transition-smooth)];
+  }
+}
