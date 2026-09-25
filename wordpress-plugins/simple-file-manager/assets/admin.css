@@ -1,0 +1,76 @@
+.sfm-wrap .sfm-breadcrumbs {
+	margin: 12px 0;
+	font-size: 14px;
+}
+.sfm-wrap .sfm-breadcrumbs a {
+	text-decoration: none;
+}
+.sfm-wrap .sfm-breadcrumbs .dashicons {
+	font-size: 16px;
+	vertical-align: text-bottom;
+}
+.sfm-wrap .sfm-sep {
+	color: #8c8f94;
+	margin: 0 2px;
+}
+.sfm-wrap .sfm-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 16px;
+	align-items: center;
+	margin: 12px 0 16px;
+	padding: 12px;
+	background: #fff;
+	border: 1px solid #c3c4c7;
+}
+.sfm-wrap .sfm-inline {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	margin: 0;
+}
+.sfm-wrap .button .dashicons {
+	font-size: 16px;
+	line-height: 1.8;
+	vertical-align: middle;
+}
+.sfm-wrap .sfm-table .dashicons {
+	color: #8c8f94;
+	vertical-align: middle;
+}
+.sfm-wrap .sfm-table a .dashicons-category {
+	color: #dba617;
+}
+.sfm-wrap .sfm-table a {
+	text-decoration: none;
+}
+.sfm-wrap .sfm-col-name {
+	word-break: break-all;
+}
+.sfm-wrap .sfm-col-size {
+	width: 90px;
+}
+.sfm-wrap .sfm-col-date {
+	width: 170px;
+}
+.sfm-wrap .sfm-col-actions {
+	width: 240px;
+	white-space: nowrap;
+}
+.sfm-wrap .sfm-col-actions .sfm-inline {
+	display: inline;
+}
+.sfm-wrap .sfm-empty {
+	color: #646970;
+	font-style: italic;
+}
+@media screen and (max-width: 782px) {
+	.sfm-wrap .sfm-col-size,
+	.sfm-wrap .sfm-col-date {
+		display: none;
+	}
+	.sfm-wrap .sfm-col-actions {
+		width: auto;
+		white-space: normal;
+	}
+}
