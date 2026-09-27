@@ -7,7 +7,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'LILO_VERSION', '1.0.0' );
+define( 'LILO_VERSION', '1.0.1' );
 define( 'LILO_DIR', get_template_directory() );
 define( 'LILO_URI', get_template_directory_uri() );
 

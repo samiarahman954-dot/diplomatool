@@ -214,7 +214,7 @@ a.lilo-pill:hover { background: var(--lilo-olive); color: var(--lilo-bg); }
 
 /* Eyebrow & live status */
 .lilo-eyebrow { display: flex; align-items: center; gap: 10px; }
-.lilo-eyebrow__icon { width: 30px; height: 30px; object-fit: contain; flex: none; }
+:is(.lilo-sec, .lilo-hero, .lilo-header, .lilo-footer) img.lilo-eyebrow__icon { width: 30px; height: 30px; max-width: none; object-fit: contain; flex: none; }
 .lilo-eyebrow__text {
 	font: 500 12px/normal var(--lilo-sans);
 	letter-spacing: .24em;
@@ -235,16 +235,17 @@ a.lilo-pill:hover { background: var(--lilo-olive); color: var(--lilo-bg); }
 .lilo-status.is-later .lilo-status__dot { background: #EA8184; }
 
 /* Image frames fill their box */
-.lilo-hero__photo img,
-.lilo-hero__badge img,
-.lilo-cats__media img,
-.lilo-plist__media img,
-.lilo-card-p__media img,
-.lilo-story__media img,
-.lilo-social__tile img,
-.lilo-phead__tile img,
-.lilo-mlist__media img,
-.lilo-visit__map img {
+/* Scoped so Elementor's global `.elementor img { height: auto }` can't override it. */
+:is(.lilo-sec, .lilo-hero, .lilo-header, .lilo-footer) .lilo-hero__photo img,
+:is(.lilo-sec, .lilo-hero, .lilo-header, .lilo-footer) .lilo-hero__badge img,
+:is(.lilo-sec, .lilo-hero, .lilo-header, .lilo-footer) .lilo-cats__media img,
+:is(.lilo-sec, .lilo-hero, .lilo-header, .lilo-footer) .lilo-plist__media img,
+:is(.lilo-sec, .lilo-hero, .lilo-header, .lilo-footer) .lilo-card-p__media img,
+:is(.lilo-sec, .lilo-hero, .lilo-header, .lilo-footer) .lilo-story__media img,
+:is(.lilo-sec, .lilo-hero, .lilo-header, .lilo-footer) .lilo-social__tile img,
+:is(.lilo-sec, .lilo-hero, .lilo-header, .lilo-footer) .lilo-phead__tile img,
+:is(.lilo-sec, .lilo-hero, .lilo-header, .lilo-footer) .lilo-mlist__media img,
+:is(.lilo-sec, .lilo-hero, .lilo-header, .lilo-footer) .lilo-visit__map img {
 	display: block;
 	width: 100%;
 	height: 100%;
@@ -275,7 +276,7 @@ a.lilo-pill:hover { background: var(--lilo-olive); color: var(--lilo-bg); }
 	gap: 16px 32px;
 }
 .lilo-header__logo { display: flex; flex: none; }
-.lilo-header__logo-img { height: 58px; width: auto; display: block; }
+.lilo-header img.lilo-header__logo-img { height: 58px; width: auto; max-width: none; display: block; }
 
 .lilo-nav {
 	display: flex;
@@ -358,7 +359,7 @@ a.lilo-pill:hover { background: var(--lilo-olive); color: var(--lilo-bg); }
 	.lilo-header--collapsible .lilo-nav__list a { padding: 14px 0; border-bottom: 1px solid var(--lilo-line); }
 	.lilo-header--collapsible .lilo-nav__list .current-menu-item > a:not([href*="#"]) { color: var(--lilo-coral); border-bottom-color: var(--lilo-line); }
 	.lilo-header--collapsible .lilo-btn--nav { margin-top: 18px; align-self: flex-start; }
-	.lilo-header__logo-img { height: 50px; }
+	.lilo-header img.lilo-header__logo-img { height: 50px; }
 }
 
 /* --------------------------------------------------------------------------
@@ -377,7 +378,7 @@ a.lilo-pill:hover { background: var(--lilo-olive); color: var(--lilo-bg); }
 	gap: 36px;
 }
 .lilo-footer__logo { display: block; align-self: start; }
-.lilo-footer__logo-img { width: 150px; height: auto; display: block; }
+.lilo-footer img.lilo-footer__logo-img { width: 150px; height: auto; display: block; }
 .lilo-footer__col {
 	display: flex;
 	flex-direction: column;
@@ -463,8 +464,8 @@ a.lilo-pill:hover { background: var(--lilo-olive); color: var(--lilo-bg); }
 	justify-content: center;
 	transform: rotate(-6deg);
 }
-.lilo-hero__badge img { width: 112%; height: 112%; max-width: none; flex: none; }
-.lilo-hero__flower {
+.lilo-hero .lilo-hero__badge img { width: 112%; height: 112%; max-width: none; flex: none; }
+.lilo-hero img.lilo-hero__flower {
 	position: absolute;
 	right: -8px;
 	top: 18px;
@@ -500,7 +501,7 @@ a.lilo-pill:hover { background: var(--lilo-olive); color: var(--lilo-bg); }
 	flex-direction: column;
 	gap: 22px;
 }
-.lilo-hero--full .lilo-eyebrow__icon { width: 28px; height: 28px; }
+.lilo-hero--full img.lilo-eyebrow__icon { width: 28px; height: 28px; }
 .lilo-hero--full .lilo-hero__title { font-size: clamp(44px, 5vw, 72px); line-height: 1.03; letter-spacing: 0; }
 .lilo-hero__actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 .lilo-hero__actions .lilo-status { padding-left: 8px; }
@@ -609,6 +610,14 @@ a.lilo-card-p:hover { color: inherit; }
 .lilo-cards--bordered .lilo-card-p__text { gap: 3px; }
 .lilo-cards--bordered .lilo-card-p__name { color: var(--lilo-text); }
 
+@media (max-width: 600px) {
+	/* Two cards per row on phones (Elementor's "Card min width" can still override). */
+	.lilo-cards, .lilo-social__grid { --lilo-min: 140px; gap: 12px; }
+	.lilo-card-p { padding: 10px 10px 14px; border-radius: 16px; }
+	.lilo-card-p__name { font-size: 18px; }
+	.lilo-card-p__desc { font-size: 13px; }
+}
+
 /* --------------------------------------------------------------------------
    Story
    ----------------------------------------------------------------------- */
@@ -657,7 +666,7 @@ a.lilo-card-p:hover { color: inherit; }
 	padding: 16px 20px;
 	margin-top: 6px;
 }
-.lilo-story__note-icon { width: 34px; height: 34px; flex: none; object-fit: contain; }
+.lilo-story img.lilo-story__note-icon { width: 34px; height: 34px; max-width: none; flex: none; object-fit: contain; }
 .lilo-story__note-text { font: 400 16px/1.5 var(--lilo-sans); color: var(--lilo-body); }
 
 /* --------------------------------------------------------------------------
@@ -675,7 +684,7 @@ a.lilo-card-p:hover { color: inherit; }
 	align-items: center;
 	gap: 24px;
 }
-.lilo-mission__icon { width: 52px; height: 52px; object-fit: contain; }
+.lilo-mission img.lilo-mission__icon { width: 52px; height: 52px; max-width: none; object-fit: contain; }
 .lilo-mission__quote {
 	margin: 0;
 	font: 400 clamp(28px, 3.4vw, 44px)/1.3 var(--lilo-serif);
@@ -756,7 +765,7 @@ a.lilo-card-p:hover { color: inherit; }
 	border: 0;
 	display: block;
 }
-.lilo-visit__map--image img { position: absolute; inset: 0; }
+.lilo-visit .lilo-visit__map--image img { position: absolute; inset: 0; }
 
 /* --------------------------------------------------------------------------
    Tags / merch
@@ -815,7 +824,7 @@ a.lilo-social__tile:hover img { transform: scale(1.04); }
 }
 .lilo-phead__text { display: flex; flex-direction: column; gap: 20px; }
 .lilo-phead__script { display: flex; align-items: center; gap: 8px; }
-.lilo-phead__icon { width: 40px; height: 40px; object-fit: contain; }
+.lilo-phead img.lilo-phead__icon { width: 40px; height: 40px; max-width: none; object-fit: contain; }
 .lilo-phead .lilo-script { font-size: 56px; }
 .lilo-phead__title { margin: 0; font: 400 clamp(56px, 7vw, 96px)/1 var(--lilo-serif); color: var(--lilo-olive); }
 .lilo-phead__desc { margin: 0; max-width: 420px; font: 400 17px/1.6 var(--lilo-sans); color: var(--lilo-body); }
@@ -1027,6 +1036,8 @@ input[type="submit"]:hover, button[type="submit"]:hover, .search-submit:hover { 
 /* Let theme widgets span the full container and keep the design spacing. */
 .elementor-widget[class*="elementor-widget-lilo-"] { width: 100%; }
 .elementor-widget[class*="elementor-widget-lilo-"] > .elementor-widget-container { margin: 0; padding: 0; }
+/* Sections sit flush against each other like the design (no default widget spacing). */
+.elementor-widget[class*="elementor-widget-lilo-"]:not(:last-child) { margin-block-end: 0; }
 
 /* Header template rendered by Elementor keeps the sticky wrapper working. */
 .lilo-site-header .e-con,
