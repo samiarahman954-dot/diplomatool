@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SeniorUni – Mottaker-velkomst
  * Description: Sends the MemberPress welcome email to a Corporate Accounts sub-account (the "Mottaker" on a Familie purchase) only after they have set their password. Does not modify MemberPress, Corporate Accounts or the Vipps plugin.
- * Version:     1.0.0
+ * Version:     1.0.1
  * Author:      SeniorUni
  * Requires at least: 6.2
  * Requires PHP: 7.4
@@ -23,6 +23,9 @@ final class SeniorUni_Mottaker_Welcome {
 	/** Users handled during this request, so the two password hooks can't double-send. */
 	private static $handled = array();
 
+	/** Users whose reset key was issued during this request (i.e. account creation), not a later visit. */
+	private static $pending_this_request = array();
+
 	public static function init() {
 		// A reset key is generated when the "Set your password" email is created.
 		add_action( 'retrieve_password_key', array( __CLASS__, 'mark_pending' ), 10, 1 );
@@ -30,9 +33,12 @@ final class SeniorUni_Mottaker_Welcome {
 		// Core wp-login.php?action=rp flow.
 		add_action( 'after_password_reset', array( __CLASS__, 'on_password_reset' ), 20, 1 );
 
-		// Any other path that sets the password (e.g. MemberPress's own reset form).
-		// Only acts when a reset key was issued first, so passwords set at account creation are ignored.
+		// Other paths that set the password, e.g. MemberPress's own reset form, which may
+		// save via wp_set_password() or via wp_update_user() (profile_update).
+		// Only act when a reset key was issued in an earlier request, so passwords set at
+		// account creation are ignored.
 		add_action( 'wp_set_password', array( __CLASS__, 'on_wp_set_password' ), 20, 2 );
+		add_action( 'profile_update', array( __CLASS__, 'on_profile_update' ), 20, 3 );
 
 		if ( is_admin() ) {
 			add_action( 'admin_menu', array( __CLASS__, 'admin_menu' ) );
@@ -49,6 +55,7 @@ final class SeniorUni_Mottaker_Welcome {
 		$user = get_user_by( 'login', $user_login );
 		if ( $user && ! get_user_meta( $user->ID, self::META_SENT, true ) ) {
 			update_user_meta( $user->ID, self::META_PENDING, time() );
+			self::$pending_this_request[ $user->ID ] = true;
 		}
 	}
 
@@ -59,9 +66,24 @@ final class SeniorUni_Mottaker_Welcome {
 	}
 
 	public static function on_wp_set_password( $password, $user_id ) {
-		if ( get_user_meta( $user_id, self::META_PENDING, true ) ) {
+		if ( self::is_pending_from_earlier_request( (int) $user_id ) ) {
 			self::maybe_send( (int) $user_id, 'wp_set_password' );
 		}
+	}
+
+	public static function on_profile_update( $user_id, $old_user_data, $userdata = array() ) {
+		$password_changed = $old_user_data instanceof WP_User
+			&& ! empty( $userdata['user_pass'] )
+			&& $userdata['user_pass'] !== $old_user_data->user_pass;
+
+		if ( $password_changed && self::is_pending_from_earlier_request( (int) $user_id ) ) {
+			self::maybe_send( (int) $user_id, 'profile_update' );
+		}
+	}
+
+	private static function is_pending_from_earlier_request( $user_id ) {
+		return ! isset( self::$pending_this_request[ $user_id ] )
+			&& get_user_meta( $user_id, self::META_PENDING, true );
 	}
 
 	private static function maybe_send( $user_id, $source ) {

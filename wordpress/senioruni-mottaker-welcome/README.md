@@ -15,7 +15,7 @@ It does not edit MemberPress, MemberPress Corporate Accounts or the SeniorUni Tr
 ## How it works
 
 - `retrieve_password_key`: when the set-password link is generated, the user is flagged as pending.
-- `after_password_reset` (core `wp-login.php?action=rp`) and `wp_set_password` (any other form that sets a password, only if the pending flag is set) trigger the send.
+- `after_password_reset` (core `wp-login.php?action=rp`) triggers the send. `wp_set_password` and `profile_update` also trigger it, which covers MemberPress's own reset form. Those two only act if the pending flag was set in an earlier request, so a password set while the account is being created never triggers the email.
 - It sends only if the user has `mpca_corporate_account_id` user meta, which marks a sub-account. The purchaser and one-person members never match.
 - The `_senioruni_mw_sent` user meta flag means the welcome email is sent once. Later logins and password changes don't send it again.
 - The email body is taken from a **MemberPress template**, so the wording is edited in *MemberPress → Settings → Emails*. The template is picked under *Settings → Mottaker-velkomst*. By default the plugin auto-detects the Corporate Accounts "Sub Account Welcome Email". You can also choose the core Welcome Email or the membership-specific welcome set on the Familie membership.
