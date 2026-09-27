@@ -1,0 +1,44 @@
+# SeniorUni – Mottaker-velkomst
+
+Standalone WordPress plugin for senioruni.no. On a **Familie** (two-person) MemberPress purchase, it sends the second person (the Mottaker, a Corporate Accounts sub-account) their welcome email **only after they have set their password**.
+
+It does not edit MemberPress, MemberPress Corporate Accounts or the SeniorUni Trygg (Vipps) plugin.
+
+## Flow
+
+| # | Who | Email | Sent by |
+|---|---|---|---|
+| 1 | Purchaser | Welcome | MemberPress (unchanged) |
+| 2 | Mottaker | Set your password | MemberPress Corporate Accounts (unchanged) |
+| 3 | Mottaker | Welcome, once, after the password is set | **this plugin** |
+
+## How it works
+
+- `retrieve_password_key`: when the set-password link is generated, the user is flagged as pending.
+- `after_password_reset` (core `wp-login.php?action=rp`) and `wp_set_password` (any other form that sets a password, only if the pending flag is set) trigger the send.
+- It sends only if the user has `mpca_corporate_account_id` user meta, which marks a sub-account. The purchaser and one-person members never match.
+- The `_senioruni_mw_sent` user meta flag means the welcome email is sent once. Later logins and password changes don't send it again.
+- The email body is taken from a **MemberPress template**, so the wording is edited in *MemberPress → Settings → Emails*. The template is picked under *Settings → Mottaker-velkomst*. By default the plugin auto-detects the Corporate Accounts "Sub Account Welcome Email". You can also choose the core Welcome Email or the membership-specific welcome set on the Familie membership.
+
+## Install
+
+1. Upload `senioruni-mottaker-welcome.zip` under *Plugins → Add New → Upload*, then activate it.
+2. Open *Settings → Mottaker-velkomst*.
+   - Check which template is selected.
+   - Click **Send test** with an existing Mottaker's address and your own address as recipient.
+   - Make sure the test is a Norwegian **welcome** email, not the "Set your password" email. If it's the wrong one, pick another template and test again.
+
+## Verify (fresh Familie purchase, two new `+alias` addresses)
+
+1. The purchaser gets the welcome email immediately.
+2. The Mottaker gets the set-password email immediately and **no** welcome email yet.
+3. The Mottaker sets a password, then the welcome email arrives. It also shows under *Recent activity* on the settings page.
+4. The Mottaker logs out and in again, or resets the password again. No second welcome email is sent.
+
+If step 3 shows `failed: …` under *Recent activity*, the message says why, for example that the template is disabled or wasn't found.
+
+## Notes
+
+- Sub-accounts that already existed before activation have no "sent" flag. They get the welcome email once, the next time they reset their password.
+- The plugin doesn't translate the English "[SeniorUni] Set your password" email. That's a separate task.
+- Filters: `senioruni_mw_is_sub_account` (bool, user_id) and `senioruni_mw_email_params` (params, user_id, txn, template).
