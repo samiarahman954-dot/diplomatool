@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SeniorUni – Mottaker-velkomst
  * Description: Sends the MemberPress welcome email to a Corporate Accounts sub-account (the "Mottaker" on a Familie purchase) only after they have set their password. Does not modify MemberPress, Corporate Accounts or the Vipps plugin.
- * Version:     1.0.1
+ * Version:     1.0.2
  * Author:      SeniorUni
  * Requires at least: 6.2
  * Requires PHP: 7.4
@@ -204,7 +204,7 @@ final class SeniorUni_Mottaker_Welcome {
 			try {
 				foreach ( (array) MeprEmailFactory::all( 'MeprBaseOptionsUserEmail' ) as $email ) {
 					$class         = get_class( $email );
-					$out[ $class ] = ! empty( $email->title ) ? $email->title : $class;
+					$out[ $class ] = ! empty( $email->title ) ? wp_strip_all_tags( $email->title ) : $class;
 				}
 			} catch ( \Throwable $e ) {
 				// Fall through with whatever was collected.
