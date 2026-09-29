@@ -150,6 +150,7 @@ final class JMK_Leads {
 			'jmk_phone'  => __( 'Phone', 'jmk' ),
 			'jmk_route'  => __( 'From → To', 'jmk' ),
 			'jmk_size'   => __( 'Move size', 'jmk' ),
+			'jmk_est'    => __( 'Estimate', 'jmk' ),
 			'date'       => $cols['date'],
 		);
 	}
@@ -161,12 +162,41 @@ final class JMK_Leads {
 				printf( '<a href="%s">%s</a>', esc_url( 'tel:' . preg_replace( '/[^\d+]/', '', $phone ) ), esc_html( $phone ) );
 				break;
 			case 'jmk_route':
-				echo esc_html( trim( get_post_meta( $post_id, '_jmk_from_zip', true ) . ' → ' . get_post_meta( $post_id, '_jmk_to_zip', true ), ' →' ) );
+				$record = self::quote_record( $post_id );
+				if ( $record ) {
+					$from = $record['quote']['from_addr'];
+					$to   = $record['quote']['to_addr'];
+				} else {
+					$from = get_post_meta( $post_id, '_jmk_from_zip', true );
+					$to   = get_post_meta( $post_id, '_jmk_to_zip', true );
+				}
+				echo esc_html( implode( ' → ', array_filter( array( $from, $to ), 'strlen' ) ) );
 				break;
 			case 'jmk_size':
 				echo esc_html( get_post_meta( $post_id, '_jmk_size', true ) );
 				break;
+			case 'jmk_est':
+				$record = self::quote_record( $post_id );
+				if ( ! $record ) {
+					echo '<span style="color:#888">' . esc_html__( 'Quick form', 'jmk' ) . '</span>';
+				} elseif ( $record['view'] ) {
+					echo '#' . (int) $record['est_no'] . '<br><b>' . esc_html( $record['view']['total'] ) . '</b>';
+				} else {
+					echo '#' . (int) $record['est_no'] . '<br>' . esc_html__( 'Custom quote', 'jmk' );
+				}
+				break;
 		}
+	}
+
+	/**
+	 * Quote-builder record for a lead, or null for quick-form leads.
+	 */
+	public static function quote_record( $post_id ) {
+		if ( 'quote' !== get_post_meta( $post_id, '_jmk_kind', true ) ) {
+			return null;
+		}
+		$record = get_post_meta( $post_id, '_jmk_quote', true );
+		return is_array( $record ) && isset( $record['quote'] ) ? $record : null;
 	}
 
 	public static function meta_box() {
@@ -174,6 +204,27 @@ final class JMK_Leads {
 			'jmk_lead_details',
 			__( 'Lead details', 'jmk' ),
 			static function ( $post ) {
+				$record = self::quote_record( $post->ID );
+				if ( $record ) {
+					echo JMK_Quote::summary_html( $record ); // phpcs:ignore WordPress.Security.EscapeOutput -- escaped inside.
+					if ( $record['files'] ) {
+						echo '<h4>' . esc_html__( 'Photos / files', 'jmk' ) . '</h4><div style="display:flex;flex-wrap:wrap;gap:10px">';
+						foreach ( $record['files'] as $f ) {
+							$img = 0 === strpos( (string) $f['type'], 'image/' ) && 'image/heic' !== $f['type'];
+							printf(
+								'<a href="%1$s" target="_blank" rel="noopener" style="display:block;width:120px;text-align:center;font-size:11px;word-break:break-all">%2$s%3$s</a>',
+								esc_url( $f['url'] ),
+								$img ? '<img src="' . esc_url( $f['url'] ) . '" alt="" style="width:120px;height:90px;object-fit:cover;border-radius:6px;display:block;margin-bottom:4px">' : '',
+								esc_html( $f['name'] )
+							);
+						}
+						echo '</div>';
+					}
+					if ( $record['page_url'] ) {
+						echo '<p>' . esc_html__( 'Page:', 'jmk' ) . ' <a href="' . esc_url( $record['page_url'] ) . '" target="_blank" rel="noopener">' . esc_html( $record['page_url'] ) . '</a></p>';
+					}
+					return;
+				}
 				echo '<table class="widefat striped"><tbody>';
 				foreach ( self::FIELDS as $k => $label ) {
 					printf(

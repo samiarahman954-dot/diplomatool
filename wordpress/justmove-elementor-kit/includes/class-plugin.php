@@ -36,6 +36,13 @@ final class JMK_Plugin {
 		'mobile-bar'     => 'JMK_Widget_Mobile_Bar',
 	);
 
+	/**
+	 * Widgets that are not part of the home page layout.
+	 */
+	const EXTRA_WIDGETS = array(
+		'quote-builder' => 'JMK_Widget_Quote_Builder',
+	);
+
 	public static function instance() {
 		if ( null === self::$instance ) {
 			self::$instance = new self();
@@ -45,6 +52,7 @@ final class JMK_Plugin {
 
 	private function __construct() {
 		JMK_Leads::init();
+		JMK_Quote::init();
 		JMK_Admin::init();
 
 		if ( ! self::elementor_ready() ) {
@@ -96,7 +104,7 @@ final class JMK_Plugin {
 	public function register_widgets( $widgets_manager ) {
 		require_once JMK_PATH . 'includes/class-widget-base.php';
 
-		foreach ( self::WIDGETS as $slug => $class ) {
+		foreach ( self::WIDGETS + self::EXTRA_WIDGETS as $slug => $class ) {
 			require_once JMK_PATH . 'widgets/' . $slug . '.php';
 			$widgets_manager->register( new $class() );
 		}

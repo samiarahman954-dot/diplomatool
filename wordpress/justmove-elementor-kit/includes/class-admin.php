@@ -92,6 +92,10 @@ final class JMK_Admin {
 					<?php esc_html_e( 'Demo imported.', 'jmk' ); ?>
 					<a href="<?php echo esc_url( get_permalink( $page_id ) ); ?>" target="_blank"><?php esc_html_e( 'View page', 'jmk' ); ?></a> ·
 					<a href="<?php echo esc_url( self::edit_url( $page_id ) ); ?>"><?php esc_html_e( 'Edit with Elementor', 'jmk' ); ?></a>
+					<?php $quote_page = JMK_Demo_Importer::quote_page_id(); ?>
+					<?php if ( $quote_page ) : ?>
+						· <a href="<?php echo esc_url( get_permalink( $quote_page ) ); ?>" target="_blank"><?php esc_html_e( 'View quote page', 'jmk' ); ?></a>
+					<?php endif; ?>
 					<?php if ( $parts['header'] ) : ?>
 						· <a href="<?php echo esc_url( self::edit_url( $parts['header'] ) ); ?>"><?php esc_html_e( 'Edit header', 'jmk' ); ?></a>
 					<?php endif; ?>
@@ -145,6 +149,14 @@ final class JMK_Admin {
 							</span></p>
 					<?php else : ?>
 						<p class="description"><?php esc_html_e( 'Elementor Pro (Theme Builder) not detected: header and footer are placed inside the page, which uses the blank Elementor Canvas template. Activate Elementor Pro and import again to get Theme Builder header/footer templates.', 'jmk' ); ?></p>
+					<?php endif; ?>
+					<?php
+					$quote_page = JMK_Demo_Importer::quote_page_id();
+					if ( ! $quote_page && ! get_page_by_path( JMK_Demo_Importer::QUOTE_SLUG ) ) :
+						?>
+						<p><label><input type="checkbox" name="quote_page" value="1" checked> <?php esc_html_e( 'Also create a "Get a Quote" page at /quote/ with the quote builder', 'jmk' ); ?></label></p>
+					<?php else : ?>
+						<p class="description"><?php esc_html_e( 'A /quote/ page already exists, so no quote page will be created. Add the "JM Quote Builder" widget or the [jmk_quote_builder] shortcode to it.', 'jmk' ); ?></p>
 					<?php endif; ?>
 					<p><label><input type="checkbox" name="library" value="1" checked> <?php esc_html_e( 'Also save to Elementor → Templates → Saved Templates', 'jmk' ); ?></label></p>
 					<p><button type="submit" class="button button-primary button-hero" <?php disabled( ! $ready ); ?>><?php esc_html_e( 'Import demo now', 'jmk' ); ?></button></p>
@@ -202,6 +214,7 @@ final class JMK_Admin {
 				'set_front'   => ! empty( $_POST['set_front'] ),
 				'library'     => ! empty( $_POST['library'] ),
 				'theme_parts' => ! empty( $_POST['theme_parts'] ),
+				'quote_page'  => ! empty( $_POST['quote_page'] ),
 			)
 		);
 

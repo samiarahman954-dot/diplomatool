@@ -2,7 +2,7 @@
 Requires at least: 6.0
 Requires PHP: 7.4
 Requires Plugins: elementor
-Stable tag: 1.0.0
+Stable tag: 1.1.0
 
 The Just Move DFW home page rebuilt as 18 custom Elementor widgets (one per section) with one-click demo import. No default Elementor widgets are used.
 
@@ -29,6 +29,26 @@ JM FAQ (with FAQPage schema) · JM Final CTA · JM Footer (with MovingCompany sc
 
 Every widget has Content controls for all text/links/lists and a Style tab with brand colours,
 section padding, max width and typography.
+
+== Quote builder (instant estimates) ==
+
+Add it with the "JM Quote Builder" Elementor widget or the shortcode [jmk_quote_builder]
+(optional attributes: brand="", tagline="", logo="URL", background="no").
+The demo import also creates a "Get a Quote" page at /quote/ (unless one exists).
+
+* 6 steps: move type, size, addresses + access, date, services/photos, contact.
+* Local and labor-only moves get an instant price range; long-distance and commercial get a
+  "custom quote" message.
+* The price is calculated on the server from Just Move Kit → Quote Builder (hourly rates,
+  travel fee, hours per size, crew, packing, materials, specialty items, stairs), so what the
+  customer sees, what is saved and what is emailed always match.
+* Each request is saved under Just Move Kit → Leads with its estimate number and photos, emailed
+  to you (Reply-To = customer) and, if the customer gave an email, emailed to the customer too.
+* Customers can download a branded PDF estimate (jsPDF is bundled and loads only on click).
+* Photos: up to 10 files (images/PDF), large phone photos are shrunk in the browser before
+  upload, stored with random names in uploads/jmk-quotes/, and deleted with the lead.
+* Spam protection: honeypot + max 5 requests per 10 minutes per visitor.
+* Developers: `jmk_quote_received` ( $record, $post_id ) fires after each request.
 
 == Quote form ==
 

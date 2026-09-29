@@ -15,6 +15,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 final class JMK_Demo_Importer {
 
 	const OPT_PAGE_ID   = 'jmk_demo_page_id';
+	const OPT_QUOTE_ID  = 'jmk_quote_page_id';
+	const QUOTE_SLUG    = 'quote';
 	const OPT_HEADER_ID = 'jmk_theme_header_id';
 	const OPT_FOOTER_ID = 'jmk_theme_footer_id';
 	const PAGE_TITLE    = 'Home – Just Move DFW';
@@ -133,7 +135,7 @@ final class JMK_Demo_Importer {
 	/**
 	 * Run the import.
 	 *
-	 * @param array $args { set_front: bool, library: bool, theme_parts: bool }
+	 * @param array $args { set_front: bool, library: bool, theme_parts: bool, quote_page: bool }
 	 * @return int|WP_Error Page ID.
 	 */
 	public static function import( array $args ) {
@@ -162,31 +164,20 @@ final class JMK_Demo_Importer {
 		$page_types    = $theme_parts ? self::body_widget_types() : JMK_Plugin::demo_widget_types();
 		$page_settings = self::page_settings( $theme_parts );
 
-		$page_id = wp_insert_post(
-			array(
-				'post_type'   => 'page',
-				'post_status' => 'publish',
-				'post_title'  => self::PAGE_TITLE,
-			),
-			true
-		);
+		$page_id = self::create_page( self::PAGE_TITLE, '', $page_types, $page_settings );
 		if ( is_wp_error( $page_id ) ) {
 			return $page_id;
 		}
 
-		$document = \Elementor\Plugin::$instance->documents->get( $page_id, false );
-		if ( ! $document ) {
-			wp_delete_post( $page_id, true );
-			return new WP_Error( 'jmk_doc', __( 'Elementor could not open the new page.', 'jmk' ) );
+		if ( ! empty( $args['quote_page'] ) && ! self::quote_page_id() && ! get_page_by_path( self::QUOTE_SLUG ) ) {
+			$quote_types = $theme_parts
+				? array( 'jmk-quote-builder' )
+				: array( 'jmk-header', 'jmk-quote-builder', 'jmk-footer', 'jmk-mobile-bar' );
+			$quote_id    = self::create_page( __( 'Get a Quote', 'jmk' ), self::QUOTE_SLUG, $quote_types, $page_settings );
+			if ( ! is_wp_error( $quote_id ) ) {
+				update_option( self::OPT_QUOTE_ID, $quote_id );
+			}
 		}
-		update_post_meta( $page_id, '_elementor_edit_mode', 'builder' );
-		update_post_meta( $page_id, '_wp_page_template', $page_settings['template'] );
-		$document->save(
-			array(
-				'elements' => self::build_elements( $page_types ),
-				'settings' => $page_settings,
-			)
-		);
 
 		if ( ! empty( $args['set_front'] ) ) {
 			update_option( 'show_on_front', 'page' );
@@ -201,6 +192,46 @@ final class JMK_Demo_Importer {
 		\Elementor\Plugin::$instance->files_manager->clear_cache();
 
 		return $page_id;
+	}
+
+	/**
+	 * Publish a page and fill it with kit widgets through Elementor's document API.
+	 *
+	 * @return int|WP_Error
+	 */
+	private static function create_page( $title, $slug, array $types, array $settings ) {
+		$page_id = wp_insert_post(
+			array(
+				'post_type'   => 'page',
+				'post_status' => 'publish',
+				'post_title'  => $title,
+				'post_name'   => $slug,
+			),
+			true
+		);
+		if ( is_wp_error( $page_id ) ) {
+			return $page_id;
+		}
+
+		$document = \Elementor\Plugin::$instance->documents->get( $page_id, false );
+		if ( ! $document ) {
+			wp_delete_post( $page_id, true );
+			return new WP_Error( 'jmk_doc', __( 'Elementor could not open the new page.', 'jmk' ) );
+		}
+		update_post_meta( $page_id, '_elementor_edit_mode', 'builder' );
+		update_post_meta( $page_id, '_wp_page_template', $settings['template'] );
+		$document->save(
+			array(
+				'elements' => self::build_elements( $types ),
+				'settings' => $settings,
+			)
+		);
+		return $page_id;
+	}
+
+	public static function quote_page_id() {
+		$id = (int) get_option( self::OPT_QUOTE_ID );
+		return ( $id && 'page' === get_post_type( $id ) && 'trash' !== get_post_status( $id ) ) ? $id : 0;
 	}
 
 	/**

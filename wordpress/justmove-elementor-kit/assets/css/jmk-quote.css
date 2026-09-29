@@ -1,0 +1,140 @@
+/*
+ * Just Move DFW – Quote Builder. Everything is scoped under .jmq and every
+ * class is prefixed so theme styles for .card/.header/.btn can't leak in.
+ */
+.jmq{
+  --blue:#27a7e0;--blue-deep:#1488c4;--navy:#0c3a52;--navy2:#0a3247;
+  --yellow:#f6de2d;--yellow-deep:#f0c600;--ink:#0b1620;--muted:#6b7c88;
+  --line:#e2e9ef;--soft:#e9f6fd;--white:#fff;--ok:#15a05f;--err:#d23f3f;
+  --shadow:0 24px 60px -18px rgba(12,58,82,.30);
+  font-family:'Hanken Grotesk',system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;
+  display:flex;align-items:center;justify-content:center;padding:28px 16px;line-height:1.4;font-size:16px;text-align:left;color-scheme:light;
+}
+.jmq.jmq-bg{background:radial-gradient(1200px 600px at 110% -10%,rgba(39,167,224,.14),transparent 60%),radial-gradient(900px 500px at -10% 110%,rgba(246,222,45,.16),transparent 55%),#f3f9fc}
+.jmq *,.jmq *::before,.jmq *::after{box-sizing:border-box;margin:0;padding:0}
+.jmq [hidden]{display:none!important}
+.jmq img{max-width:100%}
+
+/* neutralise theme button styles, then style our own */
+.jmq button{all:unset;box-sizing:border-box;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent}
+.jmq button:focus-visible,.jmq .jmq-input:focus-visible{outline:3px solid rgba(39,167,224,.55);outline-offset:2px}
+
+.jmq .jmq-card{width:100%;max-width:560px;background:var(--white);border-radius:26px;box-shadow:var(--shadow);overflow:hidden;position:relative}
+
+.jmq .jmq-header{position:relative;background:linear-gradient(135deg,var(--navy) 0%,var(--blue-deep) 60%,var(--blue) 100%);padding:20px 26px 30px;color:#fff;overflow:hidden}
+.jmq .jmq-wave{position:absolute;left:0;right:0;bottom:-1px;width:100%;display:block}
+.jmq .jmq-brand{display:flex;align-items:center;gap:14px;position:relative;z-index:2}
+.jmq .jmq-logo{width:78px;height:72px;border-radius:13px;flex:none;background:#fff;display:grid;place-items:center;padding:5px;box-shadow:0 6px 16px rgba(0,0,0,.22);overflow:hidden}
+.jmq .jmq-logo img{width:100%;height:100%;object-fit:contain;display:block}
+.jmq .jmq-brand-name{font-family:'Archivo',system-ui,sans-serif;font-weight:900;font-size:18px;letter-spacing:.3px;line-height:1.05;color:#fff}
+.jmq .jmq-brand-sub{font-size:11.5px;letter-spacing:.13em;text-transform:uppercase;color:#bfe8fa;font-weight:700;margin-top:4px}
+
+.jmq .jmq-progress-wrap{position:relative;z-index:2;margin-top:18px;display:flex;align-items:center;gap:12px}
+.jmq .jmq-progress{flex:1;height:6px;border-radius:99px;background:rgba(255,255,255,.20);overflow:hidden}
+.jmq .jmq-progress-bar{height:100%;width:10%;border-radius:99px;background:linear-gradient(90deg,var(--yellow),#fff09a);transition:width .45s cubic-bezier(.22,1,.36,1)}
+.jmq .jmq-progress-label{font-size:12px;color:#cdeefb;font-weight:700;white-space:nowrap}
+
+.jmq .jmq-body{padding:30px 26px 18px;min-height:330px;position:relative;display:block}
+.jmq .jmq-step{display:none;animation:jmq-fade .42s cubic-bezier(.22,1,.36,1)}
+.jmq .jmq-step.is-active{display:block}
+@keyframes jmq-fade{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.jmq .jmq-step{animation:none}}
+
+.jmq .jmq-q{font-family:'Archivo',system-ui,sans-serif;font-weight:800;font-size:25px;line-height:1.18;letter-spacing:-.01em;color:var(--navy)}
+.jmq .jmq-accent{color:var(--blue)}
+.jmq .jmq-sub{color:var(--muted);font-size:14.5px;margin-top:8px;line-height:1.5}
+
+.jmq .jmq-opts{margin-top:22px;display:flex;flex-direction:column;gap:12px}
+.jmq button.jmq-opt{display:flex;align-items:center;gap:14px;width:100%;padding:16px 18px;border:1.6px solid var(--line);border-radius:14px;background:#fff;transition:all .18s ease;font-size:15.5px;font-weight:600;line-height:1.35;color:var(--ink);user-select:none;white-space:normal;text-align:left}
+.jmq button.jmq-opt:hover{border-color:var(--blue);background:var(--soft);color:var(--ink);transform:translateY(-1px)}
+.jmq .jmq-mark{width:24px;height:24px;border-radius:50%;border:2px solid #c4d2db;flex:none;display:grid;place-items:center;transition:all .18s}
+.jmq button.jmq-opt.is-selected{border-color:var(--blue);background:var(--soft);box-shadow:0 4px 14px rgba(39,167,224,.14)}
+.jmq .jmq-opt.is-selected .jmq-mark{background:var(--blue);border-color:var(--blue)}
+.jmq .jmq-mark svg{opacity:0;transform:scale(.4);transition:all .18s}
+.jmq .jmq-opt.is-selected .jmq-mark svg{opacity:1;transform:scale(1)}
+.jmq .jmq-emoji{font-size:20px;width:28px;text-align:center;flex:none}
+
+.jmq .jmq-field{margin-top:18px}
+.jmq .jmq-field label,.jmq .jmq-label{display:block;font-weight:700;font-size:13px;line-height:1.3;color:var(--navy);margin-bottom:7px}
+.jmq .jmq-input{display:block;width:100%;height:auto;min-height:50px;padding:14px 16px;border:1.6px solid var(--line);border-radius:13px;font-family:inherit;font-size:16px;line-height:1.3;color:var(--ink);background:#fbfdfe;transition:all .16s;-webkit-appearance:none;appearance:none;box-shadow:none;margin:0}
+.jmq .jmq-input::placeholder{color:#a9b6c0}
+.jmq .jmq-input:focus{outline:none;border-color:var(--blue);background:#fff;box-shadow:0 0 0 4px rgba(39,167,224,.14)}
+.jmq select.jmq-input{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' stroke='%236b7c88' stroke-width='2' fill='none' stroke-linecap='round'/></svg>");background-repeat:no-repeat;background-position:right 16px center;padding-right:40px}
+.jmq .jmq-hint{font-size:12.5px;color:var(--muted);margin-top:7px;line-height:1.45}
+.jmq .jmq-ab{border:1.5px solid var(--line);border-radius:15px;padding:14px 16px;margin-top:14px;background:#fbfdfe}
+.jmq .jmq-tag{font-family:'Archivo',system-ui,sans-serif;font-weight:800;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--blue);margin-bottom:4px}
+
+.jmq .jmq-chips{display:flex;flex-wrap:wrap;gap:9px;margin-top:10px}
+.jmq button.jmq-chip{display:inline-block;padding:10px 15px;border:1.5px solid var(--line);border-radius:99px;font-size:13.5px;font-weight:700;line-height:1.3;background:#fff;color:var(--muted);transition:all .15s;white-space:normal;text-align:center}
+.jmq button.jmq-chip:hover{border-color:var(--blue);color:var(--blue);background:#fff}
+.jmq button.jmq-chip.is-selected,.jmq button.jmq-chip.is-selected:hover{background:var(--navy);border-color:var(--navy);color:#fff}
+.jmq .jmq-toggle{display:flex;gap:9px;margin-top:8px}
+.jmq .jmq-toggle .jmq-t{flex:1;white-space:nowrap;padding-left:8px;padding-right:8px}
+
+.jmq button.jmq-upload{display:block;width:100%;margin-top:8px;border:2px dashed #bfdcea;border-radius:14px;padding:22px 16px;text-align:center;background:#fbfdfe;transition:all .16s;color:var(--ink);white-space:normal}
+.jmq button.jmq-upload:hover,.jmq button.jmq-upload.is-drag{border-color:var(--blue);background:var(--soft)}
+.jmq .jmq-upload span{display:block}
+.jmq .jmq-upico{font-size:26px}
+.jmq .jmq-uptext{font-weight:700;color:var(--navy);margin-top:6px;font-size:14.5px}
+.jmq .jmq-uphint{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.4}
+.jmq .jmq-thumbs{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+.jmq .jmq-thumbs:empty{display:none}
+.jmq .jmq-thumb{position:relative;width:72px;height:72px;border-radius:10px;border:1px solid var(--line);background:#fff;display:grid;place-items:center}
+.jmq .jmq-thumb img{width:100%;height:100%;object-fit:cover;display:block;border-radius:10px}
+.jmq .jmq-doc{font-size:10px;color:var(--muted);text-align:center;padding:4px;word-break:break-word;line-height:1.25}
+.jmq button.jmq-rm{position:absolute;top:-7px;right:-7px;width:22px;height:22px;border-radius:50%;background:var(--navy);color:#fff;border:2px solid #fff;font-size:13px;line-height:1;display:grid;place-items:center}
+.jmq .jmq-file-msg:empty{display:none}
+
+.jmq .jmq-error{display:none;margin-top:14px;padding:12px 14px;border-radius:12px;background:#fdecec;color:#a52a2a;font-size:14px;font-weight:600;line-height:1.45}
+.jmq .jmq-error.is-on{display:block}
+.jmq .jmq-hp{position:absolute!important;left:-9999px!important;width:1px;height:1px;overflow:hidden}
+
+.jmq .jmq-quote-head{text-align:center;margin-bottom:8px}
+.jmq .jmq-quote-badge{display:inline-flex;align-items:center;gap:7px;background:var(--yellow);color:#5a4b00;font-weight:800;font-size:12px;letter-spacing:.08em;text-transform:uppercase;padding:8px 15px;border-radius:99px}
+.jmq .jmq-total-box{margin-top:14px;text-align:center;padding:26px 18px;border-radius:18px;background:linear-gradient(135deg,var(--navy),var(--blue-deep));color:#fff;position:relative;overflow:hidden}
+.jmq .jmq-total-box::after{content:"";position:absolute;inset:0;background:radial-gradient(420px 170px at 100% 0,rgba(39,167,224,.5),transparent 60%);pointer-events:none}
+.jmq .jmq-total-label{font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;color:#bfe8fa;font-weight:700;position:relative;z-index:2}
+.jmq .jmq-total-amt{font-family:'Archivo',system-ui,sans-serif;font-weight:900;font-size:40px;line-height:1.15;letter-spacing:-.02em;margin-top:6px;position:relative;z-index:2;color:#fff}
+.jmq .jmq-total-sub{font-size:13px;color:#cdeefb;margin-top:6px;position:relative;z-index:2}
+
+.jmq .jmq-lines{margin-top:18px;border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.jmq .jmq-line{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 18px;font-size:14.5px;border-bottom:1px solid var(--line)}
+.jmq .jmq-line:last-child{border-bottom:none}
+.jmq .jmq-desc{color:var(--ink);font-weight:600}
+.jmq .jmq-meta{color:var(--muted);font-size:12px;font-weight:500;margin-top:2px}
+.jmq .jmq-amt{font-weight:700;font-family:'Archivo',system-ui,sans-serif;color:var(--navy);white-space:nowrap}
+.jmq .jmq-line.is-sub{background:#f4f9fc}
+
+.jmq button.jmq-dlbtn{margin-top:16px;width:100%;display:flex;align-items:center;justify-content:center;gap:9px;padding:15px;border-radius:14px;font-family:'Hanken Grotesk',system-ui,sans-serif;font-weight:800;font-size:15px;background:linear-gradient(135deg,var(--yellow),var(--yellow-deep));color:#4a3d00;box-shadow:0 10px 22px -10px rgba(240,198,0,.8);transition:all .18s;text-align:center}
+.jmq button.jmq-dlbtn:hover{transform:translateY(-1px);color:#4a3d00}
+.jmq button.jmq-dlbtn[disabled]{opacity:.7;cursor:wait}
+
+.jmq .jmq-note-card{margin-top:16px;padding:14px 16px;background:#fffdf2;border:1px solid #f3e6a8;border-radius:13px;font-size:13px;color:#6a5a14;line-height:1.55}
+.jmq .jmq-note-card b{color:#4d4000}
+.jmq .jmq-callout{margin-top:14px;padding:18px;border-radius:16px;background:var(--soft);border:1px solid #cdeafa;text-align:center}
+.jmq .jmq-callout-t{font-family:'Archivo',system-ui,sans-serif;font-weight:800;color:var(--navy);font-size:17px}
+.jmq .jmq-callout-d{color:var(--muted);font-size:13.5px;margin-top:6px;line-height:1.5}
+
+.jmq .jmq-status{margin-top:14px;display:flex;align-items:center;gap:11px;padding:13px 16px;border-radius:13px;font-size:13.5px;font-weight:700;line-height:1.4;background:#e8f7ef;color:#0f7a45}
+
+.jmq .jmq-footer{display:flex;gap:12px;padding:18px 26px 26px;border-top:1px solid var(--line);background:#fff}
+.jmq button.jmq-btn{flex:1;padding:15px 20px;border-radius:99px;font-family:'Hanken Grotesk',system-ui,sans-serif;font-weight:800;font-size:15.5px;line-height:1.2;transition:all .18s;text-align:center;white-space:nowrap}
+.jmq button.jmq-btn-back{background:#fff;color:var(--blue-deep);border:1.6px solid #c7e4f4}
+.jmq button.jmq-btn-back:hover{background:var(--soft);color:var(--blue-deep)}
+.jmq button.jmq-btn-next{background:var(--blue);color:#fff;flex:1.6;box-shadow:0 10px 22px -8px rgba(39,167,224,.6)}
+.jmq button.jmq-btn-next:hover{background:var(--blue-deep);color:#fff;transform:translateY(-1px)}
+.jmq button.jmq-btn-next[disabled],.jmq button.jmq-btn-next[disabled]:hover{opacity:.45;cursor:not-allowed;box-shadow:none;transform:none;background:var(--blue)}
+.jmq button.jmq-btn-next.is-busy{opacity:.75;cursor:wait}
+.jmq button.jmq-btn-skip{background:#fff;color:var(--muted);border:1.6px solid var(--line)}
+.jmq button.jmq-btn-skip:hover{background:#fff;color:var(--ink)}
+.jmq button.jmq-btn-restart{background:var(--navy);color:#fff;flex:1}
+.jmq button.jmq-btn-restart:hover{background:var(--navy2);color:#fff}
+.jmq .jmq-footnote{text-align:center;font-size:11.5px;color:var(--muted);padding:0 26px 18px;line-height:1.5}
+
+@media(max-width:480px){
+  .jmq{padding:16px 10px}
+  .jmq .jmq-q{font-size:22px}
+  .jmq .jmq-total-amt{font-size:32px}
+  .jmq .jmq-header,.jmq .jmq-body,.jmq .jmq-footer{padding-left:18px;padding-right:18px}
+  .jmq button.jmq-btn{padding:14px 12px}
+}
