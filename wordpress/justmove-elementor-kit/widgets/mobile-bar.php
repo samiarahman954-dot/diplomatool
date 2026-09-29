@@ -31,7 +31,7 @@ class JMK_Widget_Mobile_Bar extends JMK_Widget_Base {
 		$this->add_button_controls( 'btn2', __( 'Right button', 'jmk' ), 'Get my free quote', '/quote/', 'y' );
 		$this->end_controls_section();
 
-		$this->add_brand_style_controls();
+		$this->add_brand_style_controls( false );
 	}
 
 	protected function render() {

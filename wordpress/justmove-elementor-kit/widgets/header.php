@@ -92,7 +92,7 @@ class JMK_Widget_Header extends JMK_Widget_Base {
 		);
 		$this->end_controls_section();
 
-		$this->add_brand_style_controls();
+		$this->add_brand_style_controls( false );
 	}
 
 	/**

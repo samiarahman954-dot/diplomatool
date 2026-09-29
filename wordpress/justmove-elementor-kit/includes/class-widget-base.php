@@ -233,9 +233,10 @@ abstract class JMK_Widget_Base extends Widget_Base {
 
 	/**
 	 * Style tab: brand colours (CSS variables), section spacing, typography.
-	 * Call at the end of register_controls().
+	 * Call at the end of register_controls(). Pass false for widgets without a
+	 * .jmk-sec box (header, mobile bar) so no dead "Section layout" controls show.
 	 */
-	protected function add_brand_style_controls() {
+	protected function add_brand_style_controls( $with_layout = true ) {
 		$this->start_controls_section(
 			'jmk_style_brand',
 			array(
@@ -267,6 +268,45 @@ abstract class JMK_Widget_Base extends Widget_Base {
 
 		$this->end_controls_section();
 
+		if ( $with_layout ) {
+			$this->add_layout_style_controls();
+		}
+
+		$this->start_controls_section(
+			'jmk_style_type',
+			array(
+				'label' => __( 'Typography', 'jmk' ),
+				'tab'   => Controls_Manager::TAB_STYLE,
+			)
+		);
+		$this->add_group_control(
+			Group_Control_Typography::get_type(),
+			array(
+				'name'     => 'jmk_heading_typo',
+				'label'    => __( 'Headings', 'jmk' ),
+				'selector' => '{{WRAPPER}} .jmk h1, {{WRAPPER}} .jmk h2, {{WRAPPER}} .jmk h3',
+			)
+		);
+		$this->add_control(
+			'jmk_heading_color',
+			array(
+				'label'     => __( 'Heading colour', 'jmk' ),
+				'type'      => Controls_Manager::COLOR,
+				'selectors' => array( '{{WRAPPER}} .jmk h1, {{WRAPPER}} .jmk h2, {{WRAPPER}} .jmk h3' => 'color: {{VALUE}};' ),
+			)
+		);
+		$this->add_group_control(
+			Group_Control_Typography::get_type(),
+			array(
+				'name'     => 'jmk_body_typo',
+				'label'    => __( 'Body text', 'jmk' ),
+				'selector' => '{{WRAPPER}} .jmk p, {{WRAPPER}} .jmk li',
+			)
+		);
+		$this->end_controls_section();
+	}
+
+	private function add_layout_style_controls() {
 		$this->start_controls_section(
 			'jmk_style_layout',
 			array(
@@ -301,39 +341,6 @@ abstract class JMK_Widget_Base extends Widget_Base {
 				'label'     => __( 'Section background', 'jmk' ),
 				'type'      => Controls_Manager::COLOR,
 				'selectors' => array( '{{WRAPPER}} .jmk-sec' => 'background: {{VALUE}};' ),
-			)
-		);
-		$this->end_controls_section();
-
-		$this->start_controls_section(
-			'jmk_style_type',
-			array(
-				'label' => __( 'Typography', 'jmk' ),
-				'tab'   => Controls_Manager::TAB_STYLE,
-			)
-		);
-		$this->add_group_control(
-			Group_Control_Typography::get_type(),
-			array(
-				'name'     => 'jmk_heading_typo',
-				'label'    => __( 'Headings', 'jmk' ),
-				'selector' => '{{WRAPPER}} .jmk h1, {{WRAPPER}} .jmk h2, {{WRAPPER}} .jmk h3',
-			)
-		);
-		$this->add_control(
-			'jmk_heading_color',
-			array(
-				'label'     => __( 'Heading colour', 'jmk' ),
-				'type'      => Controls_Manager::COLOR,
-				'selectors' => array( '{{WRAPPER}} .jmk h1, {{WRAPPER}} .jmk h2, {{WRAPPER}} .jmk h3' => 'color: {{VALUE}};' ),
-			)
-		);
-		$this->add_group_control(
-			Group_Control_Typography::get_type(),
-			array(
-				'name'     => 'jmk_body_typo',
-				'label'    => __( 'Body text', 'jmk' ),
-				'selector' => '{{WRAPPER}} .jmk p, {{WRAPPER}} .jmk li',
 			)
 		);
 		$this->end_controls_section();

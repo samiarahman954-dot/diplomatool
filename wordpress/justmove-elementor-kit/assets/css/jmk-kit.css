@@ -38,7 +38,9 @@
 
 /* header */
 .jmk-sticky-host{position:sticky!important;top:var(--wp-admin--admin-bar--height,0px);z-index:50}
-.jmk.jmk-header{background:rgba(11,12,14,.82);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+/* WP admin bar stops being fixed at <=600px, so no offset there */
+@media(max-width:600px){.jmk-sticky-host{top:0}}
+.jmk.jmk-header{--maxw:1240px;background:rgba(11,12,14,.82);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
 .jmk .jmk-nav-in{display:flex;align-items:center;gap:20px;height:66px}
 .jmk .jmk-logo{display:flex;align-items:baseline;gap:2px;white-space:nowrap;flex:none;font-family:'Anton',sans-serif;font-size:22px;letter-spacing:.5px;text-transform:uppercase;line-height:1.2}
 .jmk .jmk-logo img{max-height:44px;width:auto}
@@ -46,12 +48,19 @@
 .jmk .jmk-logo .dfw{background:var(--yellow);color:#111;padding:1px 7px;border-radius:6px;margin-left:6px}
 .jmk .jmk-logo .arw{color:var(--blue);margin-left:2px}
 .jmk .jmk-nav-links{display:flex;gap:22px;margin-left:auto;font-size:14.5px;font-weight:600;color:var(--muted)}
+.jmk .jmk-nav-links a{white-space:nowrap}
+.jmk .jmk-nav-cta .jmk-btn{white-space:nowrap}
 .jmk .jmk-nav-links a:hover{color:var(--text)}
 .jmk .jmk-nav-cta{display:flex;align-items:center;gap:12px;margin-left:auto}
 .jmk .jmk-nav-links + .jmk-nav-cta{margin-left:0}
 .jmk .jmk-nav-phone{font-weight:800;color:var(--text);white-space:nowrap;font-size:14.5px}
 .jmk .jmk-nav-phone span{color:var(--blue)}
-@media(max-width:860px){.jmk .jmk-nav-links{display:none}.jmk .jmk-nav-phone{display:none}.jmk .jmk-nav-cta{margin-left:auto}}
+@media(max-width:1080px){.jmk .jmk-nav-links{display:none}.jmk .jmk-nav-cta{margin-left:auto}}
+/* logo + 6 links + phone + button need ~1160px: drop the phone while the links are shown on narrower screens */
+@media(min-width:1081px) and (max-width:1300px){.jmk .jmk-nav-phone{display:none}}
+@media(max-width:860px){.jmk .jmk-nav-phone{display:none}}
+@media(max-width:420px){.jmk .jmk-nav-in{gap:12px}.jmk .jmk-logo{font-size:18px}.jmk .jmk-nav-cta .jmk-btn{padding:11px 14px;font-size:14px}}
+@media(max-width:360px){.jmk .jmk-nav-in{padding:0 14px}.jmk .jmk-logo{font-size:17px}.jmk .jmk-logo .arw{display:none}}
 
 /* route divider */
 .jmk.jmk-divider{padding:14px 0}
@@ -117,7 +126,9 @@
 .jmk .jmk-prose{max-width:820px}
 .jmk .jmk-prose p{color:var(--muted);font-size:17px;margin-top:16px}
 .jmk .jmk-prose h3{font-size:20px;margin-top:28px;color:var(--text)}
-.jmk .jmk-prose ul{margin:14px 0 0 20px}
+.jmk .jmk-prose ul,.jmk .jmk-prose ol{margin:14px 0 0 20px}
+.jmk .jmk-prose h2{font-size:clamp(22px,3vw,28px);margin-top:28px}
+.jmk .jmk-prose h4{font-size:17px;margin-top:22px;color:var(--text)}
 .jmk .jmk-prose li{color:var(--muted);font-size:16.5px;margin-bottom:8px}
 .jmk .jmk-prose b,.jmk .jmk-prose strong{color:var(--text)}
 .jmk .jmk-prose a{color:var(--blue)}

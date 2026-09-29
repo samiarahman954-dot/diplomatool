@@ -59,15 +59,19 @@
         if (btn) { btn.disabled = true; btn.textContent = t('sending', 'Sending…'); }
 
         fetch(cfg.ajaxUrl, { method: 'POST', body: data, credentials: 'same-origin' })
-          .then(function (r) { return r.json(); })
+          // A non-JSON reply (PHP error page, "0" from admin-ajax) must not leak a parser message.
+          .then(function (r) { return r.json().catch(function () { return null; }); })
           .then(function (res) {
             if (!res || !res.success) {
-              throw new Error((res && res.data && res.data.message) || t('error', 'Something went wrong.'));
+              var fail = new Error((res && res.data && res.data.message) || t('error', 'Something went wrong.'));
+              fail.jmk = true;
+              throw fail;
             }
             if (form.dataset.redirect) { window.location.href = form.dataset.redirect; return; }
             form.classList.add('sent');
           })
-          .catch(function (ex) { showErr(ex.message || t('error', 'Something went wrong.')); })
+          // Only our own messages reach the visitor; network errors get the generic text.
+          .catch(function (ex) { showErr(ex && ex.jmk ? ex.message : t('error', 'Something went wrong.')); })
           .then(function () { if (btn) { btn.disabled = false; btn.innerHTML = label; } });
       });
     });

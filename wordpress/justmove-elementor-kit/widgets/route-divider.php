@@ -45,7 +45,7 @@ class JMK_Widget_Route_Divider extends JMK_Widget_Base {
 	protected function render() {
 		$s = $this->get_settings_for_display();
 		?>
-		<div class="jmk jmk-divider" role="presentation"><div class="jmk-wrap">
+		<div class="jmk jmk-divider jmk-sec" role="presentation"><div class="jmk-wrap">
 			<?php if ( '' !== $s['from'] . $s['to'] ) : ?>
 				<div class="jmk-divider-lbl"><span><?php echo esc_html( $s['from'] ); ?></span><span><?php echo esc_html( $s['to'] ); ?></span></div>
 			<?php endif; ?>

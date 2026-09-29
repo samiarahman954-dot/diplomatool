@@ -119,7 +119,10 @@ final class JMK_Leads {
 	}
 
 	private static function notify( array $lead, $post_id ) {
-		$to = get_option( self::OPT_EMAIL, get_option( 'admin_email' ) );
+		$to = get_option( self::OPT_EMAIL );
+		if ( ! is_email( $to ) ) {
+			$to = get_option( 'admin_email' );
+		}
 		if ( ! is_email( $to ) ) {
 			return;
 		}

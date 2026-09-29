@@ -233,7 +233,12 @@ final class JMK_Admin {
 		check_admin_referer( 'jmk_save_settings' );
 
 		$email = isset( $_POST['lead_email'] ) ? sanitize_email( wp_unslash( $_POST['lead_email'] ) ) : '';
-		update_option( JMK_Leads::OPT_EMAIL, $email );
+		// Empty or invalid → fall back to the site admin email instead of silently dropping alerts.
+		if ( is_email( $email ) ) {
+			update_option( JMK_Leads::OPT_EMAIL, $email );
+		} else {
+			delete_option( JMK_Leads::OPT_EMAIL );
+		}
 		wp_safe_redirect( self::page_url( array( 'jmk' => 'saved' ) ) );
 		exit;
 	}
