@@ -73,6 +73,11 @@ final class JMK_Admin {
 
 		$ready    = JMK_Plugin::elementor_ready();
 		$page_id  = JMK_Demo_Importer::imported_page_id();
+		$tb_ready = $ready && JMK_Demo_Importer::theme_builder_available();
+		$parts    = array(
+			'header' => JMK_Demo_Importer::template_id( JMK_Demo_Importer::OPT_HEADER_ID ),
+			'footer' => JMK_Demo_Importer::template_id( JMK_Demo_Importer::OPT_FOOTER_ID ),
+		);
 		$email    = get_option( JMK_Leads::OPT_EMAIL, get_option( 'admin_email' ) );
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended
 		$status   = isset( $_GET['jmk'] ) ? sanitize_key( $_GET['jmk'] ) : '';
@@ -87,6 +92,12 @@ final class JMK_Admin {
 					<?php esc_html_e( 'Demo imported.', 'jmk' ); ?>
 					<a href="<?php echo esc_url( get_permalink( $page_id ) ); ?>" target="_blank"><?php esc_html_e( 'View page', 'jmk' ); ?></a> ·
 					<a href="<?php echo esc_url( self::edit_url( $page_id ) ); ?>"><?php esc_html_e( 'Edit with Elementor', 'jmk' ); ?></a>
+					<?php if ( $parts['header'] ) : ?>
+						· <a href="<?php echo esc_url( self::edit_url( $parts['header'] ) ); ?>"><?php esc_html_e( 'Edit header', 'jmk' ); ?></a>
+					<?php endif; ?>
+					<?php if ( $parts['footer'] ) : ?>
+						· <a href="<?php echo esc_url( self::edit_url( $parts['footer'] ) ); ?>"><?php esc_html_e( 'Edit footer', 'jmk' ); ?></a>
+					<?php endif; ?>
 				</p></div>
 			<?php elseif ( 'error' === $status ) : ?>
 				<div class="notice notice-error"><p><?php echo esc_html( $message ); ?></p></div>
@@ -108,7 +119,7 @@ final class JMK_Admin {
 
 			<div class="card" style="max-width:760px">
 				<h2><?php esc_html_e( 'One-click demo import', 'jmk' ); ?></h2>
-				<p><?php esc_html_e( 'Creates a new page built entirely from the Just Move DFW widgets (header, hero + quote form, trust strip, services, reviews, FAQ, footer and more), using the blank Elementor Canvas template.', 'jmk' ); ?></p>
+				<p><?php esc_html_e( 'Creates a new page built entirely from the Just Move DFW widgets (hero + quote form, trust strip, services, reviews, FAQ and more).', 'jmk' ); ?></p>
 				<?php if ( $page_id ) : ?>
 					<p><em>
 						<?php esc_html_e( 'Already imported:', 'jmk' ); ?>
@@ -120,6 +131,21 @@ final class JMK_Admin {
 					<input type="hidden" name="action" value="jmk_import_demo">
 					<?php wp_nonce_field( 'jmk_import_demo' ); ?>
 					<p><label><input type="checkbox" name="set_front" value="1" checked> <?php esc_html_e( 'Set as the site front page', 'jmk' ); ?></label></p>
+					<?php if ( $tb_ready ) : ?>
+						<p><label><input type="checkbox" name="theme_parts" value="1" checked>
+							<?php esc_html_e( 'Import header & footer into Elementor Pro Theme Builder (Header / Footer, Entire Site)', 'jmk' ); ?></label><br>
+							<span class="description">
+								<?php
+								if ( $parts['header'] || $parts['footer'] ) {
+									esc_html_e( 'The kit header/footer templates already exist — they are kept (with your edits) and set to Entire Site again.', 'jmk' );
+								} else {
+									esc_html_e( 'The footer template also carries the mobile call bar. The page uses the "Elementor Full Width" template so the theme header/footer show.', 'jmk' );
+								}
+								?>
+							</span></p>
+					<?php else : ?>
+						<p class="description"><?php esc_html_e( 'Elementor Pro (Theme Builder) not detected: header and footer are placed inside the page, which uses the blank Elementor Canvas template. Activate Elementor Pro and import again to get Theme Builder header/footer templates.', 'jmk' ); ?></p>
+					<?php endif; ?>
 					<p><label><input type="checkbox" name="library" value="1" checked> <?php esc_html_e( 'Also save to Elementor → Templates → Saved Templates', 'jmk' ); ?></label></p>
 					<p><button type="submit" class="button button-primary button-hero" <?php disabled( ! $ready ); ?>><?php esc_html_e( 'Import demo now', 'jmk' ); ?></button></p>
 				</form>
@@ -173,8 +199,9 @@ final class JMK_Admin {
 
 		$result = JMK_Demo_Importer::import(
 			array(
-				'set_front' => ! empty( $_POST['set_front'] ),
-				'library'   => ! empty( $_POST['library'] ),
+				'set_front'   => ! empty( $_POST['set_front'] ),
+				'library'     => ! empty( $_POST['library'] ),
+				'theme_parts' => ! empty( $_POST['theme_parts'] ),
 			)
 		);
 

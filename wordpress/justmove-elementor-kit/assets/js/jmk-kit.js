@@ -5,12 +5,14 @@
   var cfg = window.jmkKit || { ajaxUrl: '', action: 'jmk_submit_lead', i18n: {} };
   var t = function (k, d) { return (cfg.i18n && cfg.i18n[k]) || d; };
 
-  // Sticky header: make the Elementor container/section that holds the header sticky,
-  // since the header itself is only as tall as its own wrapper.
+  // Sticky header: make the outermost wrapper that holds the header sticky, since the
+  // header itself is only as tall as its own wrapper. In an Elementor Pro Theme Builder
+  // header that is the location wrapper; on a page it is the top-level container/section.
   function initHeader(root) {
     var headers = root.querySelectorAll('[data-jmk-sticky]');
     Array.prototype.forEach.call(headers, function (h) {
-      var host = h.closest('.elementor-top-section, .elementor > .e-con, .elementor-section-wrap > .e-con') ||
+      var host = h.closest('.elementor-location-header') ||
+                 h.closest('.elementor-top-section, .elementor > .e-con, .elementor-section-wrap > .e-con') ||
                  h.closest('.e-con, .elementor-section');
       if (host) { host.classList.add('jmk-sticky-host'); }
     });
