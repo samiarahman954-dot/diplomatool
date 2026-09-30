@@ -259,6 +259,19 @@ body.woocommerce-checkout #payment {
   border-radius: var(--doja-radius);
   font-family: var(--doja-sans);
 }
+/* Inner spacing for the bordered payment box (the theme sets it to 0).
+   Two ids so it beats the theme's #order_review/#payment rules. */
+body.woocommerce-checkout #order_review #payment {
+  padding: clamp(16px, 2.5vw, 24px);
+}
+body.woocommerce-checkout #order_review #payment ul.payment_methods {
+  padding: 0 0 16px;
+  margin: 0 0 16px;
+}
+body.woocommerce-checkout #order_review #payment div.form-row.place-order {
+  padding: 0;
+  margin-bottom: 0;
+}
 body.woocommerce-checkout #payment ul.payment_methods {
   border-bottom-color: var(--doja-line);
 }
