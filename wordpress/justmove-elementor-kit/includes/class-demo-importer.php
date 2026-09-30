@@ -133,7 +133,8 @@ final class JMK_Demo_Importer {
 	}
 
 	/**
-	 * Run the import.
+	 * Run the import. Once the kit is on the site this never builds a second
+	 * copy: it runs the safe sync instead (see JMK_Sync).
 	 *
 	 * @param array $args { set_front: bool, library: bool, theme_parts: bool, quote_page: bool }
 	 * @return int|WP_Error Page ID.
@@ -145,6 +146,12 @@ final class JMK_Demo_Importer {
 
 		// Kit widgets must be known to Elementor before any document is saved.
 		\Elementor\Plugin::$instance->widgets_manager->get_widget_types();
+
+		$existing = self::imported_page_id();
+		if ( $existing ) {
+			self::sync( ! empty( $args['quote_page'] ) );
+			return $existing;
+		}
 
 		$theme_parts = ! empty( $args['theme_parts'] ) && self::theme_builder_available();
 
@@ -164,19 +171,13 @@ final class JMK_Demo_Importer {
 		$page_types    = $theme_parts ? self::body_widget_types() : JMK_Plugin::demo_widget_types();
 		$page_settings = self::page_settings( $theme_parts );
 
-		$page_id = self::create_page( self::PAGE_TITLE, '', $page_types, $page_settings );
+		$page_id = self::create_page( self::PAGE_TITLE, '', $page_types, $page_settings, $theme_parts ? 'home-body' : 'home-full' );
 		if ( is_wp_error( $page_id ) ) {
 			return $page_id;
 		}
 
-		if ( ! empty( $args['quote_page'] ) && ! self::quote_page_id() && ! get_page_by_path( self::QUOTE_SLUG ) ) {
-			$quote_types = $theme_parts
-				? array( 'jmk-quote-builder' )
-				: array( 'jmk-header', 'jmk-quote-builder', 'jmk-footer', 'jmk-mobile-bar' );
-			$quote_id    = self::create_page( __( 'Get a Quote', 'jmk' ), self::QUOTE_SLUG, $quote_types, $page_settings );
-			if ( ! is_wp_error( $quote_id ) ) {
-				update_option( self::OPT_QUOTE_ID, $quote_id );
-			}
+		if ( ! empty( $args['quote_page'] ) ) {
+			self::maybe_create_quote_page( $theme_parts );
 		}
 
 		if ( ! empty( $args['set_front'] ) ) {
@@ -195,11 +196,71 @@ final class JMK_Demo_Importer {
 	}
 
 	/**
+	 * Safe update after the first import: add kit sections introduced by newer
+	 * plugin versions and kit parts that were never created. Existing content and
+	 * styles are never changed, and deleted sections/pages are not recreated.
+	 *
+	 * @return array JMK_Sync::sync_all() report plus 'created' => string[].
+	 */
+	public static function sync( $quote_page = true ) {
+		\Elementor\Plugin::$instance->widgets_manager->get_widget_types();
+		$created = array();
+
+		$home      = self::imported_page_id();
+		$home_role = $home ? get_post_meta( $home, JMK_Sync::META_ROLE, true ) : '';
+		if ( $home && ! $home_role ) {
+			$home_role = in_array( 'jmk-header', JMK_Sync::collect_types( JMK_Sync::read_elements( $home ) ), true ) ? 'home-full' : 'home-body';
+		}
+		$body_mode = 'home-body' === $home_role;
+
+		// Header/footer templates only belong to a site set up for Theme Builder,
+		// and only if they were never created (a deleted one stays deleted).
+		if ( $body_mode && self::theme_builder_available() ) {
+			$parts = array(
+				'header' => array( self::OPT_HEADER_ID, __( 'Just Move DFW – Header', 'jmk' ), self::HEADER_WIDGETS ),
+				'footer' => array( self::OPT_FOOTER_ID, __( 'Just Move DFW – Footer', 'jmk' ), self::FOOTER_WIDGETS ),
+			);
+			foreach ( $parts as $location => $part ) {
+				if ( false === get_option( $part[0], false ) && ! is_wp_error( self::import_theme_part( $location, $part[0], $part[1], $part[2] ) ) ) {
+					$created[] = $location;
+				}
+			}
+		}
+
+		if ( $quote_page && self::maybe_create_quote_page( $body_mode ) ) {
+			$created[] = 'quote';
+		}
+
+		$report            = JMK_Sync::sync_all();
+		$report['created'] = $created;
+		return $report;
+	}
+
+	/**
+	 * Create the /quote/ page unless it was created before (even if since deleted)
+	 * or the slug is taken.
+	 *
+	 * @return int Page ID or 0.
+	 */
+	private static function maybe_create_quote_page( $body_mode ) {
+		if ( false !== get_option( self::OPT_QUOTE_ID, false ) || get_page_by_path( self::QUOTE_SLUG ) ) {
+			return 0;
+		}
+		$role     = $body_mode ? 'quote-body' : 'quote-full';
+		$quote_id = self::create_page( __( 'Get a Quote', 'jmk' ), self::QUOTE_SLUG, JMK_Sync::role_types( $role ), self::page_settings( $body_mode ), $role );
+		if ( is_wp_error( $quote_id ) ) {
+			return 0;
+		}
+		update_option( self::OPT_QUOTE_ID, $quote_id );
+		return $quote_id;
+	}
+
+	/**
 	 * Publish a page and fill it with kit widgets through Elementor's document API.
 	 *
 	 * @return int|WP_Error
 	 */
-	private static function create_page( $title, $slug, array $types, array $settings ) {
+	private static function create_page( $title, $slug, array $types, array $settings, $role ) {
 		$page_id = wp_insert_post(
 			array(
 				'post_type'   => 'page',
@@ -226,6 +287,7 @@ final class JMK_Demo_Importer {
 				'settings' => $settings,
 			)
 		);
+		JMK_Sync::mark( $page_id, $role, $types );
 		return $page_id;
 	}
 
@@ -273,6 +335,7 @@ final class JMK_Demo_Importer {
 
 		$post_id = $document->get_main_id();
 		self::assign_entire_site( $post_id );
+		JMK_Sync::mark( $post_id, $location, $widget_types );
 		update_option( $option, $post_id );
 
 		return $post_id;

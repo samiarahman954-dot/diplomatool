@@ -2,7 +2,7 @@
 Requires at least: 6.0
 Requires PHP: 7.4
 Requires Plugins: elementor
-Stable tag: 1.1.0
+Stable tag: 1.2.0
 
 The Just Move DFW home page rebuilt as 18 custom Elementor widgets (one per section) with one-click demo import. No default Elementor widgets are used.
 
@@ -19,6 +19,19 @@ The Just Move DFW home page rebuilt as 18 custom Elementor widgets (one per sect
      Find them under Templates → Theme Builder. Re-importing keeps the existing header/footer.
    - Without Elementor Pro: header and footer stay inside the page (Elementor Canvas template).
 4. Edit with Elementor: every section is its own widget in the "Just Move DFW" panel category.
+
+== Updating without losing your edits ==
+
+* Import runs once. Clicking it again never creates a second copy.
+* Plugin updates (design, fixes, new options) apply as soon as the plugin is updated — no
+  re-import. Upload the new zip and choose "Replace current with uploaded".
+* Then, if the update notes mention new sections, click Just Move Kit → "Sync now". Sync never
+  changes existing sections, their text/images/links/colours/style settings, their order, or
+  anything you added; sections or pages you deleted are not brought back. It only adds kit
+  sections the page has never had.
+* "Reset to demo layout" is separate, asks for confirmation, and is always backed up first.
+* Backups (last 5 per page/template) are taken before every sync, reset or restore and can be
+  restored with one click from the Just Move Kit screen.
 
 == Widgets ==
 
@@ -47,7 +60,8 @@ The demo import also creates a "Get a Quote" page at /quote/ (unless one exists)
 * Customers can download a branded PDF estimate (jsPDF is bundled and loads only on click).
 * Photos: up to 10 files (images/PDF), large phone photos are shrunk in the browser before
   upload, stored with random names in uploads/jmk-quotes/, and deleted with the lead.
-* Spam protection: honeypot + max 5 requests per 10 minutes per visitor.
+* Spam protection: honeypot + max 20 requests per 10 minutes per IP; customer copies are
+  capped at 3 per email address per hour.
 * Developers: `jmk_quote_received` ( $record, $post_id ) fires after each request.
 
 == Quote form ==

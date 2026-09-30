@@ -2,6 +2,11 @@
 /**
  * Shared base for every kit widget: category, assets, brand/section style
  * controls and small render helpers (section heading, buttons, icons).
+ *
+ * Keeping site owners' edits across plugin updates depends on one rule:
+ * never rename or remove a control ID (or a widget name). Elementor stores
+ * edited values by control ID, so a renamed control silently drops them.
+ * Add new controls instead; changing a default only affects untouched fields.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
