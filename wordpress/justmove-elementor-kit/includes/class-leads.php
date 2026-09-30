@@ -13,8 +13,11 @@ final class JMK_Leads {
 	const POST_TYPE = 'jmk_lead';
 	const OPT_EMAIL = 'jmk_lead_email';
 
-	/** Max submissions per visitor in RATE_WINDOW seconds. */
-	const RATE_MAX    = 5;
+	/**
+	 * Max submissions per IP in RATE_WINDOW seconds. Generous on purpose: behind a
+	 * CDN/proxy many real visitors can share one IP, and a lost lead costs more than spam.
+	 */
+	const RATE_MAX    = 20;
 	const RATE_WINDOW = 600;
 
 	const FIELDS = array(
@@ -57,7 +60,7 @@ final class JMK_Leads {
 
 	public static function handle() {
 		// Honeypot: bots fill every field.
-		if ( ! empty( $_POST['website'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+		if ( ! empty( $_POST['jmk_hp'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
 			wp_send_json_success();
 		}
 

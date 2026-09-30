@@ -24,7 +24,8 @@ final class JMK_Quote {
 
 	const MAX_FILES     = 10;
 	const MAX_FILE_MB   = 10;
-	const RATE_MAX      = 5;
+	const RATE_MAX      = 20; // per IP; see JMK_Leads::RATE_MAX
+	const MAIL_CAP      = 3;  // customer copies per email address per hour
 	const RATE_WINDOW   = 600;
 	const EST_NO_OFFSET = 4000;
 
@@ -329,7 +330,6 @@ final class JMK_Quote {
 				'ready'     => __( 'Estimate ready', 'jmk' ),
 				'error'     => __( 'We could not send your request. Please try again or call us.', 'jmk' ),
 				'tooBig'    => __( 'Some files were too large and were skipped.', 'jmk' ),
-				'badFile'   => __( 'Some files could not be read as photos and were skipped.', 'jmk' ),
 				'tooMany'   => __( 'You can add up to %d files.', 'jmk' ),
 				'pdf'       => __( 'Preparing PDF…', 'jmk' ),
 				'pdfError'  => __( 'Could not create the PDF. Please try again.', 'jmk' ),
@@ -483,7 +483,7 @@ final class JMK_Quote {
 					<div class="jmq-field"><label for="<?php echo esc_attr( $uid ); ?>-e"><?php esc_html_e( 'Email address', 'jmk' ); ?></label>
 						<input class="jmq-input" id="<?php echo esc_attr( $uid ); ?>-e" name="email" type="email" autocomplete="email" maxlength="120" placeholder="you@email.com"></div>
 					<div class="jmq-hint"><?php esc_html_e( 'Phone or email is required. Add your email to get a copy of the estimate.', 'jmk' ); ?></div>
-					<div class="jmq-hp" aria-hidden="true"><label>Website<input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
+					<div class="jmq-hp" aria-hidden="true"><label>Leave this field empty<input type="text" name="jmk_hp" value="" tabindex="-1" autocomplete="off" data-lpignore="true" data-1p-ignore></label></div>
 					<div class="jmq-error" role="alert"></div>
 				</div>
 
@@ -611,7 +611,7 @@ final class JMK_Quote {
 
 	public static function handle() {
 		// phpcs:disable WordPress.Security.NonceVerification.Missing -- public form, see JMK_Leads::handle().
-		if ( ! empty( $_POST['website'] ) ) {
+		if ( ! empty( $_POST['jmk_hp'] ) ) {
 			wp_send_json_success( array( 'ignored' => true ) );
 		}
 
@@ -909,6 +909,15 @@ final class JMK_Quote {
 	private static function email_customer( array $r ) {
 		$co   = self::company();
 		$q    = $r['quote'];
+
+		// Stop the form from being used to flood someone else's inbox.
+		$cap_key = 'jmk_mailcap_' . md5( strtolower( $q['email'] ) );
+		$sent    = (int) get_transient( $cap_key );
+		if ( $sent >= self::MAIL_CAP ) {
+			return false;
+		}
+		set_transient( $cap_key, $sent + 1, HOUR_IN_SECONDS );
+
 		$body = '<div style="font:15px/1.55 Arial,sans-serif;color:#0b1620;max-width:560px">'
 			. '<p>' . esc_html( sprintf( /* translators: %s: first name */ __( 'Hi %s,', 'jmk' ), strtok( $q['name'], ' ' ) ) ) . '</p>'
 			. '<p>' . esc_html(

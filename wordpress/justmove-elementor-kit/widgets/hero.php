@@ -257,7 +257,7 @@ class JMK_Widget_Hero extends JMK_Widget_Base {
 							}
 							?>
 						</select>
-						<div class="jmk-hp" aria-hidden="true"><label>Website<input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
+						<div class="jmk-hp" aria-hidden="true"><label>Leave this field empty<input type="text" name="jmk_hp" value="" tabindex="-1" autocomplete="off" data-lpignore="true" data-1p-ignore></label></div>
 						<button class="jmk-btn jmk-btn-y" type="submit"><?php echo esc_html( $s['form_btn'] ); ?></button>
 						<p class="err" role="alert"></p>
 						<p class="fine"><?php echo self::inline_kses( $s['form_fine'] ); // phpcs:ignore ?></p>

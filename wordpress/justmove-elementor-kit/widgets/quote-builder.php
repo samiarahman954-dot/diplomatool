@@ -23,6 +23,14 @@ class JMK_Widget_Quote_Builder extends JMK_Widget_Base {
 		return array( 'quote', 'estimate', 'form', 'price', 'just move' );
 	}
 
+	/**
+	 * Never element-cache the builder: it needs its script enqueued on every render
+	 * and a fresh id per instance.
+	 */
+	protected function is_dynamic_content(): bool {
+		return true;
+	}
+
 	public function get_style_depends() {
 		return array( 'jmk-quote-fonts', 'jmk-quote' );
 	}

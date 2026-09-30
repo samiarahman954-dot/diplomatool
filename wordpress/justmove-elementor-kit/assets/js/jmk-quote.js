@@ -38,22 +38,27 @@
 
   /**
    * Shrink big phone photos so 10 of them fit under PHP's upload limits.
-   * Resolves null for a JPEG/PNG/WebP the browser can't decode (not a real image).
+   * Resolves { blob, decoded }. If the browser can't decode it (huge photo, odd
+   * format) the original is kept: the server validates every file anyway.
    */
   function shrinkImage(file) {
-    if (!/^image\/(jpeg|png|webp)$/i.test(file.type) || !window.createImageBitmap) { return Promise.resolve(file); }
-    return createImageBitmap(file).then(function (bmp) {
+    var keep = { blob: file, decoded: false };
+    if (!/^image\/(jpeg|png|webp)$/i.test(file.type) || !window.createImageBitmap) {
+      return Promise.resolve({ blob: file, decoded: /^image\/gif$/i.test(file.type) });
+    }
+    // Apply the phone's EXIF rotation so portrait photos don't arrive sideways.
+    return createImageBitmap(file, { imageOrientation: 'from-image' }).then(function (bmp) {
       var scale = Math.min(1, MAX_IMAGE_EDGE / Math.max(bmp.width, bmp.height));
-      if (scale === 1 && file.size < 900 * 1024) { return file; }
+      if (scale === 1 && file.size < 900 * 1024) { return { blob: file, decoded: true }; }
       var c = document.createElement('canvas');
       c.width = Math.round(bmp.width * scale); c.height = Math.round(bmp.height * scale);
       c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
       return new Promise(function (res) {
         c.toBlob(function (b) {
-          res(b && b.size < file.size ? new File([b], file.name.replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' }) : file);
+          res({ blob: b && b.size < file.size ? new File([b], file.name.replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' }) : file, decoded: true });
         }, 'image/jpeg', 0.82);
       });
-    }, function () { return null; });
+    }, function () { return keep; });
   }
 
   // jsPDF's built-in Helvetica only covers Latin-1.
@@ -166,17 +171,16 @@
         return p.then(function () {
           if (state.files.length >= cfg.maxFiles) { msgs.tooMany = true; return; }
           if (!/^image\//.test(file.type) && file.type !== 'application/pdf') { return; }
-          return shrinkImage(file).then(function (blob) {
-            if (!blob) { msgs.bad = true; return; }
+          return shrinkImage(file).then(function (out) {
+            var blob = out.blob;
             if (blob.size > maxFile || (cfg.maxTotal && totalBytes() + blob.size > cfg.maxTotal)) { msgs.tooBig = true; return; }
-            var canPreview = /^image\/(jpeg|png|gif|webp)$/i.test(blob.type);
+            var canPreview = out.decoded;
             state.files.push({ blob: blob, name: file.name, preview: canPreview ? URL.createObjectURL(blob) : null });
           });
         });
       }, Promise.resolve()).then(function () {
         renderThumbs();
         var out = [];
-        if (msgs.bad) { out.push(i18n.badFile); }
         if (msgs.tooBig) { out.push(i18n.tooBig); }
         if (msgs.tooMany) { out.push(fmt(i18n.tooMany, cfg.maxFiles)); }
         fileMsg.textContent = out.join(' ');
@@ -237,8 +241,9 @@
     function go(n) {
       step = n;
       show(step);
+      // Keep the card's top in view, clear of a sticky site header.
       var top = root.getBoundingClientRect().top;
-      if (top < 0) { root.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+      if (top < 0) { window.scrollTo({ top: window.pageYOffset + top - 90, behavior: 'smooth' }); }
     }
 
     function advance() {
@@ -265,7 +270,7 @@
       fd.append('action', cfg.action);
       fd.append('move_type', state.moveType);
       fd.append('size', state.size);
-      ['from_addr', 'from_access', 'to_addr', 'to_access', 'move_date', 'name', 'phone', 'email', 'website'].forEach(function (n) {
+      ['from_addr', 'from_access', 'to_addr', 'to_access', 'move_date', 'name', 'phone', 'email', 'jmk_hp'].forEach(function (n) {
         fd.append(n, field(n).value.trim());
       });
       fd.append('flex', state.flex);
@@ -356,7 +361,13 @@
       }
       pts.push([0 - px, 0 - py]);
       doc.setFillColor.apply(doc, navy); doc.lines(pts, 0, 0, [1, 1], 'F', true);
-      if (logo) { try { doc.addImage(logo.url, logo.fmt, 42, 70, 92, 92); } catch (e) { /* logo is optional */ } }
+      if (logo) {
+        try {
+          // Fit inside a 120x92 box without stretching the logo.
+          var ip = doc.getImageProperties(logo.url), k = Math.min(120 / ip.width, 92 / ip.height);
+          doc.addImage(logo.url, logo.fmt, 42, 70, ip.width * k, ip.height * k);
+        } catch (e) { /* logo is optional */ }
+      }
 
       doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor.apply(doc, gray);
       var ry = 80;
@@ -389,10 +400,11 @@
         T('Line item', 48, y); T('Details', 250, y); T('Estimate', W - 48, y, { align: 'right' });
         y += 26; doc.setFont('helvetica', 'normal');
         r.view.rows.forEach(function (row) {
+          var det = doc.splitTextToSize(pdfText(row[1]), 200), extra = (det.length - 1) * 12;
           doc.setTextColor.apply(doc, ink); T(row[0], 48, y);
-          doc.setTextColor.apply(doc, gray); T(row[1], 250, y);
+          doc.setTextColor.apply(doc, gray); doc.text(det, 250, y);
           doc.setTextColor.apply(doc, ink); T(row[2], W - 48, y, { align: 'right' });
-          doc.setDrawColor(238, 243, 247); doc.setLineWidth(0.6); doc.line(42, y + 9, W - 42, y + 9); y += 24;
+          doc.setDrawColor(238, 243, 247); doc.setLineWidth(0.6); doc.line(42, y + 9 + extra, W - 42, y + 9 + extra); y += 24 + extra;
         });
         y += 10; doc.setDrawColor.apply(doc, blue); doc.setLineWidth(1.6); doc.line(320, y - 6, W - 42, y - 6);
         doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.setTextColor.apply(doc, navy); T('Estimated total', 330, y + 14);
