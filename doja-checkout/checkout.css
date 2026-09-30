@@ -196,9 +196,9 @@ body.woocommerce-checkout .select2-container--default .select2-results__option--
 
 /* ---------- Order review ---------- */
 body.woocommerce-checkout #order_review table.shop_table {
-  border: 1px solid var(--doja-line);
-  border-radius: var(--doja-radius);
-  background: var(--doja-card);
+  border: none;
+  border-radius: 0;
+  background: transparent;
   font-family: var(--doja-sans);
   color: var(--doja-text);
 }
@@ -250,15 +250,16 @@ body.woocommerce-checkout #payment ul.payment_methods li label {
 body.woocommerce-checkout #payment ul.payment_methods li input.input-radio {
   accent-color: var(--doja-gold);
 }
+/* !important: the theme colours this box with a stronger selector */
 body.woocommerce-checkout #payment div.payment_box {
-  background: rgba(255, 255, 255, 0.6);
+  background: #faf6f2 !important;
   border: 1px solid var(--doja-line);
   border-radius: var(--doja-radius);
   color: var(--doja-muted);
 }
-/* The little arrow above the payment box */
+/* The little arrow above the payment box — same colour as the box */
 body.woocommerce-checkout #payment div.payment_box::before {
-  border-bottom-color: rgba(255, 255, 255, 0.6);
+  border-bottom-color: #faf6f2 !important;
 }
 
 /* ---------- Privacy text ---------- */
