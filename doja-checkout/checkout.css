@@ -13,6 +13,17 @@
 /* Must stay the first line of the stylesheet, otherwise browsers ignore it. */
 @import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Jost:wght@400;500;600&display=swap");
 
+:root {
+  /* Parchment texture — defined site-wide so any page/section can use it */
+  --doja-paper-color: #eadcdb;
+  /* Drawn with SVG noise — no image file needed.
+     Layers: fine paper grain, light mottling, soft darker clouds. */
+  --doja-paper:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='g' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.7' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .4 0 0 0 0 .3 0 0 0 0 .29 0 0 0 .3 -.06'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='m' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.06' numOctaves='4' seed='5' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 .98 0 0 0 0 .97 1.3 0 0 0 -.5'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23m)'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600'%3E%3Cfilter id='c' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.018' numOctaves='3' seed='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .6 0 0 0 0 .5 0 0 0 0 .49 .7 0 0 0 -.3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23c)'/%3E%3C/svg%3E");
+}
+
 body.woocommerce-checkout {
   --doja-ink: #2b201b;
   --doja-text: #4a3d36;
@@ -26,19 +37,17 @@ body.woocommerce-checkout {
   --doja-radius: 4px;
   --doja-serif: "Cormorant Garamond", "Playfair Display", Georgia, serif;
   --doja-sans: "Jost", "Montserrat", "Helvetica Neue", Arial, sans-serif;
-  --doja-paper-color: #eadcdb;
-  /* Parchment texture drawn with SVG noise — no image file needed.
-     Layers: fine paper grain, light mottling, soft darker clouds. */
-  --doja-paper:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='g' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.7' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .4 0 0 0 0 .3 0 0 0 0 .29 0 0 0 .3 -.06'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E"),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='m' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.06' numOctaves='4' seed='5' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 .98 0 0 0 0 .97 1.3 0 0 0 -.5'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23m)'/%3E%3C/svg%3E"),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600'%3E%3Cfilter id='c' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.018' numOctaves='3' seed='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .6 0 0 0 0 .5 0 0 0 0 .49 .7 0 0 0 -.3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23c)'/%3E%3C/svg%3E");
 }
 
 /* ---------- Parchment background ----------
-   body = whole page (shows wherever header/footer are transparent);
-   6b6c7e4a = the Elementor checkout section (its own Elementor background
-   setting is stronger, hence !important). */
+   Reusable anywhere on the site: add the CSS class  doja-paper  to any
+   Elementor section/container/column/widget (Advanced → CSS Classes).
+   !important so it wins over the element's own Elementor background setting.
+
+   On the checkout page it's applied to the body (whole page) and to the
+   checkout section 6b6c7e4a automatically. */
+.doja-paper,
+.elementor .elementor-element.doja-paper,
 body.woocommerce-checkout,
 body.woocommerce-checkout .elementor-element.elementor-element-6b6c7e4a {
   background-color: var(--doja-paper-color) !important;
