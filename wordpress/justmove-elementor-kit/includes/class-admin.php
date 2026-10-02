@@ -20,6 +20,7 @@ final class JMK_Admin {
 		add_action( 'admin_post_jmk_sync', array( __CLASS__, 'handle_sync' ) );
 		add_action( 'admin_post_jmk_reset', array( __CLASS__, 'handle_reset' ) );
 		add_action( 'admin_post_jmk_restore', array( __CLASS__, 'handle_restore' ) );
+		add_action( 'admin_post_jmk_global_styles', array( __CLASS__, 'handle_global_styles' ) );
 		add_action( 'admin_post_jmk_export_template', array( __CLASS__, 'handle_export' ) );
 		add_action( 'admin_post_jmk_save_settings', array( __CLASS__, 'handle_settings' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( JMK_FILE ), array( __CLASS__, 'action_links' ) );
@@ -108,6 +109,8 @@ final class JMK_Admin {
 				</p></div>
 			<?php elseif ( 'synced' === $status ) : ?>
 				<div class="notice notice-success"><p><?php echo esc_html( self::sync_summary() ); ?></p></div>
+			<?php elseif ( 'globals' === $status ) : ?>
+				<div class="notice notice-success"><p><?php echo esc_html( self::globals_summary() ); ?></p></div>
 			<?php elseif ( 'reset' === $status ) : ?>
 				<div class="notice notice-success"><p><?php esc_html_e( 'Reset to the demo layout. Your previous version was backed up — see Backups below to restore it.', 'jmk' ); ?></p></div>
 			<?php elseif ( 'restored' === $status ) : ?>
@@ -167,6 +170,7 @@ final class JMK_Admin {
 					<?php else : ?>
 						<p class="description"><?php esc_html_e( 'A /quote/ page already exists, so no quote page will be created. Add the "JM Quote Builder" widget or the [jmk_quote_builder] shortcode to it.', 'jmk' ); ?></p>
 					<?php endif; ?>
+					<?php self::render_global_checkboxes(); ?>
 					<p><label><input type="checkbox" name="library" value="1" checked> <?php esc_html_e( 'Also save to Elementor → Templates → Saved Templates', 'jmk' ); ?></label></p>
 					<p><button type="submit" class="button button-primary button-hero" <?php disabled( ! $ready ); ?>><?php esc_html_e( 'Import demo now', 'jmk' ); ?></button></p>
 				</form>
@@ -231,7 +235,9 @@ final class JMK_Admin {
 				'set_front'   => ! empty( $_POST['set_front'] ),
 				'library'     => ! empty( $_POST['library'] ),
 				'theme_parts' => ! empty( $_POST['theme_parts'] ),
-				'quote_page'  => ! empty( $_POST['quote_page'] ),
+				'quote_page'    => ! empty( $_POST['quote_page'] ),
+				'global_styles' => ! empty( $_POST['global_styles'] ),
+				'global_system' => ! empty( $_POST['global_system'] ),
 			)
 		);
 
@@ -275,6 +281,26 @@ final class JMK_Admin {
 			</form>
 		</div>
 
+		<div class="card" style="max-width:760px">
+			<h2><?php esc_html_e( 'Elementor Global styles', 'jmk' ); ?></h2>
+			<p><?php esc_html_e( 'Adds the kit\'s colours (JM Yellow, JM Blue, JM Navy…) and fonts (Anton, Inter, Archivo, Hanken Grotesk) to Elementor → Site Settings → Global Colors / Global Fonts. The kit then follows them: change "JM Yellow" there and every kit section updates. You can also pick them in any other Elementor widget.', 'jmk' ); ?></p>
+			<p><em>
+				<?php
+				echo esc_html(
+					JMK_Global_Styles::applied()
+						? __( 'Already added. Running it again only adds what is missing — colours and fonts you edited are kept.', 'jmk' )
+						: __( 'Not added yet.', 'jmk' )
+				);
+				?>
+			</em></p>
+			<form method="post" action="<?php echo $post; // phpcs:ignore ?>">
+				<input type="hidden" name="action" value="jmk_global_styles">
+				<?php wp_nonce_field( 'jmk_global_styles' ); ?>
+				<?php self::render_global_checkboxes( false ); ?>
+				<p><button type="submit" class="button button-primary" <?php disabled( ! $ready ); ?>><?php esc_html_e( 'Add to Elementor Global styles', 'jmk' ); ?></button></p>
+			</form>
+		</div>
+
 		<div class="card" style="max-width:760px;border-left:4px solid #d63638">
 			<h2><?php esc_html_e( 'Reset to demo layout', 'jmk' ); ?></h2>
 			<p><?php esc_html_e( 'Replaces the selected page/template with the original demo layout. This removes your edits on it — a backup is taken first so you can restore it below. The page keeps its address and front-page setting.', 'jmk' ); ?></p>
@@ -296,7 +322,7 @@ final class JMK_Admin {
 			<p><?php esc_html_e( 'Taken automatically before every sync, reset or restore (last 5 per item). Your own edits in Elementor are also kept in Elementor\'s Revisions panel.', 'jmk' ); ?></p>
 			<?php
 			$any = false;
-			foreach ( $targets as $key => $t ) :
+			foreach ( JMK_Sync::backup_targets() as $key => $t ) :
 				$backups = JMK_Sync::backups( $t[1] );
 				if ( ! $backups ) {
 					continue;
@@ -334,6 +360,7 @@ final class JMK_Admin {
 			'sync'           => __( 'Before sync', 'jmk' ),
 			'reset'          => __( 'Before reset to demo', 'jmk' ),
 			'before-restore' => __( 'Before restoring a backup', 'jmk' ),
+			'global-styles'  => __( 'Before adding global styles', 'jmk' ),
 		);
 		return isset( $labels[ $reason ] ) ? $labels[ $reason ] : $reason;
 	}
@@ -406,9 +433,57 @@ final class JMK_Admin {
 		check_admin_referer( 'jmk_restore' );
 		$key     = isset( $_POST['target'] ) ? sanitize_key( wp_unslash( $_POST['target'] ) ) : '';
 		$index   = isset( $_POST['index'] ) ? (int) $_POST['index'] : -1;
-		$targets = JMK_Sync::targets();
+		$targets = JMK_Sync::backup_targets();
 		$ok      = isset( $targets[ $key ] ) && JMK_Sync::restore( $targets[ $key ][1], $index );
 		wp_safe_redirect( self::page_url( $ok ? array( 'jmk' => 'restored' ) : array( 'jmk' => 'error', 'jmk_msg' => rawurlencode( __( 'That backup could not be restored.', 'jmk' ) ) ) ) );
+		exit;
+	}
+
+	/**
+	 * Global-styles checkboxes, shared by the import form and the card.
+	 *
+	 * @param bool $with_main Include the main "add globals" checkbox (import form only).
+	 */
+	private static function render_global_checkboxes( $with_main = true ) {
+		if ( $with_main ) :
+			?>
+			<p><label><input type="checkbox" name="global_styles" value="1" checked> <?php esc_html_e( 'Add the kit\'s colours & fonts to Elementor Global styles (Site Settings)', 'jmk' ); ?></label></p>
+		<?php else : ?>
+			<input type="hidden" name="global_styles" value="1">
+		<?php endif; ?>
+		<p style="margin-left:<?php echo $with_main ? '24px' : '0'; ?>"><label><input type="checkbox" name="global_system" value="1">
+			<?php esc_html_e( 'Also set Elementor\'s default Primary / Secondary / Text / Accent colours and fonts', 'jmk' ); ?></label><br>
+			<span class="description"><?php esc_html_e( 'Off by default: these defaults are used by every Elementor widget on the site that is left on "Default", so other pages may change too. A backup is taken first.', 'jmk' ); ?></span></p>
+		<?php
+	}
+
+	private static function globals_summary() {
+		$r = get_transient( 'jmk_globals_report_' . get_current_user_id() );
+		if ( ! is_array( $r ) ) {
+			return __( 'Global styles updated.', 'jmk' );
+		}
+		/* translators: 1: number added, 2: number kept */
+		$msg = sprintf( __( 'Elementor Global styles: %1$d added, %2$d already there (kept as they are).', 'jmk' ), $r['added'], $r['kept'] );
+		if ( $r['system'] ) {
+			$msg .= ' ' . __( 'Default Primary/Secondary/Text/Accent colours and fonts were set; a backup was taken.', 'jmk' );
+		}
+		return $msg;
+	}
+
+	public static function handle_global_styles() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Not allowed.', 'jmk' ), 403 );
+		}
+		check_admin_referer( 'jmk_global_styles' );
+		$result = JMK_Plugin::elementor_ready()
+			? JMK_Global_Styles::apply( ! empty( $_POST['global_system'] ) )
+			: new WP_Error( 'jmk', __( 'Elementor must be active.', 'jmk' ) );
+		if ( is_wp_error( $result ) ) {
+			wp_safe_redirect( self::page_url( array( 'jmk' => 'error', 'jmk_msg' => rawurlencode( $result->get_error_message() ) ) ) );
+			exit;
+		}
+		set_transient( 'jmk_globals_report_' . get_current_user_id(), $result, 120 );
+		wp_safe_redirect( self::page_url( array( 'jmk' => 'globals' ) ) );
 		exit;
 	}
 

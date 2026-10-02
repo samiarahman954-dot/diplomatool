@@ -2,7 +2,7 @@
 Requires at least: 6.0
 Requires PHP: 7.4
 Requires Plugins: elementor
-Stable tag: 1.2.0
+Stable tag: 1.3.0
 
 The Just Move DFW home page rebuilt as 18 custom Elementor widgets (one per section) with one-click demo import. No default Elementor widgets are used.
 
@@ -19,6 +19,21 @@ The Just Move DFW home page rebuilt as 18 custom Elementor widgets (one per sect
      Find them under Templates → Theme Builder. Re-importing keeps the existing header/footer.
    - Without Elementor Pro: header and footer stay inside the page (Elementor Canvas template).
 4. Edit with Elementor: every section is its own widget in the "Just Move DFW" panel category.
+
+== Elementor Global styles ==
+
+Tick "Add the kit's colours & fonts to Elementor Global styles" on import, or use the
+"Elementor Global styles" card on the Just Move Kit screen later.
+
+* Adds 12 colours (JM Yellow, JM Blue, JM Background, JM Quote Navy, …) and 4 fonts (JM Display =
+  Anton, JM Body = Inter, JM Quote Heading = Archivo, JM Quote Body = Hanken Grotesk) to
+  Elementor → Site Settings → Global Colors / Global Fonts.
+* The kit follows them: change "JM Yellow" in Site Settings and every kit section updates. They can
+  also be picked in any other Elementor widget. Without them the kit uses its built-in values.
+* Running it again never duplicates; colours/fonts you already edited are kept.
+* Optional (off by default): also set Elementor's default Primary/Secondary/Text/Accent colours and
+  fonts. These affect every Elementor widget left on "Default", so other pages may change too.
+* A backup of Site Settings is taken first and can be restored from the Backups card.
 
 == Updating without losing your edits ==
 

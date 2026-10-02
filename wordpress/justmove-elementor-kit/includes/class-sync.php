@@ -73,6 +73,19 @@ final class JMK_Sync {
 		return $out;
 	}
 
+	/**
+	 * Everything that can have backups: kit documents plus Elementor's Site Settings
+	 * once the kit's global styles were added.
+	 */
+	public static function backup_targets() {
+		$out = self::targets();
+		$kit = JMK_Global_Styles::kit_id();
+		if ( $kit && self::backups( $kit ) ) {
+			$out['kit'] = array( __( 'Elementor Site Settings (global styles)', 'jmk' ), $kit );
+		}
+		return $out;
+	}
+
 	/* ------------------------------------------------------------------
 	 * Element data (read/write verbatim)
 	 * ------------------------------------------------------------------ */

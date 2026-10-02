@@ -136,7 +136,8 @@ final class JMK_Demo_Importer {
 	 * Run the import. Once the kit is on the site this never builds a second
 	 * copy: it runs the safe sync instead (see JMK_Sync).
 	 *
-	 * @param array $args { set_front: bool, library: bool, theme_parts: bool, quote_page: bool }
+	 * @param array $args { set_front: bool, library: bool, theme_parts: bool, quote_page: bool,
+	 *                      global_styles: bool, global_system: bool }
 	 * @return int|WP_Error Page ID.
 	 */
 	public static function import( array $args ) {
@@ -178,6 +179,11 @@ final class JMK_Demo_Importer {
 
 		if ( ! empty( $args['quote_page'] ) ) {
 			self::maybe_create_quote_page( $theme_parts );
+		}
+
+		if ( ! empty( $args['global_styles'] ) ) {
+			// A missing Kit must not fail the whole import; the card on the kit screen can retry.
+			JMK_Global_Styles::apply( ! empty( $args['global_system'] ) );
 		}
 
 		if ( ! empty( $args['set_front'] ) ) {

@@ -2,12 +2,15 @@
  * Just Move DFW – Quote Builder. Everything is scoped under .jmq and every
  * class is prefixed so theme styles for .card/.header/.btn can't leak in.
  */
+/* Follows Elementor's Global styles once imported; fallbacks after the comma. */
 .jmq{
-  --blue:#27a7e0;--blue-deep:#1488c4;--navy:#0c3a52;--navy2:#0a3247;
-  --yellow:#f6de2d;--yellow-deep:#f0c600;--ink:#0b1620;--muted:#6b7c88;
+  --blue:var(--e-global-color-jmkqblue,#27a7e0);--blue-deep:#1488c4;--navy:var(--e-global-color-jmkqnavy,#0c3a52);--navy2:#0a3247;
+  --yellow:var(--e-global-color-jmkqyellow,#f6de2d);--yellow-deep:#f0c600;--ink:var(--e-global-color-jmkqink,#0b1620);--muted:#6b7c88;
+  --font-head:var(--e-global-typography-jmkqhead-font-family,'Archivo');
+  --font-body:var(--e-global-typography-jmkqbody-font-family,'Hanken Grotesk');
   --line:#e2e9ef;--soft:#e9f6fd;--white:#fff;--ok:#15a05f;--err:#d23f3f;
   --shadow:0 24px 60px -18px rgba(12,58,82,.30);
-  font-family:'Hanken Grotesk',system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;
+  font-family:var(--font-body),system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;
   display:flex;align-items:center;justify-content:center;padding:28px 16px;line-height:1.4;font-size:16px;text-align:left;color-scheme:light;
 }
 .jmq.jmq-bg{background:radial-gradient(1200px 600px at 110% -10%,rgba(39,167,224,.14),transparent 60%),radial-gradient(900px 500px at -10% 110%,rgba(246,222,45,.16),transparent 55%),#f3f9fc}
@@ -26,7 +29,7 @@
 .jmq .jmq-brand{display:flex;align-items:center;gap:14px;position:relative;z-index:2}
 .jmq .jmq-logo{width:78px;height:72px;border-radius:13px;flex:none;background:#fff;display:grid;place-items:center;padding:5px;box-shadow:0 6px 16px rgba(0,0,0,.22);overflow:hidden}
 .jmq .jmq-logo img{width:100%;height:100%;object-fit:contain;display:block}
-.jmq .jmq-brand-name{font-family:'Archivo',system-ui,sans-serif;font-weight:900;font-size:18px;letter-spacing:.3px;line-height:1.05;color:#fff}
+.jmq .jmq-brand-name{font-family:var(--font-head),system-ui,sans-serif;font-weight:900;font-size:18px;letter-spacing:.3px;line-height:1.05;color:#fff}
 .jmq .jmq-brand-sub{font-size:11.5px;letter-spacing:.13em;text-transform:uppercase;color:#bfe8fa;font-weight:700;margin-top:4px}
 
 .jmq .jmq-progress-wrap{position:relative;z-index:2;margin-top:18px;display:flex;align-items:center;gap:12px}
@@ -40,7 +43,7 @@
 @keyframes jmq-fade{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){.jmq .jmq-step{animation:none}}
 
-.jmq .jmq-q{font-family:'Archivo',system-ui,sans-serif;font-weight:800;font-size:25px;line-height:1.18;letter-spacing:-.01em;color:var(--navy)}
+.jmq .jmq-q{font-family:var(--font-head),system-ui,sans-serif;font-weight:800;font-size:25px;line-height:1.18;letter-spacing:-.01em;color:var(--navy)}
 .jmq .jmq-accent{color:var(--blue)}
 .jmq .jmq-sub{color:var(--muted);font-size:14.5px;margin-top:8px;line-height:1.5}
 
@@ -62,7 +65,7 @@
 .jmq select.jmq-input{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' stroke='%236b7c88' stroke-width='2' fill='none' stroke-linecap='round'/></svg>");background-repeat:no-repeat;background-position:right 16px center;padding-right:40px}
 .jmq .jmq-hint{font-size:12.5px;color:var(--muted);margin-top:7px;line-height:1.45}
 .jmq .jmq-ab{border:1.5px solid var(--line);border-radius:15px;padding:14px 16px;margin-top:14px;background:#fbfdfe}
-.jmq .jmq-tag{font-family:'Archivo',system-ui,sans-serif;font-weight:800;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--blue);margin-bottom:4px}
+.jmq .jmq-tag{font-family:var(--font-head),system-ui,sans-serif;font-weight:800;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--blue);margin-bottom:4px}
 
 .jmq .jmq-chips{display:flex;flex-wrap:wrap;gap:9px;margin-top:10px}
 .jmq button.jmq-chip{display:inline-block;padding:10px 15px;border:1.5px solid var(--line);border-radius:99px;font-size:13.5px;font-weight:700;line-height:1.3;background:#fff;color:var(--muted);transition:all .15s;white-space:normal;text-align:center}
@@ -94,7 +97,7 @@
 .jmq .jmq-total-box{margin-top:14px;text-align:center;padding:26px 18px;border-radius:18px;background:linear-gradient(135deg,var(--navy),var(--blue-deep));color:#fff;position:relative;overflow:hidden}
 .jmq .jmq-total-box::after{content:"";position:absolute;inset:0;background:radial-gradient(420px 170px at 100% 0,rgba(39,167,224,.5),transparent 60%);pointer-events:none}
 .jmq .jmq-total-label{font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;color:#bfe8fa;font-weight:700;position:relative;z-index:2}
-.jmq .jmq-total-amt{font-family:'Archivo',system-ui,sans-serif;font-weight:900;font-size:40px;line-height:1.15;letter-spacing:-.02em;margin-top:6px;position:relative;z-index:2;color:#fff}
+.jmq .jmq-total-amt{font-family:var(--font-head),system-ui,sans-serif;font-weight:900;font-size:40px;line-height:1.15;letter-spacing:-.02em;margin-top:6px;position:relative;z-index:2;color:#fff}
 .jmq .jmq-total-sub{font-size:13px;color:#cdeefb;margin-top:6px;position:relative;z-index:2}
 
 .jmq .jmq-lines{margin-top:18px;border:1px solid var(--line);border-radius:16px;overflow:hidden}
@@ -102,23 +105,23 @@
 .jmq .jmq-line:last-child{border-bottom:none}
 .jmq .jmq-desc{color:var(--ink);font-weight:600}
 .jmq .jmq-meta{color:var(--muted);font-size:12px;font-weight:500;margin-top:2px}
-.jmq .jmq-amt{font-weight:700;font-family:'Archivo',system-ui,sans-serif;color:var(--navy);white-space:nowrap}
+.jmq .jmq-amt{font-weight:700;font-family:var(--font-head),system-ui,sans-serif;color:var(--navy);white-space:nowrap}
 .jmq .jmq-line.is-sub{background:#f4f9fc}
 
-.jmq button.jmq-dlbtn{margin-top:16px;width:100%;display:flex;align-items:center;justify-content:center;gap:9px;padding:15px;border-radius:14px;font-family:'Hanken Grotesk',system-ui,sans-serif;font-weight:800;font-size:15px;background:linear-gradient(135deg,var(--yellow),var(--yellow-deep));color:#4a3d00;box-shadow:0 10px 22px -10px rgba(240,198,0,.8);transition:all .18s;text-align:center}
+.jmq button.jmq-dlbtn{margin-top:16px;width:100%;display:flex;align-items:center;justify-content:center;gap:9px;padding:15px;border-radius:14px;font-family:var(--font-body),system-ui,sans-serif;font-weight:800;font-size:15px;background:linear-gradient(135deg,var(--yellow),var(--yellow-deep));color:#4a3d00;box-shadow:0 10px 22px -10px rgba(240,198,0,.8);transition:all .18s;text-align:center}
 .jmq button.jmq-dlbtn:hover{transform:translateY(-1px);color:#4a3d00}
 .jmq button.jmq-dlbtn[disabled]{opacity:.7;cursor:wait}
 
 .jmq .jmq-note-card{margin-top:16px;padding:14px 16px;background:#fffdf2;border:1px solid #f3e6a8;border-radius:13px;font-size:13px;color:#6a5a14;line-height:1.55}
 .jmq .jmq-note-card b{color:#4d4000}
 .jmq .jmq-callout{margin-top:14px;padding:18px;border-radius:16px;background:var(--soft);border:1px solid #cdeafa;text-align:center}
-.jmq .jmq-callout-t{font-family:'Archivo',system-ui,sans-serif;font-weight:800;color:var(--navy);font-size:17px}
+.jmq .jmq-callout-t{font-family:var(--font-head),system-ui,sans-serif;font-weight:800;color:var(--navy);font-size:17px}
 .jmq .jmq-callout-d{color:var(--muted);font-size:13.5px;margin-top:6px;line-height:1.5}
 
 .jmq .jmq-status{margin-top:14px;display:flex;align-items:center;gap:11px;padding:13px 16px;border-radius:13px;font-size:13.5px;font-weight:700;line-height:1.4;background:#e8f7ef;color:#0f7a45}
 
 .jmq .jmq-footer{display:flex;gap:12px;padding:18px 26px 26px;border-top:1px solid var(--line);background:#fff}
-.jmq button.jmq-btn{flex:1;padding:15px 20px;border-radius:99px;font-family:'Hanken Grotesk',system-ui,sans-serif;font-weight:800;font-size:15.5px;line-height:1.2;transition:all .18s;text-align:center;white-space:nowrap}
+.jmq button.jmq-btn{flex:1;padding:15px 20px;border-radius:99px;font-family:var(--font-body),system-ui,sans-serif;font-weight:800;font-size:15.5px;line-height:1.2;transition:all .18s;text-align:center;white-space:nowrap}
 .jmq button.jmq-btn-back{background:#fff;color:var(--blue-deep);border:1.6px solid #c7e4f4}
 .jmq button.jmq-btn-back:hover{background:var(--soft);color:var(--blue-deep)}
 .jmq button.jmq-btn-next{background:var(--blue);color:#fff;flex:1.6;box-shadow:0 10px 22px -8px rgba(39,167,224,.6)}

@@ -3,24 +3,29 @@
  * Every rule is scoped under .jmk so the kit never leaks into the theme.
  */
 
+/* Colours and fonts follow Elementor's Global styles (Site Settings) once the kit's
+   globals are imported; the values after the comma are the built-in fallbacks. */
 .jmk{
-  --bg:#0B0C0E;--panel:#14161B;--panel2:#1B1E25;--line:rgba(255,255,255,.09);
-  --text:#ECEEF1;--muted:#9AA2AD;--yellow:#FFD21E;--yellow-deep:#F4C100;
-  --blue:#36ABE6;--blue-deep:#1B8AC9;--maxw:1120px;
-  font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);
+  --bg:var(--e-global-color-jmkbg,#0B0C0E);--panel:var(--e-global-color-jmkpanel,#14161B);--panel2:#1B1E25;--line:rgba(255,255,255,.09);
+  --text:var(--e-global-color-jmktext,#ECEEF1);--muted:var(--e-global-color-jmkmuted,#9AA2AD);
+  --yellow:var(--e-global-color-jmkyellow,#FFD21E);--yellow-deep:var(--e-global-color-jmkyellowdeep,#F4C100);
+  --blue:var(--e-global-color-jmkblue,#36ABE6);--blue-deep:var(--e-global-color-jmkbluedeep,#1B8AC9);--maxw:1120px;
+  --font-display:var(--e-global-typography-jmkdisplay-font-family,'Anton');
+  --font-body:var(--e-global-typography-jmkbody-font-family,'Inter');
+  font-family:var(--font-body),system-ui,sans-serif;background:var(--bg);color:var(--text);
   -webkit-font-smoothing:antialiased;font-size:17px;line-height:1.6;color-scheme:dark;
 }
 .jmk *,.jmk *::before,.jmk *::after{box-sizing:border-box;margin:0;padding:0}
 .jmk a{color:inherit;text-decoration:none;box-shadow:none}
 .jmk img{max-width:100%;display:block}
 .jmk .jmk-wrap{max-width:var(--maxw);margin:0 auto;padding:0 22px}
-.jmk h1,.jmk h2,.jmk h3,.jmk .jmk-disp{font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;letter-spacing:.5px;line-height:1.02;color:var(--text)}
+.jmk h1,.jmk h2,.jmk h3,.jmk .jmk-disp{font-family:var(--font-display),sans-serif;font-weight:400;text-transform:uppercase;letter-spacing:.5px;line-height:1.02;color:var(--text)}
 .jmk .jmk-eyebrow{display:inline-block;font-size:12.5px;letter-spacing:.16em;text-transform:uppercase;font-weight:800;color:var(--blue)}
 .jmk :focus-visible{outline:3px solid var(--blue);outline-offset:2px;border-radius:6px}
 
 /* buttons */
 .jmk .jmk-btn{display:inline-flex;align-items:center;gap:9px;font-weight:800;font-size:15px;line-height:1.3;border-radius:12px;
-  padding:14px 22px;cursor:pointer;border:none;transition:transform .15s,background .15s,box-shadow .15s,border-color .15s,color .15s;font-family:'Inter',system-ui,sans-serif;text-decoration:none}
+  padding:14px 22px;cursor:pointer;border:none;transition:transform .15s,background .15s,box-shadow .15s,border-color .15s,color .15s;font-family:var(--font-body),system-ui,sans-serif;text-decoration:none}
 .jmk .jmk-btn-y{background:linear-gradient(135deg,var(--yellow),var(--yellow-deep));color:#3a2f00;box-shadow:0 14px 30px -14px rgba(255,210,30,.6)}
 .jmk .jmk-btn-y:hover{transform:translateY(-2px);color:#3a2f00}
 .jmk .jmk-btn-b{background:var(--blue);color:#052430;box-shadow:0 14px 30px -14px rgba(54,171,230,.6)}
@@ -42,7 +47,7 @@
 @media(max-width:600px){.jmk-sticky-host{top:0}}
 .jmk.jmk-header{--maxw:1240px;background:rgba(11,12,14,.82);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
 .jmk .jmk-nav-in{display:flex;align-items:center;gap:20px;height:66px}
-.jmk .jmk-logo{display:flex;align-items:baseline;gap:2px;white-space:nowrap;flex:none;font-family:'Anton',sans-serif;font-size:22px;letter-spacing:.5px;text-transform:uppercase;line-height:1.2}
+.jmk .jmk-logo{display:flex;align-items:baseline;gap:2px;white-space:nowrap;flex:none;font-family:var(--font-display),sans-serif;font-size:22px;letter-spacing:.5px;text-transform:uppercase;line-height:1.2}
 .jmk .jmk-logo img{max-height:44px;width:auto}
 .jmk .jmk-logo .mv{color:var(--text)}
 .jmk .jmk-logo .dfw{background:var(--yellow);color:#111;padding:1px 7px;border-radius:6px;margin-left:6px}
@@ -154,7 +159,7 @@
 @media(max-width:900px){.jmk .jmk-steps{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:560px){.jmk .jmk-steps{grid-template-columns:1fr}}
 .jmk .jmk-step{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px;position:relative}
-.jmk .jmk-step::before{counter-increment:s;content:"0" counter(s);font-family:'Anton',sans-serif;font-size:30px;line-height:1.2;color:var(--blue);opacity:.55;display:block;margin-bottom:8px}
+.jmk .jmk-step::before{counter-increment:s;content:"0" counter(s);font-family:var(--font-display),sans-serif;font-size:30px;line-height:1.2;color:var(--blue);opacity:.55;display:block;margin-bottom:8px}
 .jmk .jmk-step h3{font-size:16px;margin-bottom:6px}
 .jmk .jmk-step p{color:var(--muted);font-size:16px}
 
@@ -194,7 +199,7 @@
 .jmk .jmk-faq summary{list-style:none;cursor:pointer;padding:18px 20px;font-weight:700;font-size:16px;display:flex;justify-content:space-between;gap:16px;align-items:center;color:var(--text)}
 .jmk .jmk-faq summary::-webkit-details-marker{display:none}
 .jmk .jmk-faq summary::marker{content:""}
-.jmk .jmk-faq summary .pm{color:var(--blue);font-family:'Anton',sans-serif;font-size:22px;flex:none;transition:transform .2s;line-height:1}
+.jmk .jmk-faq summary .pm{color:var(--blue);font-family:var(--font-display),sans-serif;font-size:22px;flex:none;transition:transform .2s;line-height:1}
 .jmk .jmk-faq details[open] summary .pm{transform:rotate(45deg)}
 .jmk .jmk-faq .ans{padding:0 20px 18px;color:var(--muted);font-size:16px}
 .jmk .jmk-faq .ans a{color:var(--blue)}
@@ -212,7 +217,7 @@
 .jmk .jmk-foot-grid{display:grid;grid-template-columns:1.6fr 1fr 1fr 1.2fr;gap:26px}
 @media(max-width:760px){.jmk .jmk-foot-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:480px){.jmk .jmk-foot-grid{grid-template-columns:1fr}}
-.jmk.jmk-footer h4{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:800;margin-bottom:14px;font-family:'Inter',system-ui,sans-serif}
+.jmk.jmk-footer h4{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:800;margin-bottom:14px;font-family:var(--font-body),system-ui,sans-serif}
 .jmk.jmk-footer .jmk-foot-col a{color:#C7CFD8;font-size:14.5px;display:block;padding:4px 0}
 .jmk.jmk-footer a:hover{color:var(--blue)}
 .jmk.jmk-footer .jmk-logo{margin-bottom:14px;display:inline-flex}
