@@ -235,3 +235,17 @@
 }
 /* keep the bar visible (not fixed) while editing so it can be selected */
 .elementor-editor-active .jmk.jmk-mbar{position:relative;display:flex}
+
+/* Glows and tints follow the brand colours too (Global styles / Brand colours
+   controls). Browsers without color-mix() keep the fixed tints above. */
+@supports (color:color-mix(in srgb,red 50%,transparent)){
+  .jmk .jmk-btn-y{box-shadow:0 14px 30px -14px color-mix(in srgb,var(--yellow) 60%,transparent)}
+  .jmk .jmk-btn-b{box-shadow:0 14px 30px -14px color-mix(in srgb,var(--blue) 60%,transparent)}
+  .jmk .jmk-route .dot{box-shadow:0 0 0 4px color-mix(in srgb,var(--blue) 18%,transparent)}
+  .jmk .jmk-route .pin{box-shadow:0 0 0 4px color-mix(in srgb,var(--yellow) 16%,transparent)}
+  .jmk.jmk-hero{background:radial-gradient(900px 460px at 108% -12%,color-mix(in srgb,var(--blue) 16%,transparent),transparent 60%),
+             radial-gradient(760px 420px at -10% 118%,color-mix(in srgb,var(--yellow) 11%,transparent),transparent 55%),var(--bg)}
+  .jmk .jmk-urgency{border-color:color-mix(in srgb,var(--yellow) 35%,transparent)}
+  .jmk .jmk-band{border-color:color-mix(in srgb,var(--blue) 28%,transparent)}
+  .jmk .jmk-band::after{background:radial-gradient(460px 200px at 100% 0,color-mix(in srgb,var(--blue) 32%,transparent),transparent 60%)}
+}

@@ -141,3 +141,15 @@
   .jmq .jmq-header,.jmq .jmq-body,.jmq .jmq-footer{padding-left:18px;padding-right:18px}
   .jmq button.jmq-btn{padding:14px 12px}
 }
+
+/* Glows and tints follow the brand colours too (Global styles). Browsers
+   without color-mix() keep the fixed tints above. */
+@supports (color:color-mix(in srgb,red 50%,transparent)){
+  .jmq{--shadow:0 24px 60px -18px color-mix(in srgb,var(--navy) 30%,transparent)}
+  .jmq.jmq-bg{background:radial-gradient(1200px 600px at 110% -10%,color-mix(in srgb,var(--blue) 14%,transparent),transparent 60%),radial-gradient(900px 500px at -10% 110%,color-mix(in srgb,var(--yellow) 16%,transparent),transparent 55%),#f3f9fc}
+  .jmq button:focus-visible,.jmq .jmq-input:focus-visible{outline-color:color-mix(in srgb,var(--blue) 55%,transparent)}
+  .jmq button.jmq-opt.is-selected{box-shadow:0 4px 14px color-mix(in srgb,var(--blue) 14%,transparent)}
+  .jmq .jmq-input:focus{box-shadow:0 0 0 4px color-mix(in srgb,var(--blue) 14%,transparent)}
+  .jmq .jmq-total-box::after{background:radial-gradient(420px 170px at 100% 0,color-mix(in srgb,var(--blue) 50%,transparent),transparent 60%)}
+  .jmq button.jmq-btn-next{box-shadow:0 10px 22px -8px color-mix(in srgb,var(--blue) 60%,transparent)}
+}

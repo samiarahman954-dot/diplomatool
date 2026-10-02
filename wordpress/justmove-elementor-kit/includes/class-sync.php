@@ -292,10 +292,19 @@ final class JMK_Sync {
 			return false;
 		}
 		self::backup( $post_id, 'before-restore' );
-		self::write_elements( $post_id, $elements );
 		if ( is_array( $snap['settings'] ) ) {
 			update_post_meta( $post_id, '_elementor_page_settings', wp_slash( $snap['settings'] ) );
+		} else {
+			// The snapshot had no settings at all: go back to exactly that.
+			delete_post_meta( $post_id, '_elementor_page_settings' );
 		}
+		if ( (int) $post_id === JMK_Global_Styles::kit_id() ) {
+			// Site Settings: only its settings are ours to put back, never page content.
+			delete_post_meta( $post_id, '_elementor_css' );
+			self::flush_all();
+			return true;
+		}
+		self::write_elements( $post_id, $elements );
 		// Sections present in the restored version count as placed again.
 		$placed = get_post_meta( $post_id, self::META_TYPES, true );
 		update_post_meta(
