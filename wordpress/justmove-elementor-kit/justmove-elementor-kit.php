@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Just Move DFW – Elementor Template Kit
  * Description:       The Just Move DFW home page rebuilt as custom Elementor widgets (one widget per section, no default Elementor widgets) with one-click demo import.
- * Version:           1.3.1
+ * Version:           1.3.2
  * Author:            Just Move DFW
  * Text Domain:       jmk
  * Requires at least: 6.0
@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'JMK_VERSION', '1.3.1' );
+define( 'JMK_VERSION', '1.3.2' );
 define( 'JMK_FILE', __FILE__ );
 define( 'JMK_PATH', plugin_dir_path( __FILE__ ) );
 define( 'JMK_URL', plugin_dir_url( __FILE__ ) );

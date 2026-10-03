@@ -60,6 +60,16 @@ class JMK_Widget_Header extends JMK_Widget_Base {
 				),
 			)
 		);
+		$this->add_control(
+			'mobile_menu',
+			array(
+				'label'        => __( 'Mobile menu (hamburger)', 'jmk' ),
+				'type'         => Controls_Manager::SWITCHER,
+				'default'      => 'yes',
+				'return_value' => 'yes',
+				'description'  => __( 'On tablets and phones the menu items move into a ☰ button.', 'jmk' ),
+			)
+		);
 		$this->end_controls_section();
 
 		$this->start_controls_section( 'cta', array( 'label' => __( 'Phone & button', 'jmk' ) ) );
@@ -153,6 +163,8 @@ class JMK_Widget_Header extends JMK_Widget_Base {
 	protected function render() {
 		$s      = $this->get_settings_for_display();
 		$sticky = 'yes' === $s['sticky'] ? ' data-jmk-sticky="1"' : '';
+		$burger = ! empty( $s['links'] ) && 'yes' === $s['mobile_menu'];
+		$panel  = 'jmk-mnav-' . $this->get_id();
 		?>
 		<header class="jmk jmk-header"<?php echo $sticky; // phpcs:ignore ?>><div class="jmk-wrap jmk-nav-in">
 			<?php $this->render_link( 'logo', $s['logo_link'], 'jmk-logo', self::logo_html( $s ) ); ?>
@@ -173,7 +185,32 @@ class JMK_Widget_Header extends JMK_Widget_Base {
 				$this->render_button( $s, 'btn' );
 				?>
 			</div>
-		</div></header>
+			<?php if ( $burger ) : ?>
+				<button type="button" class="jmk-burger" aria-expanded="false" aria-controls="<?php echo esc_attr( $panel ); ?>" aria-label="<?php esc_attr_e( 'Open menu', 'jmk' ); ?>" data-label-open="<?php esc_attr_e( 'Open menu', 'jmk' ); ?>" data-label-close="<?php esc_attr_e( 'Close menu', 'jmk' ); ?>"><span></span><span></span><span></span></button>
+			<?php endif; ?>
+		</div>
+		<?php if ( $burger ) : ?>
+			<div class="jmk-mnav" id="<?php echo esc_attr( $panel ); ?>" hidden>
+				<nav class="jmk-mnav-links" aria-label="<?php esc_attr_e( 'Main', 'jmk' ); ?>">
+					<?php
+					foreach ( $s['links'] as $i => $item ) {
+						$this->render_link( 'mnav' . $i, $item['link'], '', esc_html( $item['label'] ) . '<span aria-hidden="true">&rsaquo;</span>' );
+					}
+					?>
+				</nav>
+				<div class="jmk-mnav-cta">
+					<?php
+					if ( '' !== $s['phone'] ) {
+						$this->render_link( 'mphone', $s['phone_link'], 'jmk-btn jmk-btn-ghost', '<span>&#9742;</span> ' . esc_html( $s['phone'] ) );
+					}
+					if ( ! empty( $s['btn_text'] ) ) {
+						$this->render_link( 'mbtn', $s['btn_link'], 'jmk-btn jmk-btn-' . ( isset( $s['btn_style'] ) ? $s['btn_style'] : 'y' ), esc_html( $s['btn_text'] ) );
+					}
+					?>
+				</div>
+			</div>
+		<?php endif; ?>
+		</header>
 		<?php
 	}
 }

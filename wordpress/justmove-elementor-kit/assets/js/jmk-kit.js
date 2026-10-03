@@ -18,6 +18,38 @@
     });
   }
 
+  // Mobile menu. Delegated, so it keeps working when Elementor re-renders the header.
+  function setMenu(btn, open) {
+    var panel = document.getElementById(btn.getAttribute('aria-controls'));
+    if (!panel) { return; }
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    btn.setAttribute('aria-label', btn.getAttribute(open ? 'data-label-close' : 'data-label-open') || '');
+    panel.hidden = !open;
+  }
+  function closeMenus(except) {
+    var open = document.querySelectorAll('.jmk-burger[aria-expanded="true"]');
+    Array.prototype.forEach.call(open, function (b) { if (b !== except) { setMenu(b, false); } });
+  }
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest && e.target.closest('.jmk-burger');
+    if (btn) {
+      closeMenus(btn);
+      setMenu(btn, btn.getAttribute('aria-expanded') !== 'true');
+      return;
+    }
+    var header = e.target.closest && e.target.closest('.jmk-header');
+    // A tap on a menu link (incl. #anchors on the same page) or anywhere outside closes it.
+    if (!header || e.target.closest('.jmk-mnav a')) { closeMenus(); }
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') { return; }
+    var btn = document.querySelector('.jmk-burger[aria-expanded="true"]');
+    if (btn) { setMenu(btn, false); btn.focus(); }
+  });
+  window.addEventListener('resize', function () {
+    if (window.innerWidth > 1080) { closeMenus(); }
+  });
+
   function initMobileBar(root) {
     if (root.querySelector('[data-jmk-mbar]')) { document.body.classList.add('jmk-has-mbar'); }
   }

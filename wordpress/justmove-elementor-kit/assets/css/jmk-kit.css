@@ -60,12 +60,35 @@
 .jmk .jmk-nav-links + .jmk-nav-cta{margin-left:0}
 .jmk .jmk-nav-phone{font-weight:800;color:var(--text);white-space:nowrap;font-size:14.5px}
 .jmk .jmk-nav-phone span{color:var(--blue)}
-@media(max-width:1080px){.jmk .jmk-nav-links{display:none}.jmk .jmk-nav-cta{margin-left:auto}}
+@media(max-width:1080px){.jmk .jmk-nav-links{display:none}.jmk .jmk-nav-cta,.jmk .jmk-nav-links + .jmk-nav-cta{margin-left:auto}}
 /* logo + 6 links + phone + button need ~1160px: drop the phone while the links are shown on narrower screens */
 @media(min-width:1081px) and (max-width:1300px){.jmk .jmk-nav-phone{display:none}}
 @media(max-width:860px){.jmk .jmk-nav-phone{display:none}}
 @media(max-width:420px){.jmk .jmk-nav-in{gap:12px}.jmk .jmk-logo{font-size:18px}.jmk .jmk-nav-cta .jmk-btn{padding:11px 14px;font-size:14px}}
 @media(max-width:360px){.jmk .jmk-nav-in{padding:0 14px}.jmk .jmk-logo{font-size:17px}.jmk .jmk-logo .arw{display:none}}
+/* mobile menu: the links move into a ☰ panel wherever the desktop links are hidden */
+.jmk.jmk-header{position:relative;z-index:60} /* the open menu must sit above the sections below */
+.jmk .jmk-burger{display:none;flex:none;width:44px;height:44px;margin:0 -6px 0 0;padding:0;border:0;border-radius:10px;background:transparent;color:var(--text);cursor:pointer;position:relative;box-shadow:none;min-height:0}
+.jmk .jmk-burger:hover,.jmk .jmk-burger:focus{background:rgba(255,255,255,.06);color:var(--text)}
+.jmk .jmk-burger:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.jmk .jmk-burger span{position:absolute;left:12px;right:12px;height:2px;border-radius:2px;background:currentColor;transition:transform .22s ease,opacity .18s ease}
+.jmk .jmk-burger span:nth-child(1){top:15px}
+.jmk .jmk-burger span:nth-child(2){top:21px}
+.jmk .jmk-burger span:nth-child(3){top:27px}
+.jmk .jmk-burger[aria-expanded="true"] span:nth-child(1){transform:translateY(6px) rotate(45deg)}
+.jmk .jmk-burger[aria-expanded="true"] span:nth-child(2){opacity:0}
+.jmk .jmk-burger[aria-expanded="true"] span:nth-child(3){transform:translateY(-6px) rotate(-45deg)}
+.jmk .jmk-mnav{position:absolute;left:0;right:0;top:100%;background:var(--bg);border-bottom:1px solid var(--line);box-shadow:0 24px 40px -18px rgba(0,0,0,.7);max-height:calc(100vh - 66px);max-height:calc(100dvh - 66px);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:8px 0 20px}
+.jmk .jmk-mnav[hidden]{display:none}
+.jmk .jmk-mnav-links{display:flex;flex-direction:column;max-width:var(--maxw);margin:0 auto;padding:0 20px}
+.jmk .jmk-mnav-links a{display:flex;justify-content:space-between;align-items:center;padding:15px 2px;border-bottom:1px solid var(--line);font-size:17px;font-weight:700;color:var(--text)}
+.jmk .jmk-mnav-links a span{color:var(--muted);font-size:22px;line-height:1}
+.jmk .jmk-mnav-links a:hover,.jmk .jmk-mnav-links a:focus-visible{color:var(--yellow)}
+.jmk .jmk-mnav-cta{display:flex;gap:10px;flex-wrap:wrap;max-width:var(--maxw);margin:18px auto 0;padding:0 20px}
+.jmk .jmk-mnav-cta .jmk-btn{flex:1 1 180px;justify-content:center}
+@media(max-width:1080px){.jmk .jmk-burger{display:block}}
+@media(min-width:1081px){.jmk .jmk-mnav{display:none!important}}
+@media(max-width:760px){body.jmk-has-mbar .jmk .jmk-mnav{max-height:calc(100vh - 140px);max-height:calc(100dvh - 140px)}} /* stay clear of the fixed call bar */
 
 /* route divider */
 .jmk.jmk-divider{padding:14px 0}
