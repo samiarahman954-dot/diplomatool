@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>WhatsApp Chat Exporter</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <img src="../icons/icon.svg" alt="" width="28" height="28">
+    <div>
+      <h1>WhatsApp Chat Exporter</h1>
+      <p id="status" class="status">Checking…</p>
+    </div>
+  </header>
+
+  <section id="not-on-wa" hidden>
+    <p>Open <strong>WhatsApp Web</strong> and select a chat, then click this button again.</p>
+    <button id="open-wa" class="primary">Open web.whatsapp.com</button>
+  </section>
+
+  <form id="export-form" hidden>
+    <fieldset>
+      <legend>Format</legend>
+      <div class="formats">
+        <label><input type="radio" name="format" value="txt" checked> TXT</label>
+        <label><input type="radio" name="format" value="html"> HTML</label>
+        <label><input type="radio" name="format" value="json"> JSON</label>
+        <label><input type="radio" name="format" value="csv"> CSV</label>
+      </div>
+    </fieldset>
+
+    <label class="check"><input type="checkbox" id="loadHistory" checked> Load full history (scroll up automatically)</label>
+    <label class="check"><input type="checkbox" id="includeSystem" checked> Include date &amp; system messages</label>
+    <label class="check"><input type="checkbox" id="saveAs"> Ask where to save the file</label>
+    <label class="num">Only last <input type="number" id="maxMessages" min="0" step="100" value="0"> messages <span class="hint">(0 = all)</span></label>
+
+    <button type="submit" id="export" class="primary">Export chat</button>
+    <p id="message" class="message" role="status"></p>
+  </form>
+
+  <footer>Runs locally – your chats never leave your computer.</footer>
+  <script src="popup.js"></script>
+</body>
+</html>
