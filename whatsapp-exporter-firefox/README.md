@@ -10,15 +10,25 @@ A Firefox add-on that exports the currently open WhatsApp Web chat to TXT, HTML,
 - **4 format:** TXT (WhatsApp-er nijer export-er moto), HTML (WhatsApp-er moto bubble design, dark mode shoho), JSON, CSV (Excel-e Bangla thik moto dekhay)
 - **HTML-e chobi shoho:** chat-er image, sticker ar video-r thumbnail HTML file-er bhitore embed hoy. Ekta file-ei sob, internet chara-o khola jay. Chobi-te click korle boro hoye dekhay.
   Je chobi WhatsApp Web-e ekhono download hoyni (jhapsa preview + download button), seta extension nije download kore asol chobi ney.
+- **Attachment download (ZIP, PDF, document, photo, video, sticker):** sob attachment ekta folder-e organized vabe save hoy, ar chat file-e protita message tar nijer attachment-er sathe link kora thake:
+  ```
+  Downloads/
+    WhatsApp Chat - Family Group - 2026-10-03/
+      WhatsApp Chat - Family Group.html      ← chat (photo, video, file link shoho)
+      attachments/
+        3-1-2026 10.25 - Rahim - IMG.png
+        3-1-2026 10.30 - Rahim - project files.zip
+        4-1-2026 10.35 - You - report.pdf
+  ```
+  TXT-e lekha thake `3/1/2026, 10:30 - Rahim: <attached: attachments/3-1-2026 10.30 - Rahim - project files.zip>`, CSV/JSON-e `attachment` column/field-e path thake.
 - **Full history:** chat-er upore auto-scroll kore purono message load kore
 - Sender, date, time, reply (quoted message), deleted message, media type (image, video, audio, document, sticker) dhore
 - Emoji ar Bangla text thik thake
 - Page-e progress box dekhay. "Stop" chaple ja load hoyeche ta diyei export hoy
 - "Only last N messages" diye shudhu sheser kichu message export kora jay
 
-> Chobi shudhu **HTML** export-e thake ("Include images in HTML export" option). TXT/CSV/JSON-e `<Media omitted: image>` likha thake.
-> Video, audio, document file export hoy na. Video-r shudhu thumbnail HTML-e thake.
-> 1.5 MB-er boro chobi 1600px-e chhoto kore rakha hoy, jate HTML file khub boro na hoy.
+> "Download attachments" off thakle: chobi shudhu HTML-e embed hoy ("Include images in HTML export"), ar 1.5 MB-er boro chobi 1600px-e chhoto kora hoy. Onno file download hoy na.
+> Attachment download korar somoy extension WhatsApp-er download button nije click kore. WhatsApp je file save korte chay, seta Downloads-er bodole export folder-e jay. Export shesh hole WhatsApp-er download abar swabhabik hoye jay.
 
 ## Install (Firefox-e)
 
@@ -37,7 +47,7 @@ Mozilla-r signature chara Firefox permanent add-on install korte dey na. Duita u
 ### Zip banano
 ```sh
 cd whatsapp-exporter-firefox
-npx web-ext build      # web-ext-artifacts/whatsapp_chat_exporter-1.2.0.zip
+npx web-ext build      # web-ext-artifacts/whatsapp_chat_exporter-1.3.0.zip
 npx web-ext lint       # check
 npx web-ext run        # Firefox-e test run
 ```
@@ -77,6 +87,8 @@ Exported: 10/3/2026, 2:33:37 PM (49 messages)
 - "No messages found" dekhale progress box-er **Copy debug info** button chapun ar report-ta developer-ke pathan. Report-e kono message text, naam ba number thake na, shudhu page-er structure thake.
 - WhatsApp Web-er HTML structure change hole kichu jinish (jemon media type, reply) bhul dekhate pare. Message text, sender, time sadharonoto `data-pre-plain-text` theke ase, ja beshi stable.
 - Phone-e thaka khub purono message WhatsApp Web-e load na hole export-eo asbe na.
-- Video/audio/document download hoy na. Chobi shudhu HTML-e thake.
-- Onek chobi thakle HTML file boro hoye jete pare (protiti chobi file-er bhitore thake).
+- Video ba voice message WhatsApp Web-e load na hole (shudhu play button, kono file nei) seta download hoy na. Chat-e `<Media omitted: video>` thakbe.
+- Je file download hoyni, seta chat-e "(not downloaded)" hisebe dekhay, document-er naam shoho.
+- Boro chat-e onek attachment thakle export-e onek somoy lagte pare.
+- Firefox-e "Always ask you where to save files" on thakle protita file-er jonno dialog aste pare. Settings → General → Downloads-e "Save files to Downloads" select korun.
 - WhatsApp phone theke muche fela ba expire hoye jawa purono media load korte na parle shudhu jhapsa preview ba "not included" dekhabe.

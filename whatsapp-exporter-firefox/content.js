@@ -56,6 +56,20 @@
       return Promise.resolve({ ok: true });
     }
 
+    if (msg.type === 'WA_PAGE_DOWNLOAD') {
+      // WhatsApp started a normal browser download that our click hook missed
+      if (captureWaiter && /^blob:/.test(msg.url || '')) {
+        const waiter = captureWaiter;
+        captureWaiter = null;
+        waiter.resolve({
+          name: basename(msg.filename || ''),
+          blobPromise: fetchBlob(msg.url),
+          pageDownloadId: msg.id,
+        });
+      }
+      return undefined;
+    }
+
     if (msg.type === 'WA_EXPORT_CANCEL') {
       cancelRequested = true;
       return Promise.resolve({ ok: true });
@@ -81,18 +95,26 @@
       overlay.set(`Reading "${chatName}"…`);
 
       const withImages = format === 'html' && options.embedImages !== false;
+      const withFiles = options.downloadAttachments !== false;
+      const folder = `WhatsApp Chat - ${sanitizeFilename(chatName)} - ${today()}`;
       const collected = {
         store: new Map(),
         order: [],
         cache: new WeakMap(),
         images: withImages ? new Map() : null, // message id -> { data, full }
         imageTried: new Set(),
+        files: withFiles ? new Map() : null, // message id -> { path, size }
+        fileTried: new Set(),
+        folder,
       };
+      if (withFiles) installDownloadHook();
       collect(main, collected);
 
       if (options.loadHistory !== false) {
+        collected.phase = 'history';
         await loadHistory(chatName, collected, maxMessages, overlay);
       }
+      collected.phase = 'sweep';
       await sweepDown(chatName, collected, overlay);
 
       let messages = finalize(collected);
@@ -126,21 +148,26 @@
       };
       const { ext, mime, build } = FORMATS[format];
       const content = build(meta, messages);
-      const filename = `WhatsApp Chat - ${sanitizeFilename(chatName)} - ${today()}.${ext}`;
+      // with attachments everything goes into one folder: chat file + attachments/
+      const filename = withFiles
+        ? `${folder}/WhatsApp Chat - ${sanitizeFilename(chatName)}.${ext}`
+        : `${folder}.${ext}`;
 
       const res = await api.runtime.sendMessage({
         type: 'WA_EXPORT_DOWNLOAD',
         filename,
         mime,
         content,
-        saveAs: !!options.saveAs,
+        saveAs: !withFiles && !!options.saveAs,
       });
       if (!res || !res.ok) throw new Error((res && res.error) || 'Download failed.');
 
-      overlay.done(`✔ Exported ${realCount} messages to ${ext.toUpperCase()}`);
+      const fileNote = withFiles ? ` + ${collected.files.size} attachments in "${folder}"` : '';
+      overlay.done(`✔ Exported ${realCount} messages to ${ext.toUpperCase()}${fileNote}`);
     } catch (err) {
       overlay.fail(`✖ ${(err && err.message) || err}`);
     } finally {
+      uninstallDownloadHook();
       running = false;
     }
   }
@@ -173,7 +200,7 @@
       await sleep(350);
 
       collect(main, collected);
-      if (collected.images) await captureImages(main, collected, scroller, overlay);
+      if (collected.images || collected.files) await captureMedia(main, collected, scroller, overlay);
       const total = countMessages(collected);
       overlay.set(`Loading older messages… ${total} found`);
 
@@ -202,8 +229,8 @@
       expandReadMore(main);
       await sleep(120);
       collect(main, collected, true);
-      if (collected.images) {
-        await captureImages(main, collected, scroller, overlay);
+      if (collected.images || collected.files) {
+        await captureMedia(main, collected, scroller, overlay);
       }
       const atBottom = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 2;
       if (atBottom || scroller.scrollTop === lastTop || cancelRequested) break;
@@ -216,30 +243,32 @@
   // Images (HTML export)
   // ---------------------------------------------------------------------------
 
-  /* Save the pictures of the image/sticker/video messages currently in the
-   * DOM as data: URLs. Images that are only a blurry preview get their
-   * download button clicked (once) when on screen, and we wait briefly for
-   * WhatsApp to load the real picture. */
-  async function captureImages(main, collected, scroller, overlay) {
+  /* Handle the media messages currently in the DOM:
+   *  - attachments mode: save each message's file (photo, sticker, video,
+   *    voice note, document/ZIP…) into <folder>/attachments/;
+   *  - HTML images: keep the picture as a data: URL to embed.
+   * Pictures that are only a blurry preview get their download button
+   * clicked (once) when on screen, then we wait briefly for the real one. */
+  async function captureMedia(main, collected, scroller, overlay) {
     const targets = [];
     for (const node of getMessageNodes(main)) {
       const msg = collected.cache.get(node);
-      if (!msg || msg.kind !== 'message' || !PICTURE_MEDIA.has(msg.media)) continue;
-      const prev = collected.images.get(msg.id);
-      if (prev && prev.full) continue;
-      const bubble = node.querySelector('.message-in, .message-out') || node;
-      targets.push({ msg, node, bubble });
+      if (!msg || msg.kind !== 'message' || !msg.media) continue;
+      const bubble = node.querySelector(MSG_CLASS_SEL) || node;
+      targets.push({ msg, node, bubble, isPic: PICTURE_MEDIA.has(msg.media) });
     }
     if (!targets.length) return;
 
     // ask WhatsApp to load full pictures that are visible but not loaded yet
     const waiting = [];
     for (const t of targets) {
+      if (!t.isPic || t.msg.media === 'video') continue;
       if (collected.imageTried.has(t.msg.id) || !isOnScreen(t.node, scroller)) continue;
+      if (collected.files ? collected.files.has(t.msg.id) : !collected.images) continue;
       const img = bestImage(t.bubble);
       if (img && isFullImage(img)) continue;
       collected.imageTried.add(t.msg.id);
-      if (t.msg.media !== 'video') clickMediaDownload(t.bubble);
+      clickMediaDownload(t.bubble);
       waiting.push(t);
     }
     if (waiting.length) {
@@ -252,17 +281,315 @@
       );
     }
 
-    for (const t of targets) {
-      if (cancelRequested) return;
-      const img = bestImage(t.bubble);
-      if (!img) continue;
-      const full = isFullImage(img);
-      const prev = collected.images.get(t.msg.id);
-      if (prev && !full) continue; // already have the preview
-      const data = await imageToDataUrl(img);
-      if (data) collected.images.set(t.msg.id, { data, full });
+    if (collected.files) {
+      for (const t of targets) {
+        if (cancelRequested) return;
+        if (collected.files.has(t.msg.id)) continue;
+        await saveMessageFile(t, collected, scroller, overlay);
+      }
     }
-    overlay.set(`Reading messages… ${countMessages(collected)} found, ${collected.images.size} images saved`);
+
+    if (collected.images) {
+      for (const t of targets) {
+        if (cancelRequested) return;
+        if (!t.isPic) continue;
+        // a saved photo/sticker file is shown from disk; video keeps its thumbnail
+        if (collected.files && collected.files.has(t.msg.id) && t.msg.media !== 'video') continue;
+        const img = bestImage(t.bubble);
+        if (!img) continue;
+        const full = isFullImage(img);
+        const prev = collected.images.get(t.msg.id);
+        if (prev && (prev.full || !full)) continue;
+        const data = await imageToDataUrl(img);
+        if (data) collected.images.set(t.msg.id, { data, full });
+      }
+    }
+
+    const parts = [`${countMessages(collected)} messages`];
+    if (collected.files) parts.push(`${collected.files.size} attachments`);
+    if (collected.images) parts.push(`${collected.images.size} images`);
+    overlay.set(`Reading chat… ${parts.join(', ')} saved`);
+  }
+
+  async function saveMessageFile(t, collected, scroller, overlay) {
+    const { msg, bubble } = t;
+    // while older messages are still loading, the topmost one may lack its
+    // date/sender context; it is saved later, during the final pass
+    const ctx = messageContext(collected, msg);
+    if (collected.phase === 'history' && !ctx.date) return;
+    let blob = null;
+    let name = '';
+
+    if (msg.media === 'image' || msg.media === 'sticker') {
+      const img = bestImage(bubble);
+      if (!img || !isFullImage(img)) return; // retried while it stays in the DOM
+      blob = await fetchBlob(img.currentSrc || img.src);
+      name = `${msg.media === 'sticker' ? 'STK' : 'IMG'}.${extFor(blob)}`;
+    } else if (msg.media === 'video' || msg.media === 'audio') {
+      const MEDIA_SRC = 'video[src^="blob:"], audio[src^="blob:"], source[src^="blob:"]';
+      if (!bubble.querySelector(MEDIA_SRC) && !collected.fileTried.has(msg.id)) {
+        // not loaded yet: press its download button and give WhatsApp a moment
+        collected.fileTried.add(msg.id);
+        if (bubble.querySelector('[data-icon*="download"]')) {
+          overlay.set(`Downloading ${msg.media}…`);
+          clickMediaDownload(bubble);
+          await waitFor(() => !!bubble.querySelector(MEDIA_SRC), 8000);
+        }
+      }
+      const el = bubble.querySelector(MEDIA_SRC);
+      if (!el) return;
+      blob = await fetchBlob(el.getAttribute('src'));
+      name = `${msg.media === 'video' ? 'VID' : 'AUD'}.${extFor(blob)}`;
+    } else {
+      // document, ZIP, PDF, … : ask WhatsApp for the file, once
+      if (collected.fileTried.has(msg.id)) return;
+      collected.fileTried.add(msg.id);
+      overlay.set(`Downloading ${msg.fileName || 'file'}…`);
+      const got = await downloadViaWhatsApp(bubble, true);
+      if (!got) return;
+      name = got.name || msg.fileName || `file.${extFor(got.blob)}`;
+      if (got.blob) {
+        blob = got.blob;
+        if (got.pageDownloadId !== undefined) discardPageDownload(got.pageDownloadId);
+      } else if (got.pageDownloadId !== undefined) {
+        // couldn't read it, but WhatsApp's own download is in the Downloads folder
+        collected.files.set(msg.id, { path: `../${name}`, size: 0 });
+        return;
+      }
+    }
+
+    if (!blob || !blob.size) return;
+    // "<date> <time> - <sender> - <original name>", e.g. "3-1-2026 10.25 - Rahim - project.zip"
+    const stamp = [ctx.date.replace(/[/.:]/g, '-'), ctx.time.replace(/:/g, '.')].filter(Boolean).join(' ');
+    const file = uniqueName(collected, safeFileName([stamp, ctx.sender, name].filter(Boolean).join(' - ')));
+    const path = `attachments/${file}`;
+    const res = await api.runtime
+      .sendMessage({
+        type: 'WA_EXPORT_DOWNLOAD',
+        filename: `${collected.folder}/${path}`,
+        mime: blob.type || 'application/octet-stream',
+        blob,
+        saveAs: false,
+      })
+      .catch((err) => ({ ok: false, error: String(err) }));
+    if (res && res.ok) collected.files.set(msg.id, { path, size: blob.size });
+  }
+
+  /* Media messages often carry no date/sender of their own; borrow them
+   * from the closest earlier message or date divider. */
+  function messageContext(collected, msg) {
+    const ctx = { date: msg.date, time: msg.time, sender: msg.sender || (msg.fromMe ? 'You' : '') };
+    const idx = collected.order.indexOf(msg.id);
+    for (let i = idx - 1; i >= 0 && (!ctx.date || !ctx.sender); i--) {
+      const prev = collected.store.get(collected.order[i]);
+      if (!prev) continue;
+      if (prev.kind === 'date') {
+        if (!ctx.date) ctx.date = prev.text;
+        if (!ctx.sender) break; // sender runs don't cross days
+        continue;
+      }
+      if (prev.kind !== 'message') continue;
+      if (!ctx.date && prev.date) ctx.date = prev.date;
+      if (!ctx.sender && !msg.fromMe && !prev.fromMe && prev.sender) ctx.sender = prev.sender;
+    }
+    return ctx;
+  }
+
+  function uniqueName(collected, file) {
+    if (!collected.usedNames) collected.usedNames = new Set();
+    const dot = file.lastIndexOf('.');
+    const base = dot > 0 ? file.slice(0, dot) : file;
+    const ext = dot > 0 ? file.slice(dot) : '';
+    let name = file;
+    for (let n = 2; collected.usedNames.has(name.toLowerCase()); n++) name = `${base} (${n})${ext}`;
+    collected.usedNames.add(name.toLowerCase());
+    return name;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Capturing WhatsApp's own file downloads
+  // ---------------------------------------------------------------------------
+
+  /* WhatsApp saves a file by clicking an <a download href="blob:…">. While an
+   * export waits for a file we intercept that click (in the page itself via
+   * Firefox's wrappedJSObject/exportFunction), read the blob and save it in
+   * our folder instead. If the click slips through, the background script
+   * reports the browser download (WA_PAGE_DOWNLOAD) and we use that. */
+  let captureWaiter = null;
+  let hook = null;
+
+  function interceptAnchor(anchor) {
+    if (!captureWaiter) return false;
+    const href = String(anchor.href || '');
+    if (!/^blob:/.test(href)) return false;
+    const waiter = captureWaiter;
+    captureWaiter = null;
+    waiter.resolve({
+      name: String(anchor.download || anchor.getAttribute('download') || ''),
+      blobPromise: fetchBlob(href),
+    });
+    return true;
+  }
+
+  function onDocumentClick(event) {
+    const a = event.target && event.target.closest && event.target.closest('a[download]');
+    if (a && interceptAnchor(a)) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  }
+
+  function installDownloadHook() {
+    if (hook) return;
+    const pageWindow = window.wrappedJSObject || window;
+    const proto = pageWindow.HTMLAnchorElement.prototype;
+    const original = proto.click;
+    const replacement = function () {
+      try {
+        if (interceptAnchor(this)) return undefined;
+      } catch (e) {
+        // fall through to the normal click
+      }
+      return original.call(this);
+    };
+    try {
+      if (window.wrappedJSObject && typeof exportFunction === 'function') {
+        exportFunction(replacement, proto, { defineAs: 'click' });
+      } else {
+        proto.click = replacement;
+      }
+      hook = { proto, original };
+    } catch (e) {
+      hook = { proto: null, original: null };
+    }
+    document.addEventListener('click', onDocumentClick, true);
+  }
+
+  function uninstallDownloadHook() {
+    if (!hook) return;
+    try {
+      if (hook.proto) hook.proto.click = hook.original;
+    } catch (e) {
+      // page reloaded or prototype gone
+    }
+    document.removeEventListener('click', onDocumentClick, true);
+    captureWaiter = null;
+    hook = null;
+  }
+
+  /* Click the message's download / open control and wait for WhatsApp to
+   * hand over the file. Big files get more time while a progress bar shows. */
+  async function downloadViaWhatsApp(bubble, isDocument) {
+    let resolveFn;
+    const got = new Promise((resolve) => {
+      resolveFn = resolve;
+    });
+    const waiter = { resolve: resolveFn };
+    captureWaiter = waiter;
+    const dialogs = document.querySelectorAll('[role="dialog"]').length;
+
+    if (!clickFileControl(bubble, isDocument)) {
+      captureWaiter = null;
+      return null;
+    }
+
+    let finished = false;
+    got.then(() => {
+      finished = true;
+    });
+    const start = Date.now();
+    const timeout = (async () => {
+      while (!finished && !cancelRequested) {
+        const busy = bubble.isConnected && bubble.querySelector('[role="progressbar"], progress');
+        if (Date.now() - start > (busy ? 180000 : 20000)) break;
+        await sleep(250);
+      }
+      return null;
+    })();
+    const result = await Promise.race([got, timeout]);
+    if (captureWaiter === waiter) captureWaiter = null;
+    if (document.querySelectorAll('[role="dialog"]').length > dialogs) pressEscape();
+    if (!result) return null;
+    const blob = await result.blobPromise;
+    return { name: result.name, blob, pageDownloadId: result.pageDownloadId };
+  }
+
+  function clickFileControl(bubble, isDocument) {
+    const icon = bubble.querySelector('[data-icon*="download"]');
+    let target = icon && (icon.closest('button, [role="button"]') || icon);
+    if (!target && isDocument) {
+      const named = findDocNameElement(bubble);
+      target = named && (named.closest('button, [role="button"]') || named);
+    }
+    if (!target && isDocument) target = bubble.querySelector('[role="button"]');
+    if (!target) return false;
+    target.click();
+    return true;
+  }
+
+  function pressEscape() {
+    const target = document.activeElement || document.body;
+    for (const type of ['keydown', 'keyup']) {
+      target.dispatchEvent(new KeyboardEvent(type, { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }));
+    }
+  }
+
+  function discardPageDownload(id) {
+    api.runtime.sendMessage({ type: 'WA_DISCARD_DOWNLOAD', id }).catch(() => {});
+  }
+
+  async function fetchBlob(url) {
+    // Firefox: content.fetch runs with the page's origin, which owns the blob: URL
+    const fetchers = [];
+    if (typeof content !== 'undefined' && content && typeof content.fetch === 'function') {
+      fetchers.push((u) => content.fetch(u));
+    }
+    fetchers.push((u) => fetch(u));
+    for (const doFetch of fetchers) {
+      try {
+        const blob = await (await doFetch(url)).blob();
+        if (blob && blob.size) return blob;
+      } catch (e) {
+        // try the next way
+      }
+    }
+    return null;
+  }
+
+  const EXT_BY_MIME = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'image/gif': 'gif',
+    'video/mp4': 'mp4',
+    'video/webm': 'webm',
+    'audio/ogg': 'ogg',
+    'audio/mpeg': 'mp3',
+    'audio/mp4': 'm4a',
+    'audio/aac': 'aac',
+    'application/pdf': 'pdf',
+    'application/zip': 'zip',
+  };
+
+  function extFor(blob) {
+    const type = ((blob && blob.type) || '').split(';')[0].trim().toLowerCase();
+    return EXT_BY_MIME[type] || (type.split('/')[1] || 'bin').replace(/[^a-z0-9]/g, '').slice(0, 6) || 'bin';
+  }
+
+  function basename(path) {
+    return String(path).split(/[\\/]/).pop();
+  }
+
+  function safeFileName(name) {
+    const clean = name
+      .replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/^[.\s]+|[.\s]+$/g, '');
+    const dot = clean.lastIndexOf('.');
+    const ext = dot > 0 && clean.length - dot <= 10 ? clean.slice(dot) : '';
+    const base = ext ? clean.slice(0, dot) : clean;
+    return (base.slice(0, 140) || 'file') + ext;
   }
 
   function bestImage(bubble) {
@@ -304,24 +631,11 @@
     const src = img.currentSrc || img.src;
     if (src.startsWith('data:image') && src.length < MAX_IMAGE_BYTES) return src;
 
-    // Firefox: content.fetch runs with the page's origin, which owns the blob: URL
-    const fetchers = [];
-    if (typeof content !== 'undefined' && content && typeof content.fetch === 'function') {
-      fetchers.push((u) => content.fetch(u));
+    const blob = await fetchBlob(src);
+    if (blob && blob.size <= MAX_IMAGE_BYTES && /^image\//.test(blob.type)) {
+      return blobToDataUrl(blob).catch(() => canvasDataUrl(img));
     }
-    fetchers.push((u) => fetch(u));
-    for (const doFetch of fetchers) {
-      try {
-        const blob = await (await doFetch(src)).blob();
-        if (blob.size && blob.size <= MAX_IMAGE_BYTES && /^image\//.test(blob.type)) {
-          return await blobToDataUrl(blob);
-        }
-        if (blob.size) break; // too big or unknown type: re-encode below
-      } catch (e) {
-        // try the next way
-      }
-    }
-    return canvasDataUrl(img);
+    return canvasDataUrl(img); // too big, unknown type or unreadable: re-encode
   }
 
   function canvasDataUrl(img) {
@@ -552,6 +866,12 @@
       text = fromMe ? 'You deleted this message' : 'This message was deleted';
     }
     const media = deleted ? null : detectMedia(bubble);
+    let fileName = '';
+    if (media === 'document') {
+      const el = findDocNameElement(bubble);
+      fileName = el ? (el.getAttribute('title') || el.textContent || '').trim() : '';
+      if (text === fileName) text = '';
+    }
 
     return {
       id: id || `msg:${date}|${time}|${sender}|${text}|${fromMe}`,
@@ -563,8 +883,22 @@
       text,
       quote,
       media,
+      fileName,
       deleted,
     };
+  }
+
+  function findDocNameElement(bubble) {
+    const looksLikeFile = (t) =>
+      t.length < 200 && /\.[A-Za-z0-9]{1,8}$/.test(t) && !/^\d+([.,]\d+)?\s?[kKmMgG]?[bB]$/.test(t);
+    for (const el of bubble.querySelectorAll('[title]')) {
+      if (looksLikeFile((el.getAttribute('title') || '').trim())) return el;
+    }
+    for (const el of bubble.querySelectorAll('span, div')) {
+      if (el.children.length || isInsideQuote(el, bubble)) continue;
+      if (looksLikeFile((el.textContent || '').trim())) return el;
+    }
+    return null;
   }
 
   function detectFromMe(node, classBubble, id, pre) {
@@ -613,11 +947,12 @@
 
   function detectMedia(bubble) {
     const has = (sel) => !!bubble.querySelector(sel);
-    if (has('audio, [data-icon="audio-play"], [data-icon="ptt-play"], [data-icon*="ptt"], [data-icon*="audio"]')) {
+    // documents first: their download button may use an "audio-download" icon
+    if (has('[data-icon*="document"], [data-icon*="doc-"], [data-testid*="document"]')) return 'document';
+    if (has('audio, [data-icon="audio-play"], [data-icon*="ptt"], [data-icon*="audio"]:not([data-icon*="download"])')) {
       return 'audio';
     }
     if (has('video, [data-icon="media-play"], [data-icon*="video"], [data-icon*="gif"]')) return 'video';
-    if (has('[data-icon*="document"], [data-icon*="doc-"], [data-testid*="document"]')) return 'document';
     if (has('[data-testid*="sticker"], [data-icon*="sticker"]')) return 'sticker';
     if (has('[data-icon*="location"], [data-testid*="location"]')) return 'location';
     if (has('[data-icon*="vcard"], [data-testid*="vcard"]')) return 'contact';
@@ -692,6 +1027,11 @@
       if (!m.fromMe && m.sender) lastIncomingSender = m.sender;
       const pic = collected.images && collected.images.get(m.id);
       if (pic) m.imageData = pic.data;
+      const file = collected.files && collected.files.get(m.id);
+      if (file) {
+        m.attachment = file.path;
+        m.attachmentSize = file.size;
+      }
     }
     for (const m of list) delete m.id;
     return list;
@@ -703,7 +1043,12 @@
 
   function bodyOf(m) {
     let body = m.text || '';
-    if (m.media) body = body ? `<Media omitted: ${m.media}> ${body}` : `<Media omitted: ${m.media}>`;
+    if (m.attachment) {
+      body = body ? `<attached: ${m.attachment}> ${body}` : `<attached: ${m.attachment}>`;
+    } else if (m.media) {
+      const what = m.fileName ? `${m.media} "${m.fileName}"` : m.media;
+      body = body ? `<Media omitted: ${what}> ${body}` : `<Media omitted: ${what}>`;
+    }
     if (!body) body = '<Media omitted>';
     if (m.quote) body = `[Reply to: "${shorten(m.quote, 80)}"] ${body}`;
     return body;
@@ -738,7 +1083,7 @@
       const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
       return `"${safe.replace(/"/g, '""')}"`;
     };
-    const rows = [['date', 'time', 'sender', 'from_me', 'type', 'media', 'text', 'reply_to']];
+    const rows = [['date', 'time', 'sender', 'from_me', 'type', 'media', 'text', 'reply_to', 'file_name', 'attachment']];
     for (const m of messages) {
       if (m.kind === 'date') continue;
       rows.push([
@@ -748,12 +1093,14 @@
         m.kind === 'message' ? (m.fromMe ? 'yes' : 'no') : '',
         m.kind,
         m.media || '',
-        m.kind === 'message' && !m.text && m.media ? '<Media omitted>' : m.text,
+        m.kind === 'message' && !m.text && m.media && !m.attachment ? '<Media omitted>' : m.text,
         m.quote || '',
+        m.fileName || '',
+        m.attachment || '',
       ]);
     }
     // BOM so Excel opens UTF-8 (Bangla, emoji…) correctly
-    return '﻿' + rows.map((r) => r.map(cell).join(',')).join('\r\n') + '\r\n';
+    return '\ufeff' + rows.map((r) => r.map(cell).join(',')).join('\r\n') + '\r\n';
   }
 
   function toHtml(meta, messages) {
@@ -775,14 +1122,28 @@
       const showName = !m.fromMe && m.sender && m.sender !== prevSender;
       prevSender = m.fromMe ? null : m.sender;
       let media = '';
-      if (m.imageData) {
+      const href = m.attachment ? esc(m.attachment.split('/').map(encodeURIComponent).join('/')) : '';
+      const label = m.attachment ? m.attachment.split('/').pop() : '';
+      if (m.attachment && (m.media === 'image' || m.media === 'sticker')) {
+        const cls = m.media === 'sticker' ? 'photo sticker' : 'photo';
+        media = `<img class="${cls}" src="${href}" alt="${esc(label)}" loading="lazy">`;
+      } else if (m.attachment && m.media === 'video') {
+        const poster = m.imageData ? ` poster="${m.imageData}"` : '';
+        media = `<video class="clip" controls preload="metadata" src="${href}"${poster}></video>`;
+      } else if (m.attachment && m.media === 'audio') {
+        media = `<audio controls preload="metadata" src="${href}"></audio>`;
+      } else if (m.attachment) {
+        const size = m.attachmentSize ? ` · ${formatSize(m.attachmentSize)}` : '';
+        media = `<a class="file" href="${href}"><span class="file-icon">📄</span><span class="file-name">${esc(m.fileName || label)}</span><span class="file-size">${esc(fileExt(label))}${size}</span></a>`;
+      } else if (m.imageData) {
         const cls = m.media === 'sticker' ? 'photo sticker' : 'photo';
         const pic = `<img class="${cls}" src="${m.imageData}" alt="${esc(m.media)}" loading="lazy">`;
         media = m.media === 'video'
           ? `<div class="video">${pic}<span class="play">▶ video (thumbnail only)</span></div>`
           : pic;
       } else if (m.media) {
-        media = `<div class="media">📎 ${esc(m.media)} (not included)</div>`;
+        const what = m.fileName ? `${m.media} "${m.fileName}"` : m.media;
+        media = `<div class="media">📎 ${esc(what)} (not downloaded)</div>`;
       }
       const quote = m.quote ? `<div class="quote">${esc(m.quote)}</div>` : '';
       const text = m.text ? `<div class="text${m.deleted ? ' deleted' : ''}">${esc(m.text)}</div>` : '';
@@ -823,6 +1184,13 @@
   .text.deleted { font-style:italic; color:var(--muted); }
   .quote { border-left:4px solid var(--accent); background:rgba(0,0,0,.05); padding:4px 8px; border-radius:4px; margin-bottom:4px; font-size:13px; color:var(--muted); white-space:pre-wrap; }
   .media { font-size:13px; color:var(--muted); margin-bottom:2px; }
+  .file { display:flex; align-items:center; gap:10px; padding:10px 12px; margin:2px 0 4px; border-radius:6px; background:rgba(0,0,0,.06); color:inherit; text-decoration:none; }
+  .file:hover { background:rgba(0,0,0,.1); }
+  .file-icon { font-size:26px; }
+  .file-name { flex:1; font-weight:500; overflow-wrap:anywhere; }
+  .file-size { font-size:11.5px; color:var(--muted); text-transform:uppercase; white-space:nowrap; }
+  .clip { display:block; max-width:100%; max-height:420px; border-radius:6px; margin:2px 0 4px; background:#000; }
+  audio { display:block; max-width:100%; margin:2px 0 4px; }
   .photo { display:block; max-width:100%; max-height:420px; border-radius:6px; margin:2px 0 4px; cursor:zoom-in; }
   .photo.sticker { max-width:160px; max-height:160px; }
   .video { position:relative; }
@@ -877,6 +1245,22 @@ ${parts.join('\n')}
       await sleep(200);
     }
     return false;
+  }
+
+  function formatSize(bytes) {
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let n = bytes;
+    let i = 0;
+    while (n >= 1024 && i < units.length - 1) {
+      n /= 1024;
+      i++;
+    }
+    return `${n < 10 && i ? n.toFixed(1) : Math.round(n)} ${units[i]}`;
+  }
+
+  function fileExt(name) {
+    const m = /\.([A-Za-z0-9]{1,8})$/.exec(name || '');
+    return m ? m[1] : 'file';
   }
 
   function shorten(s, n) {

@@ -9,9 +9,12 @@ const api = typeof browser !== 'undefined' ? browser : chrome;
 const pendingUrls = new Map();
 
 api.runtime.onMessage.addListener((msg) => {
-  if (!msg || msg.type !== 'WA_EXPORT_DOWNLOAD') return undefined;
+  if (!msg) return undefined;
+  if (msg.type === 'WA_DISCARD_DOWNLOAD') return discardDownload(msg.id);
+  if (msg.type !== 'WA_EXPORT_DOWNLOAD') return undefined;
 
-  const blob = new Blob([msg.content], { type: msg.mime || 'text/plain' });
+  const blob =
+    msg.blob instanceof Blob ? msg.blob : new Blob([msg.content || ''], { type: msg.mime || 'text/plain' });
   const url = URL.createObjectURL(blob);
 
   return api.downloads
@@ -39,3 +42,40 @@ api.downloads.onChanged.addListener((delta) => {
     pendingUrls.delete(delta.id);
   }
 });
+
+/* During an export WhatsApp's own file downloads are normally intercepted in
+ * the page. If one still reaches the browser, tell the WhatsApp tabs so the
+ * exporter can copy the file into its folder (and then discard this one). */
+api.downloads.onCreated.addListener((item) => {
+  if (!/^blob:https:\/\/web\.whatsapp\.com\//.test(item.url || '')) return;
+  api.tabs
+    .query({ url: '*://web.whatsapp.com/*' })
+    .then((tabs) => {
+      for (const tab of tabs) {
+        api.tabs
+          .sendMessage(tab.id, { type: 'WA_PAGE_DOWNLOAD', id: item.id, url: item.url, filename: item.filename })
+          .catch(() => {});
+      }
+    })
+    .catch(() => {});
+});
+
+async function discardDownload(id) {
+  try {
+    await api.downloads.cancel(id);
+  } catch (e) {
+    // already finished
+  }
+  try {
+    const [item] = await api.downloads.search({ id });
+    if (item && item.state === 'complete' && item.exists) await api.downloads.removeFile(id);
+  } catch (e) {
+    // nothing to remove
+  }
+  try {
+    await api.downloads.erase({ id });
+  } catch (e) {
+    // ignore
+  }
+  return { ok: true };
+}

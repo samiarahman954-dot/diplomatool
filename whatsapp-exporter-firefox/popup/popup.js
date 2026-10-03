@@ -8,6 +8,7 @@ const DEFAULTS = {
   loadHistory: true,
   includeSystem: true,
   embedImages: true,
+  downloadAttachments: true,
   saveAs: false,
   maxMessages: 0,
 };
@@ -37,6 +38,7 @@ function readForm() {
     loadHistory: $('loadHistory').checked,
     includeSystem: $('includeSystem').checked,
     embedImages: $('embedImages').checked,
+    downloadAttachments: $('downloadAttachments').checked,
     saveAs: $('saveAs').checked,
     maxMessages: Math.max(0, parseInt($('maxMessages').value, 10) || 0),
   };
@@ -48,6 +50,7 @@ function fillForm(opts) {
   $('loadHistory').checked = !!opts.loadHistory;
   $('includeSystem').checked = !!opts.includeSystem;
   $('embedImages').checked = !!opts.embedImages;
+  $('downloadAttachments').checked = !!opts.downloadAttachments;
   $('saveAs').checked = !!opts.saveAs;
   $('maxMessages').value = opts.maxMessages || 0;
 }
