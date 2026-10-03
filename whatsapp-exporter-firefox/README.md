@@ -37,7 +37,7 @@ Mozilla-r signature chara Firefox permanent add-on install korte dey na. Duita u
 ### Zip banano
 ```sh
 cd whatsapp-exporter-firefox
-npx web-ext build      # web-ext-artifacts/whatsapp_chat_exporter-1.1.0.zip
+npx web-ext build      # web-ext-artifacts/whatsapp_chat_exporter-1.2.0.zip
 npx web-ext lint       # check
 npx web-ext run        # Firefox-e test run
 ```
@@ -74,6 +74,7 @@ Exported: 10/3/2026, 2:33:37 PM (49 messages)
 
 ## Limitations
 
+- "No messages found" dekhale progress box-er **Copy debug info** button chapun ar report-ta developer-ke pathan. Report-e kono message text, naam ba number thake na, shudhu page-er structure thake.
 - WhatsApp Web-er HTML structure change hole kichu jinish (jemon media type, reply) bhul dekhate pare. Message text, sender, time sadharonoto `data-pre-plain-text` theke ase, ja beshi stable.
 - Phone-e thaka khub purono message WhatsApp Web-e load na hole export-eo asbe na.
 - Video/audio/document download hoy na. Chobi shudhu HTML-e thake.

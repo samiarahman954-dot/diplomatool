@@ -113,7 +113,10 @@
       }
 
       const realCount = messages.filter((m) => m.kind === 'message').length;
-      if (!realCount) throw new Error('No messages found in this chat.');
+      if (!realCount) {
+        overlay.offerDebug(() => buildDebugReport(getMain()));
+        throw new Error('No messages found in this chat. Click "Copy debug info" and send it to the developer.');
+      }
 
       overlay.set(`Building ${format.toUpperCase()} file (${realCount} messages)…`);
       const meta = {
@@ -363,13 +366,51 @@
     return name || 'WhatsApp Chat';
   }
 
+  const MSG_CLASS_SEL = '.message-in, .message-out';
+  const ANCHOR_SEL = '[data-pre-plain-text], .message-in, .message-out';
+
+  /* WhatsApp Web changes its markup often, so try several ways of finding
+   * the message rows and use the first one that actually contains messages. */
   function getMessageNodes(main) {
-    const rows = main.querySelectorAll('[role="row"]');
-    if (rows.length) return Array.from(rows);
-    // fallback: outermost elements carrying a message id
-    return Array.from(main.querySelectorAll('[data-id]')).filter(
-      (el) => !el.parentElement || !el.parentElement.closest('[data-id]')
-    );
+    const hasAnchors = !!main.querySelector(ANCHOR_SEL);
+    const strategies = [
+      () => Array.from(main.querySelectorAll('[role="row"]')),
+      () =>
+        Array.from(main.querySelectorAll('[data-id]')).filter(
+          (el) => !el.parentElement || !el.parentElement.closest('[data-id]')
+        ),
+      () => nodesFromAnchors(main),
+    ];
+    for (const strategy of strategies) {
+      const nodes = strategy();
+      if (!nodes.length) continue;
+      if (!hasAnchors || nodes.some((n) => n.matches(MSG_CLASS_SEL) || n.querySelector(ANCHOR_SEL))) {
+        return nodes;
+      }
+    }
+    return [];
+  }
+
+  /* Class-independent fallback: the message list is the closest common
+   * ancestor of all elements carrying data-pre-plain-text; its children
+   * (split further while one still holds several messages) are the rows. */
+  function nodesFromAnchors(main) {
+    const anchors = Array.from(main.querySelectorAll('[data-pre-plain-text]'));
+    if (!anchors.length) return [];
+    let list = anchors[0].parentElement;
+    if (anchors.length > 1) {
+      while (list && list !== main && !anchors.every((a) => list.contains(a))) list = list.parentElement;
+    } else {
+      while (list && list !== main && list.parentElement && list.parentElement.children.length < 3) {
+        list = list.parentElement;
+      }
+      list = list && list.parentElement;
+    }
+    if (!list) return [];
+    const count = (el) => el.querySelectorAll('[data-pre-plain-text]').length;
+    const expand = (el) =>
+      count(el) > 1 && el.children.length > 1 ? Array.from(el.children).flatMap(expand) : [el];
+    return Array.from(list.children).flatMap(expand);
   }
 
   function findScroller(main) {
@@ -464,23 +505,27 @@
   function parseNode(node) {
     const idEl = node.matches('[data-id]') ? node : node.querySelector('[data-id]');
     const id = idEl ? idEl.getAttribute('data-id') : null;
-    const bubble = node.matches('.message-in, .message-out')
-      ? node
-      : node.querySelector('.message-in, .message-out');
+    const classBubble = node.matches(MSG_CLASS_SEL) ? node : node.querySelector(MSG_CLASS_SEL);
+    const pre = node.matches('[data-pre-plain-text]') ? node : node.querySelector('[data-pre-plain-text]');
+    const looksLikeMessage =
+      classBubble ||
+      pre ||
+      node.querySelector('[data-icon^="tail-"], span.selectable-text') ||
+      detectMedia(node);
 
-    if (!bubble) {
+    if (!looksLikeMessage) {
       const text = normalize(extractText(node));
       if (!text) return null;
       const kind = DATE_DIVIDER_RE.test(text) ? 'date' : 'system';
       return { id: id || `${kind}:${text}`, kind, text };
     }
 
-    const fromMe = bubble.classList.contains('message-out') || (!!id && id.startsWith('true_'));
+    const bubble = classBubble || node;
+    const fromMe = detectFromMe(node, classBubble, id, pre);
 
     let date = '';
     let time = '';
     let sender = '';
-    const pre = bubble.querySelector('[data-pre-plain-text]');
     if (pre) {
       const parsed = parsePrePlain(pre.getAttribute('data-pre-plain-text'));
       date = parsed.date;
@@ -497,6 +542,10 @@
     );
     const topSpans = spans.filter((s) => !spans.some((o) => o !== s && o.contains(s)));
     let text = normalize(topSpans.map(extractText).join('\n'));
+    if (!text && pre && !isInsideQuote(pre, bubble)) {
+      // markup without .selectable-text: take the text container itself
+      text = normalize(extractText(pre)).replace(/\s*\d{1,2}[:.]\d{2}(\s?[AaPp]\.?\s?[Mm]\.?)?$/, '');
+    }
 
     const deleted = !!bubble.querySelector('[data-icon="recalled"], [data-testid="recalled"]');
     if (deleted) {
@@ -516,6 +565,24 @@
       media,
       deleted,
     };
+  }
+
+  function detectFromMe(node, classBubble, id, pre) {
+    if (classBubble) return classBubble.classList.contains('message-out');
+    if (/^true_/.test(id || '')) return true;
+    if (/^false_/.test(id || '')) return false;
+    if (node.querySelector('[data-icon="tail-out"], [data-icon^="msg-check"], [data-icon^="msg-dblcheck"], [data-icon="msg-time"]')) {
+      return true;
+    }
+    if (node.querySelector('[data-icon="tail-in"]')) return false;
+    // last resort: outgoing bubbles sit on the right side of the row
+    const content = pre || node.querySelector('span.selectable-text, img');
+    if (!content) return false;
+    const n = node.getBoundingClientRect();
+    const c = content.getBoundingClientRect();
+    if (!n.width || !c.width) return false;
+    const onRight = c.left - n.left > n.right - c.right;
+    return document.dir === 'rtl' ? !onRight : onRight;
   }
 
   function parsePrePlain(value) {
@@ -829,6 +896,85 @@ ${parts.join('\n')}
   }
 
   // ---------------------------------------------------------------------------
+  // Debug report (structure only – all text, names and numbers are masked)
+  // ---------------------------------------------------------------------------
+
+  function mask(value) {
+    return String(value).replace(/\p{L}/gu, 'a').replace(/\d/g, '9');
+  }
+
+  function describe(el) {
+    const parts = [el.tagName.toLowerCase()];
+    if (el.id) parts.push(`#${el.id}`);
+    const cls = typeof el.className === 'string' ? el.className.trim().split(/\s+/).filter(Boolean) : [];
+    if (cls.length) parts.push('.' + cls.slice(0, 8).join('.'));
+    for (const attr of ['role', 'data-icon', 'data-testid', 'tabindex', 'dir']) {
+      if (el.hasAttribute(attr)) parts.push(`[${attr}="${el.getAttribute(attr)}"]`);
+    }
+    for (const attr of ['data-id', 'data-pre-plain-text', 'aria-label', 'title']) {
+      if (el.hasAttribute(attr)) parts.push(`[${attr}="${mask(el.getAttribute(attr)).slice(0, 60)}"]`);
+    }
+    if (el.tagName === 'IMG') parts.push(`{src:${(el.getAttribute('src') || '').slice(0, 5)}}`);
+    return parts.join('');
+  }
+
+  function skeleton(el, depth, lines, maxDepth) {
+    if (lines.length > 400) return;
+    const text = Array.from(el.childNodes)
+      .filter((c) => c.nodeType === Node.TEXT_NODE && c.nodeValue.trim())
+      .map((c) => c.nodeValue.trim().length);
+    lines.push(`${'  '.repeat(depth)}${describe(el)}${text.length ? ` "text(${text.join(',')})"` : ''}`);
+    if (depth >= maxDepth) return;
+    const kids = Array.from(el.children);
+    kids.slice(0, 8).forEach((k) => skeleton(k, depth + 1, lines, maxDepth));
+    if (kids.length > 8) lines.push(`${'  '.repeat(depth + 1)}… ${kids.length - 8} more`);
+  }
+
+  function buildDebugReport(main) {
+    const lines = [
+      'WhatsApp Chat Exporter debug report v' + api.runtime.getManifest().version,
+      navigator.userAgent,
+    ];
+    if (!main) return lines.concat('#main not found').join('\n');
+    const count = (sel) => main.querySelectorAll(sel).length;
+    lines.push(
+      'counts: ' +
+        JSON.stringify({
+          rows: count('[role="row"]'),
+          dataId: count('[data-id]'),
+          prePlain: count('[data-pre-plain-text]'),
+          msgIn: count('.message-in'),
+          msgOut: count('.message-out'),
+          selectable: count('span.selectable-text'),
+          copyable: count('.copyable-text'),
+          tails: count('[data-icon^="tail-"]'),
+          nodesFound: getMessageNodes(main).length,
+        })
+    );
+    const anchor = main.querySelector('[data-pre-plain-text]') || main.querySelector('span.selectable-text');
+    if (anchor) {
+      lines.push('', '--- ancestors of first message text (outermost last) ---');
+      for (let el = anchor; el && el !== main.parentElement; el = el.parentElement) {
+        lines.push(`${describe(el)} children=${el.children.length}`);
+      }
+      // the row-level element: highest ancestor below a node with many children
+      let row = anchor;
+      while (row.parentElement && row.parentElement !== main && row.parentElement.children.length < 4) {
+        row = row.parentElement;
+      }
+      lines.push('', '--- message list (2 rows) ---');
+      const list = row.parentElement || row;
+      skeleton(list, 0, lines, 1);
+      lines.push('', '--- one message row ---');
+      skeleton(row, 0, lines, 14);
+    } else {
+      lines.push('', '--- #main (no message text element found) ---');
+      skeleton(main, 0, lines, 9);
+    }
+    return lines.join('\n');
+  }
+
+  // ---------------------------------------------------------------------------
   // On-page progress overlay
   // ---------------------------------------------------------------------------
 
@@ -836,6 +982,7 @@ ${parts.join('\n')}
     const old = document.getElementById('wa-chat-exporter-overlay');
     if (old) old.remove();
 
+    let keepOpen = false;
     const box = document.createElement('div');
     box.id = 'wa-chat-exporter-overlay';
     Object.assign(box.style, {
@@ -892,12 +1039,40 @@ ${parts.join('\n')}
       status.style.color = color;
       btn.disabled = false;
       btn.textContent = 'Close';
-      setTimeout(() => box.remove(), 8000);
+      setTimeout(() => {
+        if (!keepOpen) box.remove();
+      }, 8000);
     };
 
     return {
       set: (text) => {
         status.textContent = text;
+      },
+      offerDebug: (makeReport) => {
+        keepOpen = true;
+        const copy = document.createElement('button');
+        copy.textContent = 'Copy debug info';
+        Object.assign(copy.style, { background: '#00a884', color: '#111b21', border: '0', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', font: 'inherit', marginTop: '8px', display: 'block' });
+        copy.addEventListener('click', () => {
+          const report = makeReport();
+          let area = label.querySelector('textarea');
+          if (!area) {
+            area = document.createElement('textarea');
+            area.readOnly = true;
+            Object.assign(area.style, { width: '100%', height: '160px', marginTop: '6px', fontSize: '11px' });
+            label.appendChild(area);
+          }
+          area.value = report;
+          area.select();
+          copy.textContent = 'Select all + Ctrl+C if not copied';
+          const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1500));
+          Promise.race([navigator.clipboard.writeText(report), timeout])
+            .then(() => {
+              copy.textContent = 'Copied ✔ – paste it in the chat';
+            })
+            .catch(() => {});
+        });
+        label.appendChild(copy);
       },
       done: (text) => finish(text, '#a6f3c0'),
       fail: (text) => finish(text, '#ff9b9b'),

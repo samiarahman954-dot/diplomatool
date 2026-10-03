@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "WhatsApp Chat Exporter",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Export WhatsApp Web chats to TXT, HTML, JSON or CSV. Everything stays on your computer.",
   "icons": {
     "48": "icons/icon.svg",
