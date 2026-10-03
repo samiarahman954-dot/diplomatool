@@ -7,6 +7,7 @@ const DEFAULTS = {
   format: 'txt',
   loadHistory: true,
   includeSystem: true,
+  embedImages: true,
   saveAs: false,
   maxMessages: 0,
 };
@@ -35,6 +36,7 @@ function readForm() {
     format: document.querySelector('input[name="format"]:checked').value,
     loadHistory: $('loadHistory').checked,
     includeSystem: $('includeSystem').checked,
+    embedImages: $('embedImages').checked,
     saveAs: $('saveAs').checked,
     maxMessages: Math.max(0, parseInt($('maxMessages').value, 10) || 0),
   };
@@ -45,6 +47,7 @@ function fillForm(opts) {
   if (radio) radio.checked = true;
   $('loadHistory').checked = !!opts.loadHistory;
   $('includeSystem').checked = !!opts.includeSystem;
+  $('embedImages').checked = !!opts.embedImages;
   $('saveAs').checked = !!opts.saveAs;
   $('maxMessages').value = opts.maxMessages || 0;
 }

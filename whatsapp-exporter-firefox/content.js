@@ -17,6 +17,12 @@
   const DATE_DIVIDER_RE =
     /^(\d{1,4}[/.\-]\d{1,2}[/.\-]\d{1,4}|today|yesterday|monday|tuesday|wednesday|thursday|friday|saturday|sunday|[a-z]+ \d{1,2}, \d{4}|\d{1,2} [a-z]+ \d{4})$/i;
 
+  // media types whose picture (or thumbnail) is embedded in the HTML export
+  const PICTURE_MEDIA = new Set(['image', 'sticker', 'video']);
+  // images larger than this are scaled down so the HTML file stays openable
+  const MAX_IMAGE_BYTES = 1.5 * 1024 * 1024;
+  const MAX_IMAGE_SIDE = 1600;
+
   const FORMATS = {
     txt: { ext: 'txt', mime: 'text/plain;charset=utf-8', build: toTxt },
     html: { ext: 'html', mime: 'text/html;charset=utf-8', build: toHtml },
@@ -74,7 +80,14 @@
       const chatName = getChatName();
       overlay.set(`Reading "${chatName}"…`);
 
-      const collected = { store: new Map(), order: [], cache: new WeakMap() };
+      const withImages = format === 'html' && options.embedImages !== false;
+      const collected = {
+        store: new Map(),
+        order: [],
+        cache: new WeakMap(),
+        images: withImages ? new Map() : null, // message id -> { data, full }
+        imageTried: new Set(),
+      };
       collect(main, collected);
 
       if (options.loadHistory !== false) {
@@ -157,6 +170,7 @@
       await sleep(350);
 
       collect(main, collected);
+      if (collected.images) await captureImages(main, collected, scroller, overlay);
       const total = countMessages(collected);
       overlay.set(`Loading older messages… ${total} found`);
 
@@ -185,11 +199,149 @@
       expandReadMore(main);
       await sleep(120);
       collect(main, collected, true);
+      if (collected.images) {
+        await captureImages(main, collected, scroller, overlay);
+      }
       const atBottom = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 2;
       if (atBottom || scroller.scrollTop === lastTop || cancelRequested) break;
       lastTop = scroller.scrollTop;
       scroller.scrollTop += Math.max(200, Math.floor(scroller.clientHeight * 0.8));
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Images (HTML export)
+  // ---------------------------------------------------------------------------
+
+  /* Save the pictures of the image/sticker/video messages currently in the
+   * DOM as data: URLs. Images that are only a blurry preview get their
+   * download button clicked (once) when on screen, and we wait briefly for
+   * WhatsApp to load the real picture. */
+  async function captureImages(main, collected, scroller, overlay) {
+    const targets = [];
+    for (const node of getMessageNodes(main)) {
+      const msg = collected.cache.get(node);
+      if (!msg || msg.kind !== 'message' || !PICTURE_MEDIA.has(msg.media)) continue;
+      const prev = collected.images.get(msg.id);
+      if (prev && prev.full) continue;
+      const bubble = node.querySelector('.message-in, .message-out') || node;
+      targets.push({ msg, node, bubble });
+    }
+    if (!targets.length) return;
+
+    // ask WhatsApp to load full pictures that are visible but not loaded yet
+    const waiting = [];
+    for (const t of targets) {
+      if (collected.imageTried.has(t.msg.id) || !isOnScreen(t.node, scroller)) continue;
+      const img = bestImage(t.bubble);
+      if (img && isFullImage(img)) continue;
+      collected.imageTried.add(t.msg.id);
+      if (t.msg.media !== 'video') clickMediaDownload(t.bubble);
+      waiting.push(t);
+    }
+    if (waiting.length) {
+      await waitFor(
+        () => waiting.every((t) => {
+          const img = bestImage(t.bubble);
+          return img && isFullImage(img);
+        }),
+        3000
+      );
+    }
+
+    for (const t of targets) {
+      if (cancelRequested) return;
+      const img = bestImage(t.bubble);
+      if (!img) continue;
+      const full = isFullImage(img);
+      const prev = collected.images.get(t.msg.id);
+      if (prev && !full) continue; // already have the preview
+      const data = await imageToDataUrl(img);
+      if (data) collected.images.set(t.msg.id, { data, full });
+    }
+    overlay.set(`Reading messages… ${countMessages(collected)} found, ${collected.images.size} images saved`);
+  }
+
+  function bestImage(bubble) {
+    let best = null;
+    let bestScore = -1;
+    for (const img of bubble.querySelectorAll('img')) {
+      const src = img.currentSrc || img.src || '';
+      if (!/^(blob:|data:image)/.test(src)) continue;
+      if (img.classList.contains('emoji') || isInsideQuote(img, bubble) || img.closest('a[href]')) continue;
+      const area = (img.naturalWidth || img.width || 0) * (img.naturalHeight || img.height || 0);
+      const score = (src.startsWith('blob:') ? 1e9 : 0) + area;
+      if (score > bestScore) {
+        best = img;
+        bestScore = score;
+      }
+    }
+    return best;
+  }
+
+  function isFullImage(img) {
+    return (img.currentSrc || img.src || '').startsWith('blob:') && img.complete && img.naturalWidth > 0;
+  }
+
+  function isOnScreen(node, scroller) {
+    const r = node.getBoundingClientRect();
+    const s = scroller.getBoundingClientRect();
+    return r.bottom > s.top && r.top < s.bottom;
+  }
+
+  function clickMediaDownload(bubble) {
+    if (bubble.querySelector('[data-icon*="document"], [data-testid*="document"]')) return;
+    const icon = bubble.querySelector('[data-icon*="download"]');
+    if (!icon) return;
+    const target = icon.closest('button, [role="button"]') || icon;
+    target.click();
+  }
+
+  async function imageToDataUrl(img) {
+    const src = img.currentSrc || img.src;
+    if (src.startsWith('data:image') && src.length < MAX_IMAGE_BYTES) return src;
+
+    // Firefox: content.fetch runs with the page's origin, which owns the blob: URL
+    const fetchers = [];
+    if (typeof content !== 'undefined' && content && typeof content.fetch === 'function') {
+      fetchers.push((u) => content.fetch(u));
+    }
+    fetchers.push((u) => fetch(u));
+    for (const doFetch of fetchers) {
+      try {
+        const blob = await (await doFetch(src)).blob();
+        if (blob.size && blob.size <= MAX_IMAGE_BYTES && /^image\//.test(blob.type)) {
+          return await blobToDataUrl(blob);
+        }
+        if (blob.size) break; // too big or unknown type: re-encode below
+      } catch (e) {
+        // try the next way
+      }
+    }
+    return canvasDataUrl(img);
+  }
+
+  function canvasDataUrl(img) {
+    try {
+      if (!img.complete || !img.naturalWidth) return null;
+      const scale = Math.min(1, MAX_IMAGE_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.naturalWidth * scale);
+      canvas.height = Math.round(img.naturalHeight * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL('image/jpeg', 0.88);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -404,8 +556,9 @@
     if (has('[data-icon*="vcard"], [data-testid*="vcard"]')) return 'contact';
     const imgs = bubble.querySelectorAll('img[src^="blob:"], img[src^="data:image"]');
     for (const img of imgs) {
-      if (img.classList.contains('emoji') || isInsideQuote(img, bubble)) continue;
-      const w = img.naturalWidth || img.width || 0;
+      if (img.classList.contains('emoji') || isInsideQuote(img, bubble) || img.closest('a[href]')) continue;
+      // rendered size: a not-yet-downloaded photo is a tiny preview shown large
+      const w = img.getBoundingClientRect().width || img.width || img.naturalWidth || 0;
       if (w && w < 40) continue; // emoji / tiny icons
       return 'image';
     }
@@ -470,6 +623,8 @@
       else m.date = lastDate;
       if (!m.sender) m.sender = m.fromMe ? 'You' : lastIncomingSender;
       if (!m.fromMe && m.sender) lastIncomingSender = m.sender;
+      const pic = collected.images && collected.images.get(m.id);
+      if (pic) m.imageData = pic.data;
     }
     for (const m of list) delete m.id;
     return list;
@@ -552,7 +707,16 @@
       }
       const showName = !m.fromMe && m.sender && m.sender !== prevSender;
       prevSender = m.fromMe ? null : m.sender;
-      const media = m.media ? `<div class="media">📎 ${esc(m.media)} (not included)</div>` : '';
+      let media = '';
+      if (m.imageData) {
+        const cls = m.media === 'sticker' ? 'photo sticker' : 'photo';
+        const pic = `<img class="${cls}" src="${m.imageData}" alt="${esc(m.media)}" loading="lazy">`;
+        media = m.media === 'video'
+          ? `<div class="video">${pic}<span class="play">▶ video (thumbnail only)</span></div>`
+          : pic;
+      } else if (m.media) {
+        media = `<div class="media">📎 ${esc(m.media)} (not included)</div>`;
+      }
       const quote = m.quote ? `<div class="quote">${esc(m.quote)}</div>` : '';
       const text = m.text ? `<div class="text${m.deleted ? ' deleted' : ''}">${esc(m.text)}</div>` : '';
       parts.push(
@@ -592,6 +756,13 @@
   .text.deleted { font-style:italic; color:var(--muted); }
   .quote { border-left:4px solid var(--accent); background:rgba(0,0,0,.05); padding:4px 8px; border-radius:4px; margin-bottom:4px; font-size:13px; color:var(--muted); white-space:pre-wrap; }
   .media { font-size:13px; color:var(--muted); margin-bottom:2px; }
+  .photo { display:block; max-width:100%; max-height:420px; border-radius:6px; margin:2px 0 4px; cursor:zoom-in; }
+  .photo.sticker { max-width:160px; max-height:160px; }
+  .video { position:relative; }
+  .video .play { position:absolute; left:8px; bottom:12px; background:rgba(0,0,0,.6); color:#fff; font-size:12px; padding:2px 8px; border-radius:10px; }
+  #lightbox { position:fixed; inset:0; background:rgba(0,0,0,.88); display:flex; align-items:center; justify-content:center; z-index:10; cursor:zoom-out; }
+  #lightbox[hidden] { display:none; }
+  #lightbox img { max-width:96vw; max-height:96vh; }
   .meta { font-size:11px; color:var(--muted); text-align:right; margin-top:2px; }
   .divider { text-align:center; margin:12px 0; }
   .divider span, .system { display:inline-block; background:var(--pill); color:var(--muted); font-size:12.5px; padding:5px 12px; border-radius:8px; box-shadow:0 1px .5px rgba(0,0,0,.13); }
@@ -603,6 +774,21 @@
 <main>
 ${parts.join('\n')}
 </main>
+<div id="lightbox" hidden><img alt=""></div>
+<script>
+  document.addEventListener('click', function (e) {
+    var box = document.getElementById('lightbox');
+    if (e.target.classList && e.target.classList.contains('photo')) {
+      box.firstChild.src = e.target.src;
+      box.hidden = false;
+    } else if (e.target.closest && e.target.closest('#lightbox')) {
+      box.hidden = true;
+    }
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') document.getElementById('lightbox').hidden = true;
+  });
+</script>
 </body>
 </html>
 `;
