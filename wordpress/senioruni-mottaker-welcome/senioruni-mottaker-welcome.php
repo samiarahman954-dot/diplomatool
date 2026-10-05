@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SeniorUni – Mottaker-velkomst
  * Description: Familie purchases: sends the Mottaker's set-password email from a MemberPress template instead of the English one and their welcome email only after the password is set. New members are added to Mailchimp and get a welcome SMS, and member phone numbers are copied to the field Vipps/SMS login uses. Does not modify MemberPress, Corporate Accounts or the Vipps plugin.
- * Version:     1.2.0
+ * Version:     1.2.1
  * Author:      SeniorUni
  * Requires at least: 6.2
  * Requires PHP: 7.4
@@ -17,7 +17,7 @@ final class SeniorUni_Mottaker_Welcome {
 	const META_SENT    = '_senioruni_mw_sent';
 	const OPTION       = 'senioruni_mw_template';
 	const LOG_OPTION   = 'senioruni_mw_log';
-	const LOG_MAX      = 30;
+	const LOG_MAX      = 100;
 	const PRODUCT_TPL  = '__product_welcome__';
 
 	/** Template for the set-password email; '' = auto-detect Sub Account Welcome Email, 'off' = keep the English one. */
@@ -44,6 +44,9 @@ final class SeniorUni_Mottaker_Welcome {
 
 	/** True while this plugin is sending mail, so pre_wp_mail doesn't intercept its own emails. */
 	private static $sending = false;
+
+	/** Password-link variables (name => URL) for the email being sent, also replaced when URL-encoded. */
+	private static $link_vars = array();
 
 	/** Set when an onboarding job was scheduled in this request, so cron is kicked off at shutdown. */
 	private static $kick_cron = false;
@@ -229,14 +232,35 @@ final class SeniorUni_Mottaker_Welcome {
 
 			$email->to     = $to_override ? $to_override : $usr->formatted_email();
 			self::$sending = true;
+			add_filter( 'wp_mail', array( __CLASS__, 'fill_encoded_link_vars' ) );
 			$email->send( $params );
 		} catch ( \Throwable $e ) {
 			return get_class( $e ) . ': ' . $e->getMessage();
 		} finally {
-			self::$sending = false;
+			self::$sending   = false;
+			self::$link_vars = array();
+			remove_filter( 'wp_mail', array( __CLASS__, 'fill_encoded_link_vars' ) );
 		}
 
 		return true;
+	}
+
+	/**
+	 * A {$var} inside a link may reach the email URL-encoded (%7B$var%7D), which MemberPress may not
+	 * replace: fill in the password link there too.
+	 */
+	public static function fill_encoded_link_vars( $atts ) {
+		if ( ! self::$link_vars || ! isset( $atts['message'] ) || ! is_string( $atts['message'] ) ) {
+			return $atts;
+		}
+		foreach ( self::$link_vars as $var => $url ) {
+			$atts['message'] = str_ireplace(
+				array( '%7B$' . $var . '%7D', '%7B%24' . $var . '%7D', '{$' . $var . '}' ),
+				esc_url( $url ),
+				$atts['message']
+			);
+		}
+		return $atts;
 	}
 
 	/**
@@ -344,7 +368,8 @@ final class SeniorUni_Mottaker_Welcome {
 			$url = $existing_url && self::reset_url_is_valid( $existing_url, $user ) ? $existing_url : self::new_reset_url( $user );
 			$used_url = $url;
 			foreach ( array_merge( self::RESET_LINK_VARS, (array) $in_template ) as $var ) {
-				$params[ $var ] = $url;
+				$params[ $var ]          = $url;
+				self::$link_vars[ $var ] = $url;
 			}
 			return $params;
 		};
@@ -370,7 +395,8 @@ final class SeniorUni_Mottaker_Welcome {
 		if ( '' === trim( $body ) ) {
 			return null;
 		}
-		if ( ! preg_match_all( '/\{\$([a-z0-9_]+)\}/i', $body, $m ) ) {
+		// The editor may store {$var} inside a link as %7B$var%7D.
+		if ( ! preg_match_all( '/(?:\{|%7B)(?:\$|%24)([a-z0-9_]+)(?:\}|%7D)/i', $body, $m ) ) {
 			return array();
 		}
 		return array_values( array_unique( array_filter( $m[1], function ( $var ) {
@@ -729,19 +755,15 @@ final class SeniorUni_Mottaker_Welcome {
 	}
 
 	/**
-	 * Saved choice, or the Corporate Accounts "Sub Account Welcome Email" if it can be found.
+	 * Saved choice, or the membership-specific welcome (the Familie welcome email).
+	 * Never defaults to the Sub Account Welcome Email: that one asks the Mottaker to create a password.
 	 */
 	public static function get_template() {
 		$saved = get_option( self::OPTION, '' );
 		if ( $saved ) {
 			return $saved;
 		}
-		foreach ( self::available_templates() as $class => $title ) {
-			if ( preg_match( '/sub.?account.*welcome/i', $class . ' ' . $title ) ) {
-				return $class;
-			}
-		}
-		return 'MeprUserWelcomeEmail';
+		return class_exists( 'MeprUserProductWelcomeEmail' ) ? self::PRODUCT_TPL : 'MeprUserWelcomeEmail';
 	}
 
 	/* --------------------------------------------------------------------
