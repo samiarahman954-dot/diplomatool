@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: SeniorUni – Mottaker-velkomst
- * Description: Familie purchases: sends the Mottaker's set-password email from a MemberPress template instead of the English one, sends their welcome email only after the password is set, and copies member phone numbers to the field Vipps/SMS login uses. Does not modify MemberPress, Corporate Accounts or the Vipps plugin.
- * Version:     1.1.0
+ * Description: Familie purchases: sends the Mottaker's set-password email from a MemberPress template instead of the English one and their welcome email only after the password is set. New members are added to Mailchimp and get a welcome SMS, and member phone numbers are copied to the field Vipps/SMS login uses. Does not modify MemberPress, Corporate Accounts or the Vipps plugin.
+ * Version:     1.2.0
  * Author:      SeniorUni
  * Requires at least: 6.2
  * Requires PHP: 7.4
@@ -29,6 +29,13 @@ final class SeniorUni_Mottaker_Welcome {
 	const PHONE_LOGIN_META  = 'suit_mobile';
 	const META_PHONE_SYNCED = '_senioruni_mw_phone_synced';
 
+	/** On a new purchase: Mailchimp + welcome SMS, once per member. */
+	const OPTION_ONBOARD = 'senioruni_mw_onboard';
+	const META_ONBOARDED = '_senioruni_mw_onboarded';
+	const CRON_ONBOARD   = 'senioruni_mw_onboard_user';
+	const SMS_OWNER_DEFAULT    = 'Hei {navn}! Velkommen til SeniorUni. Du kan logge inn med Vipps her: {lenke}';
+	const SMS_MOTTAKER_DEFAULT = 'Hei {navn}! {kjøper} har gitt deg medlemskap i SeniorUni. Du kan logge inn med Vipps her: {lenke}';
+
 	/** Template variable names the reset link is offered under. */
 	const RESET_LINK_VARS = array( 'reset_password_link', 'reset_password_url', 'password_reset_link', 'password_reset_url', 'set_password_link', 'set_password_url', 'reset_link' );
 
@@ -37,6 +44,9 @@ final class SeniorUni_Mottaker_Welcome {
 
 	/** True while this plugin is sending mail, so pre_wp_mail doesn't intercept its own emails. */
 	private static $sending = false;
+
+	/** Set when an onboarding job was scheduled in this request, so cron is kicked off at shutdown. */
+	private static $kick_cron = false;
 
 	/** Users whose reset key was issued during this request (i.e. account creation), not a later visit. */
 	private static $pending_this_request = array();
@@ -62,11 +72,17 @@ final class SeniorUni_Mottaker_Welcome {
 		add_action( 'added_user_meta', array( __CLASS__, 'on_user_meta' ), 10, 4 );
 		add_action( 'updated_user_meta', array( __CLASS__, 'on_user_meta' ), 10, 4 );
 
+		// New purchase: add to Mailchimp and send the welcome SMS, in the background like SeniorUni Trygg does.
+		add_action( 'mepr-event-transaction-completed', array( __CLASS__, 'on_transaction_completed' ), 10, 1 );
+		add_action( self::CRON_ONBOARD, array( __CLASS__, 'onboard' ), 10, 1 );
+		add_action( 'shutdown', array( __CLASS__, 'maybe_kick_cron' ) );
+
 		if ( is_admin() ) {
 			add_action( 'admin_menu', array( __CLASS__, 'admin_menu' ) );
 			add_action( 'admin_post_senioruni_mw_save', array( __CLASS__, 'handle_save' ) );
 			add_action( 'admin_post_senioruni_mw_test', array( __CLASS__, 'handle_test' ) );
 			add_action( 'admin_post_senioruni_mw_sync_phones', array( __CLASS__, 'handle_sync_phones' ) );
+			add_action( 'admin_post_senioruni_mw_save_onboard', array( __CLASS__, 'handle_save_onboard' ) );
 		}
 	}
 
@@ -208,7 +224,7 @@ final class SeniorUni_Mottaker_Welcome {
 
 			$params = apply_filters( 'senioruni_mw_email_params', $params, $user_id, $txn, $template );
 			if ( $finalize_params ) {
-				$params = call_user_func( $finalize_params, $params );
+				$params = call_user_func( $finalize_params, $params, $email );
 			}
 
 			$email->to     = $to_override ? $to_override : $usr->formatted_email();
@@ -290,17 +306,25 @@ final class SeniorUni_Mottaker_Welcome {
 			return true;
 		}
 
-		if ( $new_url && $new_url !== $english_url ) {
-			// A new reset key was issued, so the link in the English email no longer works: send it with the new link.
-			self::$sending = true;
-			$sent          = wp_mail( $atts['to'], $subject, str_replace( $english_url, $new_url, $message ), $atts['headers'], $atts['attachments'] );
-			self::$sending = false;
-			self::log( $user->ID, 'failed: ' . $result . ' (English set-password email sent instead)', 'set-password' );
-			return $sent;
+		self::log( $user->ID, 'failed: ' . $result . ' (English set-password email sent instead)', 'set-password' );
+
+		// If a new reset key was issued along the way, the link in the English email no longer works: use a working one.
+		$fallback_url = $english_url;
+		if ( ! self::reset_url_is_valid( $english_url, $user ) ) {
+			try {
+				$fallback_url = $new_url && self::reset_url_is_valid( $new_url, $user ) ? $new_url : self::new_reset_url( $user );
+			} catch ( \Throwable $e ) {
+				$fallback_url = $english_url;
+			}
+		}
+		if ( $fallback_url === $english_url ) {
+			return $return;
 		}
 
-		self::log( $user->ID, 'failed: ' . $result . ' (English set-password email sent instead)', 'set-password' );
-		return $return;
+		self::$sending = true;
+		$sent          = wp_mail( $atts['to'], $subject, str_replace( $english_url, $fallback_url, $message ), $atts['headers'], $atts['attachments'] );
+		self::$sending = false;
+		return $sent;
 	}
 
 	/**
@@ -309,17 +333,49 @@ final class SeniorUni_Mottaker_Welcome {
 	 * @return true|string
 	 */
 	public static function send_set_password( $user, $template, $to_override = '', $existing_url = '', &$used_url = '' ) {
-		$finalize = function ( $params ) use ( $user, $existing_url, &$used_url ) {
+		$finalize = function ( $params, $email ) use ( $user, $existing_url, &$used_url ) {
+			$in_template = self::reset_vars_in_template( $email );
+			if ( array() === $in_template ) {
+				// Without a personal link the Mottaker could not set a password: let the English email go instead.
+				throw new RuntimeException( 'the template has no password link variable such as {$reset_password_link}' );
+			}
+
 			// Building the params may itself issue a new reset key, so only reuse the existing link if its key still works.
 			$url = $existing_url && self::reset_url_is_valid( $existing_url, $user ) ? $existing_url : self::new_reset_url( $user );
 			$used_url = $url;
-			foreach ( self::RESET_LINK_VARS as $var ) {
+			foreach ( array_merge( self::RESET_LINK_VARS, (array) $in_template ) as $var ) {
 				$params[ $var ] = $url;
 			}
 			return $params;
 		};
 
 		return self::send_template( $user->ID, $template, $to_override, $finalize );
+	}
+
+	/**
+	 * Variables in the template body that look like a password link ({$..reset..} / {$..password..}),
+	 * so the link works whatever the template calls it.
+	 *
+	 * @return array|null Variable names, or null if the template body can't be read.
+	 */
+	private static function reset_vars_in_template( $email ) {
+		$body = '';
+		try {
+			if ( is_object( $email ) && method_exists( $email, 'body' ) ) {
+				$body = (string) $email->body();
+			}
+		} catch ( \Throwable $e ) {
+			$body = '';
+		}
+		if ( '' === trim( $body ) ) {
+			return null;
+		}
+		if ( ! preg_match_all( '/\{\$([a-z0-9_]+)\}/i', $body, $m ) ) {
+			return array();
+		}
+		return array_values( array_unique( array_filter( $m[1], function ( $var ) {
+			return (bool) preg_match( '/reset|password|passord/i', $var );
+		} ) ) );
 	}
 
 	private static function reset_url_is_valid( $url, $user ) {
@@ -358,6 +414,10 @@ final class SeniorUni_Mottaker_Welcome {
 	public static function on_user_meta( $meta_id, $user_id, $meta_key, $meta_value ) {
 		if ( self::PHONE_SOURCE_META === $meta_key ) {
 			self::sync_phone( (int) $user_id, $meta_value );
+		}
+		// The Auto MPCA snippet writes this last, once the Mottaker is attached to the purchaser.
+		if ( 'su_mpca_parent_transaction_id' === $meta_key ) {
+			self::schedule_onboard( (int) $user_id );
 		}
 	}
 
@@ -435,6 +495,216 @@ final class SeniorUni_Mottaker_Welcome {
 			)
 		);
 		return $txn_id ? new MeprTransaction( (int) $txn_id ) : null;
+	}
+
+	/* --------------------------------------------------------------------
+	 * New purchase: Mailchimp + welcome SMS
+	 * ------------------------------------------------------------------ */
+
+	public static function onboard_settings() {
+		$saved = get_option( self::OPTION_ONBOARD, array() );
+		$saved = is_array( $saved ) ? $saved : array();
+		return array_merge(
+			array(
+				'mailchimp'    => true,
+				'sms'          => true,
+				'sms_owner'    => self::SMS_OWNER_DEFAULT,
+				'sms_mottaker' => self::SMS_MOTTAKER_DEFAULT,
+				'products'     => array(), // empty = all memberships
+			),
+			$saved
+		);
+	}
+
+	/**
+	 * Purchaser or one-person member: a completed MemberPress transaction.
+	 * The Mottaker is picked up from the sub-account transaction, or from the snippet's user meta.
+	 */
+	public static function on_transaction_completed( $event ) {
+		$txn = ( is_object( $event ) && method_exists( $event, 'get_data' ) ) ? $event->get_data() : $event;
+		if ( ! is_object( $txn ) || empty( $txn->user_id ) ) {
+			return;
+		}
+
+		if ( isset( $txn->txn_type ) && 'sub_account' === $txn->txn_type ) {
+			self::schedule_onboard( (int) $txn->user_id );
+			return;
+		}
+
+		// Manual transactions: added by an admin, or by SeniorUni Trygg for Vipps purchases
+		// (Trygg sends its own SMS and Mailchimp for those).
+		if ( ( isset( $txn->gateway ) && 'manual' === $txn->gateway ) || 0 === strpos( (string) ( $txn->trans_num ?? '' ), 'suit-' ) ) {
+			return;
+		}
+
+		$products = array_map( 'intval', (array) self::onboard_settings()['products'] );
+		if ( $products && ! in_array( (int) ( $txn->product_id ?? 0 ), $products, true ) ) {
+			return;
+		}
+
+		// Renewals and returning members are not new members.
+		if ( self::has_earlier_transaction( (int) $txn->user_id, (int) ( $txn->id ?? 0 ) ) ) {
+			return;
+		}
+
+		self::schedule_onboard( (int) $txn->user_id );
+	}
+
+	private static function has_earlier_transaction( $user_id, $txn_id ) {
+		if ( ! class_exists( 'MeprDb' ) ) {
+			return false;
+		}
+		global $wpdb;
+		$mepr_db = new MeprDb();
+		return (bool) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM {$mepr_db->transactions}
+				 WHERE user_id = %d AND id <> %d
+				 AND status IN ('complete','confirmed')
+				 AND txn_type NOT IN ('subscription_confirmation','sub_account')",
+				$user_id,
+				$txn_id
+			)
+		);
+	}
+
+	public static function schedule_onboard( $user_id ) {
+		if ( $user_id <= 0 || get_user_meta( $user_id, self::META_ONBOARDED, true ) ) {
+			return;
+		}
+		if ( ! wp_next_scheduled( self::CRON_ONBOARD, array( $user_id ) ) ) {
+			// Cron is only started at shutdown, so everything this request saves (phone, Mottaker details) is in place by then.
+			wp_schedule_single_event( time(), self::CRON_ONBOARD, array( $user_id ) );
+		}
+		self::$kick_cron = true;
+	}
+
+	/**
+	 * Start wp-cron right away instead of waiting for the next visitor (same approach as SeniorUni Trygg).
+	 */
+	public static function maybe_kick_cron() {
+		if ( ! self::$kick_cron ) {
+			return;
+		}
+		self::$kick_cron = false;
+		wp_remote_post(
+			site_url( 'wp-cron.php?doing_wp_cron=' . sprintf( '%.22F', microtime( true ) ) ),
+			array(
+				'timeout'   => 0.01,
+				'blocking'  => false,
+				'sslverify' => apply_filters( 'https_local_ssl_verify', false ),
+			)
+		);
+	}
+
+	/**
+	 * Add a new member to Mailchimp and send their welcome SMS. Runs once per member.
+	 */
+	public static function onboard( $user_id ) {
+		$user_id = (int) $user_id;
+		$user    = get_userdata( $user_id );
+		if ( ! $user || get_user_meta( $user_id, self::META_ONBOARDED, true ) || user_can( $user_id, 'manage_options' ) ) {
+			return;
+		}
+		update_user_meta( $user_id, self::META_ONBOARDED, time() );
+
+		$is_sub   = self::is_sub_account( $user_id );
+		$settings = self::onboard_settings();
+		$results  = array();
+
+		if ( $settings['mailchimp'] ) {
+			try {
+				$results[] = 'Mailchimp: ' . self::mailchimp_add( $user );
+			} catch ( \Throwable $e ) {
+				$results[] = 'Mailchimp: failed (' . $e->getMessage() . ')';
+			}
+		}
+		if ( $settings['sms'] ) {
+			try {
+				$results[] = 'SMS: ' . self::send_welcome_sms( $user, $is_sub, $settings );
+			} catch ( \Throwable $e ) {
+				$results[] = 'SMS: failed (' . $e->getMessage() . ')';
+			}
+		}
+
+		if ( $results ) {
+			self::log( $user_id, implode( '; ', $results ), $is_sub ? 'new Mottaker' : 'new member' );
+		}
+	}
+
+	/**
+	 * Adds or updates the member in the Mailchimp audience set up in SeniorUni Trygg, without tags.
+	 * Someone who has unsubscribed before stays unsubscribed.
+	 */
+	public static function mailchimp_add( $user ) {
+		$api_key = (string) get_option( 'suit_mailchimp_api_key', '' );
+		$list_id = (string) get_option( 'suit_mailchimp_list_id', '' );
+		$dc      = false !== strpos( $api_key, '-' ) ? substr( $api_key, strrpos( $api_key, '-' ) + 1 ) : '';
+		if ( '' === $list_id || '' === $dc ) {
+			return 'skipped (Mailchimp API key or audience not set in SeniorUni Trygg)';
+		}
+
+		$email    = strtolower( $user->user_email );
+		$response = wp_remote_request(
+			"https://{$dc}.api.mailchimp.com/3.0/lists/{$list_id}/members/" . md5( $email ),
+			array(
+				'method'  => 'PUT',
+				'headers' => array(
+					'Content-Type'  => 'application/json',
+					'Authorization' => 'Basic ' . base64_encode( 'anystring:' . $api_key ),
+				),
+				'body'    => wp_json_encode(
+					array(
+						'email_address' => $email,
+						'status_if_new' => 'subscribed',
+						'merge_fields'  => array(
+							'FNAME' => (string) $user->first_name,
+							'LNAME' => (string) $user->last_name,
+						),
+					)
+				),
+				'timeout' => 15,
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return 'failed (' . $response->get_error_message() . ')';
+		}
+		$code = (int) wp_remote_retrieve_response_code( $response );
+		if ( 200 === $code ) {
+			return 'added';
+		}
+		$body = json_decode( (string) wp_remote_retrieve_body( $response ), true );
+		return 'failed (HTTP ' . $code . ( ! empty( $body['detail'] ) ? ': ' . $body['detail'] : '' ) . ')';
+	}
+
+	/**
+	 * Welcome SMS through SeniorUni Trygg's Pling account, with the Vipps login link.
+	 */
+	public static function send_welcome_sms( $user, $is_sub, $settings ) {
+		$phone = self::normalize_phone( get_user_meta( $user->ID, self::PHONE_SOURCE_META, true ) );
+		if ( ! $phone ) {
+			return 'skipped (no Norwegian mobile number)';
+		}
+		if ( $is_sub && self::phone_owner( $phone, $user->ID ) ) {
+			// Shares the purchaser's number: Vipps login with that number opens the purchaser's account.
+			return 'skipped (same number as another member)';
+		}
+		if ( ! class_exists( 'SUIT_Pling' ) ) {
+			return 'skipped (SeniorUni Trygg is not active)';
+		}
+
+		$buyer   = $is_sub ? self::parent_name( $user->ID ) : '';
+		$message = strtr(
+			$is_sub ? $settings['sms_mottaker'] : $settings['sms_owner'],
+			array(
+				'{navn}'   => $user->first_name ? $user->first_name : $user->display_name,
+				'{kjøper}' => $buyer ? $buyer : 'Noen',
+				'{lenke}'  => home_url( '/vipps-login/' ),
+			)
+		);
+
+		return SUIT_Pling::send_sms( $phone, $message, 'senioruni-mw-' . $user->ID ) ? 'sent to ' . $phone : 'failed (see SeniorUni Trygg log)';
 	}
 
 	/**
@@ -579,6 +849,61 @@ final class SeniorUni_Mottaker_Welcome {
 				<?php submit_button( 'Send test', 'secondary', 'submit', false ); ?>
 			</form>
 
+			<h2>New members: Mailchimp and welcome SMS</h2>
+			<?php
+			$ob       = self::onboard_settings();
+			$mc_ready = get_option( 'suit_mailchimp_api_key' ) && get_option( 'suit_mailchimp_list_id' );
+			$sms_ready = class_exists( 'SUIT_Pling' ) && get_option( 'suit_pling_service_id' );
+			$products = get_posts( array( 'post_type' => 'memberpressproduct', 'post_status' => 'publish', 'numberposts' => -1, 'orderby' => 'title', 'order' => 'ASC' ) );
+			?>
+			<p>Runs once for each new member who buys a membership with card (MemberPress checkout), and for the Mottaker on a Familie purchase. Renewals and Vipps purchases (handled by SeniorUni Trygg) are skipped. Uses the Mailchimp audience and the Pling SMS account set up in SeniorUni Trygg.</p>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<input type="hidden" name="action" value="senioruni_mw_save_onboard">
+				<?php wp_nonce_field( 'senioruni_mw_save_onboard' ); ?>
+				<table class="form-table" role="presentation">
+					<tr>
+						<th scope="row">Mailchimp</th>
+						<td>
+							<label><input type="checkbox" name="mailchimp" value="1" <?php checked( $ob['mailchimp'] ); ?>> Add new members to Mailchimp (no tags)</label>
+							<?php if ( ! $mc_ready ) : ?><p class="description" style="color:#b32d2e;">Mailchimp API key or audience is not set in SeniorUni Trygg.</p><?php endif; ?>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row">Welcome SMS</th>
+						<td>
+							<label><input type="checkbox" name="sms" value="1" <?php checked( $ob['sms'] ); ?>> Send a welcome SMS to new members</label>
+							<?php if ( ! $sms_ready ) : ?><p class="description" style="color:#b32d2e;">SeniorUni Trygg is not active, or Pling is not set up there.</p><?php endif; ?>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="mw-sms-owner">SMS to the buyer</label></th>
+						<td>
+							<textarea id="mw-sms-owner" name="sms_owner" rows="3" class="large-text"><?php echo esc_textarea( $ob['sms_owner'] ); ?></textarea>
+							<p class="description">One-person purchase, and the buyer on a Familie purchase. <code>{navn}</code> = first name, <code>{lenke}</code> = Vipps login link.</p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="mw-sms-mottaker">SMS to the Mottaker</label></th>
+						<td>
+							<textarea id="mw-sms-mottaker" name="sms_mottaker" rows="3" class="large-text"><?php echo esc_textarea( $ob['sms_mottaker'] ); ?></textarea>
+							<p class="description">Second person on a Familie purchase. <code>{navn}</code> = their first name, <code>{kjøper}</code> = the buyer's name, <code>{lenke}</code> = Vipps login link. Not sent if they gave the same number as the buyer.</p>
+						</td>
+					</tr>
+					<?php if ( $products ) : ?>
+					<tr>
+						<th scope="row">Memberships</th>
+						<td>
+							<?php foreach ( $products as $product ) : ?>
+								<label style="display:block;"><input type="checkbox" name="products[]" value="<?php echo esc_attr( $product->ID ); ?>" <?php checked( in_array( (int) $product->ID, array_map( 'intval', (array) $ob['products'] ), true ) ); ?>> <?php echo esc_html( $product->post_title ); ?> (#<?php echo esc_html( $product->ID ); ?>)</label>
+							<?php endforeach; ?>
+							<p class="description">Only purchases of the ticked memberships count. None ticked = all memberships.</p>
+						</td>
+					</tr>
+					<?php endif; ?>
+				</table>
+				<?php submit_button( 'Save' ); ?>
+			</form>
+
 			<h2>Phone numbers for Vipps / SMS login</h2>
 			<p>When a member's <code><?php echo esc_html( self::PHONE_SOURCE_META ); ?></code> (Mobilnummer) is saved, it is copied to <code><?php echo esc_html( self::PHONE_LOGIN_META ); ?></code>, the field Vipps and SMS login look members up by. A number another member already logs in with is not copied. Use the button once to copy the numbers of existing members.</p>
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
@@ -653,6 +978,28 @@ final class SeniorUni_Mottaker_Welcome {
 			$result = self::send_welcome( $user->ID, self::get_template(), $to );
 		}
 		self::redirect( true === $result ? "Test sent to {$to}{$note}." : "Test failed: {$result}{$note}" );
+	}
+
+	public static function handle_save_onboard() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( 'Not allowed' );
+		}
+		check_admin_referer( 'senioruni_mw_save_onboard' );
+
+		$owner    = sanitize_textarea_field( wp_unslash( $_POST['sms_owner'] ?? '' ) );
+		$mottaker = sanitize_textarea_field( wp_unslash( $_POST['sms_mottaker'] ?? '' ) );
+		update_option(
+			self::OPTION_ONBOARD,
+			array(
+				'mailchimp'    => ! empty( $_POST['mailchimp'] ),
+				'sms'          => ! empty( $_POST['sms'] ),
+				'sms_owner'    => '' !== trim( $owner ) ? $owner : self::SMS_OWNER_DEFAULT,
+				'sms_mottaker' => '' !== trim( $mottaker ) ? $mottaker : self::SMS_MOTTAKER_DEFAULT,
+				'products'     => array_values( array_filter( array_map( 'absint', (array) ( $_POST['products'] ?? array() ) ) ) ),
+			),
+			false
+		);
+		self::redirect( 'Saved.' );
 	}
 
 	public static function handle_sync_phones() {
