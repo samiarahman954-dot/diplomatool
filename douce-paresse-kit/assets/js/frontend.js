@@ -93,6 +93,13 @@
 		}
 	});
 
+	// The overlay only exists below 1080px: close it (and release scrolling) when the window grows.
+	window.addEventListener('resize', function () {
+		if (window.innerWidth < 1080) { return; }
+		var headers = document.querySelectorAll('[data-dpk-header].is-open');
+		for (var i = 0; i < headers.length; i++) { setMenu(headers[i], false); }
+	});
+
 	document.addEventListener('keydown', function (e) {
 		if (e.key !== 'Escape') { return; }
 		var modals = document.querySelectorAll('[data-dpk-modal]:not([hidden])');

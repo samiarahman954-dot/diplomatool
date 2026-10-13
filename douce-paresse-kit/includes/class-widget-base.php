@@ -155,6 +155,7 @@ abstract class Base extends Widget_Base {
 			$styles = array(
 				'body'          => __( 'Body text', 'douce-paresse-kit' ),
 				'quote'         => __( 'Italic quote', 'douce-paresse-kit' ),
+				'quote-lg'      => __( 'Italic quote (large)', 'douce-paresse-kit' ),
 				'closing'       => __( 'Closing line (italic, top border)', 'douce-paresse-kit' ),
 				'closing-plain' => __( 'Closing line (top border)', 'douce-paresse-kit' ),
 				'body-bordered' => __( 'Body text with top border', 'douce-paresse-kit' ),

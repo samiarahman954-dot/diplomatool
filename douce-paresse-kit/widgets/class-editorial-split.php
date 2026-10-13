@@ -38,7 +38,9 @@ class Editorial_Split extends Base {
 			'image'      => 'maison-principal.webp',
 			'image_pos'  => '',
 			'image_side' => 'left',
-			'image_size' => 'wide',
+			'media_grow'  => 1.2,
+			'media_basis' => 440,
+			'text_basis'  => 360,
 			'ratio'      => '5/4',
 			'image_max'  => '',
 			'align'      => 'center',
@@ -50,7 +52,7 @@ class Editorial_Split extends Base {
 			'text_max'   => 520,
 			'paragraphs' => array(
 				array( 'text' => 'Douce Paresse est née d’une envie que l’on peut tous ressentir à un moment : ralentir, prendre du temps pour soi et s’accorder simplement une pause.', 'style' => 'body' ),
-				array( 'text' => 'Et si, parfois, il suffisait de s’autoriser ce moment ?', 'style' => 'quote' ),
+				array( 'text' => 'Et si, parfois, il suffisait de s’autoriser ce moment ?', 'style' => 'quote-lg' ),
 				array( 'text' => 'J’ai voulu donner une forme à cette envie et, surtout, pouvoir la partager. J’ai toujours aimé ces petits gestes qui témoignent du soin que l’on porte aux autres.', 'style' => 'body' ),
 				array( 'text' => 'Je voulais une création simple, mais raffinée. De belles matières, des finitions soignées et ce souci du détail qui peut rendre un instant ordinaire un peu plus précieux.', 'style' => 'body' ),
 				array( 'text' => 'C’est ainsi qu’est née Douce Paresse.', 'style' => 'closing-plain' ),
@@ -77,17 +79,19 @@ class Editorial_Split extends Base {
 			)
 		);
 		$this->add_control(
-			'image_size',
+			'media_grow',
 			array(
-				'label'   => __( 'Image column', 'douce-paresse-kit' ),
-				'type'    => Controls_Manager::SELECT,
-				'options' => array(
-					'wide'  => __( 'Wider than text', 'douce-paresse-kit' ),
-					'equal' => __( 'Same as text', 'douce-paresse-kit' ),
-				),
-				'default' => $d['image_size'],
+				'label'       => __( 'Image column share', 'douce-paresse-kit' ),
+				'type'        => Controls_Manager::NUMBER,
+				'min'         => 0.5,
+				'max'         => 3,
+				'step'        => 0.1,
+				'default'     => $d['media_grow'],
+				'description' => __( '1 = same share as the text, 1.3 = 30% wider.', 'douce-paresse-kit' ),
 			)
 		);
+		$this->add_control( 'media_basis', array( 'label' => __( 'Image column minimum (px)', 'douce-paresse-kit' ), 'type' => Controls_Manager::NUMBER, 'min' => 200, 'max' => 900, 'default' => $d['media_basis'] ) );
+		$this->add_control( 'text_basis', array( 'label' => __( 'Text column minimum (px)', 'douce-paresse-kit' ), 'type' => Controls_Manager::NUMBER, 'min' => 200, 'max' => 900, 'default' => $d['text_basis'] ) );
 		$this->add_control(
 			'ratio',
 			array(
@@ -144,6 +148,28 @@ class Editorial_Split extends Base {
 			)
 		);
 		$this->add_control( 'title', array( 'label' => __( 'Title', 'douce-paresse-kit' ), 'type' => Controls_Manager::TEXTAREA, 'rows' => 2, 'default' => $d['title'] ) );
+		$this->add_control(
+			'title_size',
+			array(
+				'label'   => __( 'Title size', 'douce-paresse-kit' ),
+				'type'    => Controls_Manager::SELECT,
+				'options' => array(
+					'lg' => __( 'Large (68px)', 'douce-paresse-kit' ),
+					'sm' => __( 'Medium (66px, smaller on mobile)', 'douce-paresse-kit' ),
+					'md' => __( 'Medium (64px)', 'douce-paresse-kit' ),
+				),
+				'default' => isset( $d['title_size'] ) ? $d['title_size'] : 'lg',
+			)
+		);
+		$this->add_control(
+			'title_balance',
+			array(
+				'label'        => __( 'Balance title lines', 'douce-paresse-kit' ),
+				'type'         => Controls_Manager::SWITCHER,
+				'return_value' => 'yes',
+				'default'      => 'yes',
+			)
+		);
 		$this->add_paragraphs_control( 'paragraphs', __( 'Paragraphs', 'douce-paresse-kit' ), $d['paragraphs'] );
 		$this->add_control( 'text_max', array( 'label' => __( 'Text max width (px)', 'douce-paresse-kit' ), 'type' => Controls_Manager::NUMBER, 'default' => $d['text_max'] ) );
 		$this->end_controls_section();
@@ -199,7 +225,11 @@ class Editorial_Split extends Base {
 		if ( ! empty( $s['text_max'] ) ) {
 			$vars .= '--dpk-text-max:' . absint( $s['text_max'] ) . 'px;';
 		}
-		$row_cls = 'dpk-split__row dpk-split__row--' . ( 'equal' === $s['image_size'] ? 'equal' : 'wide' );
+		$grow    = is_numeric( $s['media_grow'] ) ? max( 0.1, min( 5, (float) $s['media_grow'] ) ) : 1.3;
+		$vars   .= '--dpk-mg:' . rtrim( rtrim( sprintf( '%.2F', $grow ), '0' ), '.' ) . ';';
+		$vars   .= ! empty( $s['media_basis'] ) ? '--dpk-mb:' . absint( $s['media_basis'] ) . 'px;' : '';
+		$vars   .= ! empty( $s['text_basis'] ) ? '--dpk-tb:' . absint( $s['text_basis'] ) . 'px;' : '';
+		$row_cls = 'dpk-split__row';
 
 		ob_start();
 		?>
@@ -213,7 +243,7 @@ class Editorial_Split extends Base {
 		<div class="dpk-split__text">
 			<?php $this->render_marker( $s ); ?>
 			<?php if ( $s['title'] ) : ?>
-				<h2 class="dpk-split__title"><?php echo $this->text( $s['title'] ); // phpcs:ignore ?></h2>
+				<h2 class="dpk-split__title<?php echo in_array( $s['title_size'], array( 'md', 'sm' ), true ) ? ' dpk-split__title--' . esc_attr( $s['title_size'] ) : ''; ?><?php echo 'yes' === $s['title_balance'] ? '' : ' dpk-split__title--nobalance'; ?>"><?php echo $this->text( $s['title'] ); // phpcs:ignore ?></h2>
 			<?php endif; ?>
 			<?php $this->render_paragraphs( $s['paragraphs'] ); ?>
 		</div>

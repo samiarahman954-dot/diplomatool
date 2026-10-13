@@ -28,7 +28,9 @@ class Room_Showcase extends Editorial_Split {
 			'image'      => 'chambre-v2.webp',
 			'image_pos'  => '',
 			'image_side' => 'right',
-			'image_size' => 'equal',
+			'media_grow'  => 1,
+			'media_basis' => 380,
+			'text_basis'  => 380,
 			'ratio'      => '4/5',
 			'image_max'  => 560,
 			'align'      => 'center',
@@ -37,6 +39,7 @@ class Room_Showcase extends Editorial_Split {
 			'marker'     => 'line',
 			'marker_txt' => '',
 			'title'      => 'Pensé pour rester dans la chambre',
+			'title_size' => 'sm',
 			'text_max'   => 540,
 			'paragraphs' => array(
 				array( 'text' => 'À la fois fonctionnel et esthétique, le Coffret Luxury a été conçu pour s’intégrer durablement au sein des chambres et des suites.', 'style' => 'body' ),

@@ -244,7 +244,9 @@ return array(
 					'settings' => array(
 						'image'      => '{{img:maison-principal.webp}}',
 						'image_side' => 'left',
-						'image_size' => 'wide',
+						'media_grow'  => 1.2,
+						'media_basis' => 440,
+						'text_basis'  => 360,
 						'ratio'      => '5/4',
 						'pt'         => 'none',
 						'pb'         => 'm',
@@ -253,7 +255,7 @@ return array(
 						'text_max'   => 520,
 						'paragraphs' => array(
 							array( 'text' => 'Douce Paresse est née d’une envie que l’on peut tous ressentir à un moment : ralentir, prendre du temps pour soi et s’accorder simplement une pause.', 'style' => 'body' ),
-							array( 'text' => 'Et si, parfois, il suffisait de s’autoriser ce moment ?', 'style' => 'quote' ),
+							array( 'text' => 'Et si, parfois, il suffisait de s’autoriser ce moment ?', 'style' => 'quote-lg' ),
 							array( 'text' => 'J’ai voulu donner une forme à cette envie et, surtout, pouvoir la partager. J’ai toujours aimé ces petits gestes qui témoignent du soin que l’on porte aux autres.', 'style' => 'body' ),
 							array( 'text' => 'Je voulais une création simple, mais raffinée. De belles matières, des finitions soignées et ce souci du détail qui peut rendre un instant ordinaire un peu plus précieux.', 'style' => 'body' ),
 							array( 'text' => 'C’est ainsi qu’est née Douce Paresse.', 'style' => 'closing-plain' ),
@@ -322,7 +324,9 @@ return array(
 					'settings' => array(
 						'image'       => '{{img:coffret-hero.webp}}',
 						'image_side'  => 'right',
-						'image_size'  => 'equal',
+						'media_grow'  => 1,
+						'media_basis' => 400,
+						'text_basis'  => 380,
 						'ratio'       => '4/5',
 						'image_max'   => 580,
 						'align'       => 'flex-end',
@@ -331,6 +335,7 @@ return array(
 						'marker'      => 'numeral',
 						'marker_text' => 'I',
 						'title'       => 'Le geste retrouvé',
+						'title_balance' => '',
 						'text_max'    => 540,
 						'paragraphs'  => array(
 							array( 'text' => 'Pendant longtemps, le plateau de courtoisie s’est résumé à un objet fonctionnel, un assemblage standardisé auquel on ne prête presque plus attention.', 'style' => 'body' ),
@@ -361,7 +366,9 @@ return array(
 					'settings' => array(
 						'image'       => '{{img:chambre.webp}}',
 						'image_side'  => 'left',
-						'image_size'  => 'wide',
+						'media_grow'  => 1.3,
+						'media_basis' => 460,
+						'text_basis'  => 360,
 						'ratio'       => '5/4',
 						'pt'          => 's',
 						'pb'          => 'l',
@@ -467,13 +474,16 @@ return array(
 					'settings' => array(
 						'image'       => '{{img:pro-experience.webp}}',
 						'image_side'  => 'left',
-						'image_size'  => 'wide',
+						'media_grow'  => 1.4,
+						'media_basis' => 480,
+						'text_basis'  => 340,
 						'ratio'       => '4/3',
 						'pt'          => 'none',
 						'pb'          => 'l',
 						'marker'      => 'eyebrow',
 						'marker_text' => 'L’expérience en chambre',
 						'title'       => 'Une attention qui se prolonge',
+						'title_size'  => 'md',
 						'text_max'    => 480,
 						'paragraphs'  => array(
 							array( 'text' => 'Présent en chambre au fil des séjours, le Coffret Luxury prolonge le geste d’accueil et accompagne les moments que l’hôte choisit de s’accorder.', 'style' => 'body-bordered' ),

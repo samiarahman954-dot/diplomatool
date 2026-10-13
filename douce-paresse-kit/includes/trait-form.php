@@ -200,11 +200,11 @@ trait Form_Trait {
 		return $doc ? (int) $doc->get_main_id() : (int) get_the_ID();
 	}
 
-	protected function render_form( $s, $success_scheme = 'light', $rows = 5 ) {
+	protected function render_form( $s, $success_scheme = 'light', $rows = 5, $field_min = 260 ) {
 		$fields = is_array( $s['fields'] ) ? $s['fields'] : array();
 		?>
 		<div class="dpk-formwrap" data-dpk-formwrap>
-			<form class="dpk-form" novalidate data-dpk-form data-post="<?php echo esc_attr( $this->form_post_id() ); ?>" data-widget="<?php echo esc_attr( $this->get_id() ); ?>">
+			<form class="dpk-form" style="--dpk-field-min:<?php echo (int) $field_min; ?>px" novalidate data-dpk-form data-post="<?php echo esc_attr( $this->form_post_id() ); ?>" data-widget="<?php echo esc_attr( $this->get_id() ); ?>">
 				<div class="dpk-hp" aria-hidden="true">
 					<label><?php esc_html_e( 'Laissez ce champ vide', 'douce-paresse-kit' ); ?>
 						<input type="text" name="dpk_hp" value="" tabindex="-1" autocomplete="off">

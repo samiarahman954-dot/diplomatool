@@ -117,7 +117,7 @@ class Contact extends Base {
 				<?php endif; ?>
 			</aside>
 			<div class="dpk-contact__form">
-				<?php $this->render_form( $s, 'light', 6 ); ?>
+				<?php $this->render_form( $s, 'light', 6, 240 ); ?>
 			</div>
 		</section>
 		<?php
