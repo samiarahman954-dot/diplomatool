@@ -83,6 +83,11 @@ class Footer extends Base {
 					'text'   => 'Instagram',
 					'link'   => array( 'url' => 'https://www.instagram.com/douceparesse.officiel/', 'is_external' => 'on', 'nofollow' => '' ),
 				),
+				array(
+					'prefix' => '',
+					'text'   => 'LinkedIn',
+					'link'   => array( 'url' => 'https://www.linkedin.com/in/mariam-siby-007689397', 'is_external' => 'on', 'nofollow' => '' ),
+				),
 			),
 			true
 		);

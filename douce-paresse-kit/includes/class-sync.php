@@ -104,6 +104,10 @@ class Sync {
 			$rv = $this->value( $remote, $key, $defaults );
 
 			if ( ! self::same( $lv, $bv ) ) {
+				if ( self::is_rows( $lv ) && self::is_rows( $bv ) && self::is_rows( $rv ) ) {
+					$out[ $key ] = $this->merge_rows( $bv, $lv, $rv ); // Repeater: merge row by row.
+					continue;
+				}
 				if ( ! self::same( $lv, $rv ) ) {
 					++$this->stats['kept'];
 				}
@@ -118,6 +122,58 @@ class Sync {
 				unset( $out[ $key ] );
 			}
 			++$this->stats['updated'];
+		}
+		return $out;
+	}
+
+	/** A repeater value: a list of rows that all carry an _id. */
+	private static function is_rows( $v ) {
+		if ( ! is_array( $v ) || ! $v || array_keys( $v ) !== range( 0, count( $v ) - 1 ) ) {
+			return false;
+		}
+		foreach ( $v as $row ) {
+			if ( ! is_array( $row ) || ! isset( $row['_id'] ) ) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * Repeater rows the owner changed: their rows (and their edits) are kept, untouched rows follow the
+	 * kit, rows the owner deleted stay deleted, new kit rows are inserted after their previous sibling.
+	 */
+	private function merge_rows( $base, $local, $remote ) {
+		$bmap = array_column( $base, null, '_id' );
+		$lmap = array_column( $local, null, '_id' );
+		$rmap = array_column( $remote, null, '_id' );
+		$out  = array();
+		foreach ( $local as $row ) {
+			$id = $row['_id'];
+			if ( isset( $bmap[ $id ], $rmap[ $id ] ) ) {
+				$out[] = $this->merge_settings( $bmap[ $id ], $row, $rmap[ $id ] );
+			} elseif ( isset( $bmap[ $id ] ) && self::same( $row, $bmap[ $id ] ) ) {
+				++$this->stats['removed']; // Removed from the kit, never touched by the owner.
+			} else {
+				$out[] = $row;
+			}
+		}
+		$remote = array_values( $remote );
+		foreach ( $remote as $i => $row ) {
+			$id = $row['_id'];
+			if ( isset( $bmap[ $id ] ) || isset( $lmap[ $id ] ) ) {
+				continue;
+			}
+			$pos = 0;
+			for ( $j = $i - 1; $j >= 0; $j-- ) {
+				$found = array_search( $remote[ $j ]['_id'], array_column( $out, '_id' ), true );
+				if ( false !== $found ) {
+					$pos = $found + 1;
+					break;
+				}
+			}
+			array_splice( $out, $pos, 0, array( $row ) );
+			++$this->stats['added'];
 		}
 		return $out;
 	}

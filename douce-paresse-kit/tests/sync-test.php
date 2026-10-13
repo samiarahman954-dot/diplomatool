@@ -116,13 +116,23 @@ $remote6[0]['elements'][0]['settings']['subtitle'] = 'Kit subtitle v3';
 $merged  = ( new Sync( $defaults ) )->merge_list( $base, $local6, $remote6 );
 check( 'owner choice (default) kept', ! isset( find_el( $merged, 'w1' )['settings']['subtitle'] ) );
 
-echo "7. Repeaters are compared as a whole\n";
+echo "7. Repeaters merge row by row\n";
 $local7 = $base;
 $local7[2]['elements'][0]['settings']['items'][1]['title'] = 'Owner B';
 $remote7 = $base;
 $remote7[2]['elements'][0]['settings']['items'][0]['title'] = 'Kit A2';
+$remote7[2]['elements'][0]['settings']['items'][] = array( '_id' => 'r3', 'title' => 'Kit C' );
 $merged = ( new Sync( $defaults ) )->merge_list( $base, $local7, $remote7 );
-check( 'owner repeater kept', 'Owner B' === find_el( $merged, 'w3' )['settings']['items'][1]['title'] );
+$items  = find_el( $merged, 'w3' )['settings']['items'];
+check( 'owner row edit kept', 'Owner B' === $items[1]['title'] );
+check( 'untouched row follows the kit', 'Kit A2' === $items[0]['title'] );
+check( 'new kit row added after its sibling', 3 === count( $items ) && 'Kit C' === $items[2]['title'] );
+$local7b = $base;
+unset( $local7b[2]['elements'][0]['settings']['items'][0] );
+$local7b[2]['elements'][0]['settings']['items'] = array_values( $local7b[2]['elements'][0]['settings']['items'] );
+$merged = ( new Sync( $defaults ) )->merge_list( $base, $local7b, $remote7 );
+$items  = find_el( $merged, 'w3' )['settings']['items'];
+check( 'row deleted by the owner stays deleted', array( 'r2', 'r3' ) === array_column( $items, '_id' ) );
 
 echo "8. Idempotent when nothing changed + type-insensitive comparison\n";
 $local8 = $base;

@@ -116,6 +116,7 @@ return array(
 						'contact' => array(
 							array( 'prefix' => 'Email', 'text' => 'contact@douceparesse.com', 'link' => $link( 'mailto:contact@douceparesse.com' ) ),
 							array( 'prefix' => '', 'text' => 'Instagram', 'link' => $link( 'https://www.instagram.com/douceparesse.officiel/', true ) ),
+							array( 'prefix' => '', 'text' => 'LinkedIn', 'link' => $link( 'https://www.linkedin.com/in/mariam-siby-007689397', true ) ),
 						),
 					),
 				),

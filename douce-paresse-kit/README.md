@@ -72,6 +72,7 @@ Bots get a fake “sent” (they learn nothing); blocked messages appear under *
   - a value you changed (text, image, link, color, typography, spacing, custom CSS…) is **always kept**;
   - a value you did not touch follows the new kit version;
   - sections you added stay where they are, sections you deleted stay deleted, new kit sections are inserted next to their neighbours.
+  - repeater lists (menus, footer links, cards…) merge row by row: rows you edited keep your edit, rows you deleted stay deleted, new kit rows (e.g. the footer LinkedIn link added in 1.1.8) are inserted after their neighbour.
 - **Only import what is missing** — existing items are not touched.
 - **Reset to the kit version** — overwrites; the previous version is kept and can be brought back with *Restore backup*.
 
