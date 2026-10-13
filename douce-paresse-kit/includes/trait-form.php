@@ -172,12 +172,13 @@ trait Form_Trait {
 		$this->add_control(
 			'recipient',
 			array(
-				'label'       => __( 'Send to (e-mail)', 'douce-paresse-kit' ),
-				'type'        => Controls_Manager::TEXT,
+				'label'       => __( 'Send notifications to', 'douce-paresse-kit' ),
+				'type'        => Controls_Manager::TEXTAREA,
+				'rows'        => 3,
 				'default'     => '',
-				'placeholder' => get_option( 'admin_email' ),
+				'placeholder' => get_option( 'admin_email' ) . "\n" . 'equipe@example.com',
 				'separator'   => 'before',
-				'description' => __( 'Empty = site admin e-mail. Every submission is also saved under Douce Paresse → Messages.', 'douce-paresse-kit' ),
+				'description' => __( 'One e-mail address per line (or separated by commas): everyone receives each message. Empty = site admin e-mail. Every submission is also saved under Douce Paresse → Messages.', 'douce-paresse-kit' ),
 			)
 		);
 		$this->add_control(

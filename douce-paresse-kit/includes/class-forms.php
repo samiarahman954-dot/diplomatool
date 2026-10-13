@@ -15,8 +15,38 @@ final class Forms {
 	const MAX_TEXT = 300;
 	const MAX_AREA = 5000;
 
+	/** Maximum number of notification addresses per form. */
+	const MAX_RECIPIENTS = 20;
+
 	/** @var Forms|null */
 	private static $instance = null;
+
+	/**
+	 * Notification addresses from the widget setting: one per line, or separated by commas / semicolons /
+	 * spaces. Returns [ valid addresses, invalid entries ].
+	 */
+	public static function parse_recipients( $raw ) {
+		$valid   = array();
+		$invalid = array();
+		foreach ( preg_split( '/[\s,;]+/', (string) $raw, -1, PREG_SPLIT_NO_EMPTY ) as $part ) {
+			$part  = trim( $part, " \t<>\"'" );
+			$email = sanitize_email( $part );
+			if ( $email && is_email( $email ) ) {
+				if ( ! isset( $valid[ strtolower( $email ) ] ) ) {
+					$valid[ strtolower( $email ) ] = $email;
+				}
+			} elseif ( '' !== $part ) {
+				$invalid[] = $part;
+			}
+		}
+		return array( array_slice( array_values( $valid ), 0, self::MAX_RECIPIENTS ), $invalid );
+	}
+
+	/** Addresses a form notifies (site admin e-mail when none is valid). */
+	public static function recipients( $raw ) {
+		list( $valid ) = self::parse_recipients( $raw );
+		return $valid ? $valid : array( get_option( 'admin_email' ) );
+	}
 
 	public static function instance() {
 		if ( null === self::$instance ) {
@@ -80,6 +110,10 @@ final class Forms {
 		echo get_post_meta( $id, '_dpk_mailed', true )
 			? esc_html__( 'E-mail sent', 'douce-paresse-kit' )
 			: '<span style="color:#996800">' . esc_html__( 'E-mail not sent (copy saved here)', 'douce-paresse-kit' ) . '</span>';
+		$to = get_post_meta( $id, '_dpk_mailed_to', true );
+		if ( $to ) {
+			echo '<br><small>' . esc_html__( 'To:', 'douce-paresse-kit' ) . ' ' . esc_html( $to ) . '</small>';
+		}
 	}
 
 	public function views( $views ) {
@@ -268,11 +302,12 @@ final class Forms {
 		}
 
 		$message_id = $this->store( $title, $body, array() );
-		$to         = ! empty( $s['recipient'] ) && is_email( $s['recipient'] ) ? $s['recipient'] : get_option( 'admin_email' );
+		$to         = self::recipients( isset( $s['recipient'] ) ? $s['recipient'] : '' );
 		$headers    = $reply_to ? array( 'Reply-To: ' . $reply_to ) : array();
 		$sent       = wp_mail( $to, $subject, $body, $headers );
 		if ( $message_id ) {
 			update_post_meta( $message_id, '_dpk_mailed', $sent ? 1 : 0 );
+			update_post_meta( $message_id, '_dpk_mailed_to', implode( ', ', $to ) );
 		}
 		if ( ! $sent && ! $message_id ) {
 			$this->fail( __( 'Une erreur est survenue. Merci de réessayer.', 'douce-paresse-kit' ) );

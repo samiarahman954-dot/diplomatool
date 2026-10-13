@@ -439,7 +439,7 @@ var b=r.querySelector('.dpk-header__bar');d.snapshot={chain:c,bar:b?{position:ge
 		$missing = array();
 		$details = '';
 		foreach ( $importer->items() as $key => $item ) {
-			if ( 'page' !== ( $item['type'] ?? '' ) ) {
+			if ( 'page' !== ( $item['kind'] ?? '' ) ) {
 				continue;
 			}
 			$id = $importer->find_post( $key );
@@ -466,6 +466,13 @@ var b=r.querySelector('.dpk-header__bar');d.snapshot={chain:c,bar:b?{position:ge
 		/* E-mail and forms */
 		$mail   = get_option( self::OPT_MAIL );
 		$rows[] = self::row( $mail ? 'warn' : 'ok', 'E-mail sending', $mail ? 'Last failure ' . human_time_diff( (int) $mail['time'] ) . ' ago: ' . $mail['message'] . ' (install an SMTP plugin).' : 'No failure recorded.' );
+		foreach ( $this->form_recipients() as $f ) {
+			$rows[] = self::row(
+				$f['invalid'] ? 'warn' : 'ok',
+				'Form notifications',
+				$f['page'] . ' (' . $f['widget'] . '): ' . ( $f['valid'] ? implode( ', ', $f['valid'] ) : 'site admin e-mail ' . get_option( 'admin_email' ) ) . ( $f['invalid'] ? ' | IGNORED (not valid e-mail addresses): ' . implode( ', ', $f['invalid'] ) : '' )
+			);
+		}
 		$rows[] = self::row( Spam::turnstile_enabled() ? 'ok' : 'info', 'Cloudflare Turnstile', Spam::turnstile_enabled() ? 'On.' : 'Off (other anti-spam layers are active).' );
 
 		/* PHP errors in the log */
@@ -479,6 +486,38 @@ var b=r.querySelector('.dpk-header__bar');d.snapshot={chain:c,bar:b?{position:ge
 			$rows[] = $r;
 		}
 		return $rows;
+	}
+
+	/** Every kit form on the kit pages and the addresses it notifies. */
+	private function form_recipients() {
+		$importer = new Importer();
+		$out      = array();
+		foreach ( $importer->items() as $key => $item ) {
+			if ( 'page' !== ( $item['kind'] ?? '' ) ) {
+				continue;
+			}
+			$id = $importer->find_post( $key );
+			if ( ! $id ) {
+				continue;
+			}
+			self::walk(
+				self::elementor_data( $id ),
+				array(),
+				function ( $el ) use ( &$out, $id ) {
+					if ( ! in_array( $el['widgetType'] ?? '', array( 'dpk-contact', 'dpk-pro-form' ), true ) ) {
+						return;
+					}
+					list( $valid, $invalid ) = Forms::parse_recipients( $el['settings']['recipient'] ?? '' );
+					$out[] = array(
+						'page'    => get_the_title( $id ),
+						'widget'  => $el['widgetType'],
+						'valid'   => $valid,
+						'invalid' => $invalid,
+					);
+				}
+			);
+		}
+		return $out;
 	}
 
 	/** Last kit/Elementor related lines of wp-content/debug.log (null when there is no log). */

@@ -45,7 +45,7 @@ The Douce Paresse website (7 pages + header + footer) as a WordPress plugin for 
 | DP Legal Content | Mentions légales, Politique de confidentialité |
 
 Every widget has its content in the *Content* tab and colors / typography / spacing in the *Style* tab.
-Forms send an e-mail (recipient set in the widget, default = site admin e-mail) and keep a copy under *Douce Paresse → Messages*.
+Forms send an e-mail to every address listed in the widget (*Send notifications to*: one per line or separated by commas, e.g. you and your staff; default = site admin e-mail) and keep a copy under *Douce Paresse → Messages* with the addresses it was sent to. *Diagnostics* lists each form’s recipients and flags entries that are not valid addresses.
 Fonts (Cormorant Garamond, Jost) are bundled locally — no Google Fonts request.
 
 ## Anti-spam (Contact + Professional request forms)
@@ -108,7 +108,7 @@ demo/demo-data.php     demo content (tokens {{img:file}} and {{page:key}})
 widgets/               one class per section widget
 includes/class-sync.php      three-way merge (pure PHP)
 includes/class-importer.php  import / sync / backup
-tests/                 php tests/sync-test.php && php tests/importer-test.php && php tests/spam-test.php && php tests/links-test.php && php tests/debug-test.php && php tests/controls-test.php
+tests/                 php tests/sync-test.php && php tests/importer-test.php && php tests/spam-test.php && php tests/links-test.php && php tests/debug-test.php && php tests/controls-test.php && php tests/forms-test.php
 includes/class-spam.php      anti-spam layers + settings screen
 includes/class-debug.php     Diagnostics screen + ?dpk-debug=1 browser panel (assets/js/debug.js)
 build.sh               creates douce-paresse-kit.zip (without tests)

@@ -41,6 +41,8 @@ namespace {
 	function get_the_title( $id ) { return 'Post ' . $id; }
 	function get_post_status( $id ) { return $GLOBALS['T']['posts'][ $id ]['status'] ?? 'publish'; }
 	function get_attached_file( $id ) { return __FILE__; }
+	function sanitize_email( $e ) { return preg_replace( '/[^a-z0-9@._+\'-]/i', '', $e ); }
+	function is_email( $e ) { return (bool) filter_var( $e, FILTER_VALIDATE_EMAIL ); }
 	function human_time_diff( $t ) { return '1 min'; }
 	function size_format( $n ) { return $n . ' B'; }
 	function gmdate_( $f ) { return gmdate( $f ); }
@@ -71,10 +73,15 @@ namespace {
 
 namespace DPK {
 	class Admin { const SLUG = 'dpk-kit'; }
+	class Forms {
+		// Real parser, copied at run time from includes/class-forms.php (the class itself needs WordPress).
+		const MAX_RECIPIENTS = 20;
+		public static function parse_recipients( $raw ) { return \dpk_parse_recipients( $raw ); }
+	}
 	class Spam { const PAGE = 'dpk-spam'; static function turnstile_enabled() { return false; } }
 	class Importer {
 		const META_KEY = '_dpk_demo_key';
-		function items() { return array( 'header' => array( 'type' => 'header' ), 'footer' => array( 'type' => 'footer' ), 'home' => array( 'type' => 'page' ) ); }
+		function items() { return array( 'header' => array( 'kind' => 'template', 'type' => 'header' ), 'footer' => array( 'kind' => 'template', 'type' => 'footer' ), 'home' => array( 'kind' => 'page' ), 'contact' => array( 'kind' => 'page' ) ); } // same shape as demo/demo-data.php
 		function find_post( $key ) { foreach ( $GLOBALS['T']['posts'] as $id => $p ) { if ( ( $p['meta']['_dpk_demo_key'] ?? '' ) === $key && 'trash' !== $p['status'] ) { return $id; } } return 0; }
 		function image_files() { return array( 'logo.png' ); }
 		function find_image( $f ) { return 99; }
@@ -83,6 +90,11 @@ namespace DPK {
 
 namespace {
 	require DPK_PATH . 'includes/class-debug.php';
+
+	// Load the real DPK\Forms::parse_recipients body as a plain function.
+	$forms_src = file_get_contents( DPK_PATH . 'includes/class-forms.php' );
+	preg_match( '/public static function parse_recipients\( \$raw \) \{(.*?)\n\t\}\n/s', $forms_src, $pm );
+	eval( 'function dpk_parse_recipients( $raw ) { $self_max = 20; ' . str_replace( 'self::MAX_RECIPIENTS', '$self_max', $pm[1] ) . ' }' );
 
 	$fails = 0;
 	function check( $label, $ok ) {
@@ -111,6 +123,7 @@ namespace {
 				10 => array( 'status' => 'publish', 'meta' => array( '_dpk_demo_key' => 'header', '_elementor_template_type' => 'header', '_elementor_conditions' => array( 'include/general' ), '_elementor_data' => header_data( null ) ) ),
 				11 => array( 'status' => 'publish', 'meta' => array( '_dpk_demo_key' => 'footer', '_elementor_template_type' => 'footer', '_elementor_conditions' => array( 'include/general' ) ) ),
 				20 => array( 'status' => 'publish', 'meta' => array( '_dpk_demo_key' => 'home' ) ),
+				21 => array( 'status' => 'publish', 'meta' => array( '_dpk_demo_key' => 'contact', '_elementor_data' => json_encode( array( array( 'id' => 'c', 'elType' => 'container', 'elements' => array( array( 'id' => 'f1', 'elType' => 'widget', 'widgetType' => 'dpk-contact', 'settings' => array() ) ) ) ) ) ) ),
 			),
 			'http'    => array( 'code' => 200, 'headers' => array( 'server' => 'nginx' ), 'body' => page_html( DPK_VERSION ) ),
 		);
@@ -127,6 +140,17 @@ namespace {
 	check( 'sticky reported on (default)', 'ok' === $by['Header “Fixed on scroll”'][0]['state'] );
 	check( 'header template shown = kit', 'ok' === $by['Header template shown'][0]['state'] );
 	check( 'plugin files current', 'ok' === $by['Plugin files'][0]['state'] );
+
+	check( 'kit pages listed', false !== strpos( $by['Kit pages'][0]['details'], 'home #20' ) && false !== strpos( $by['Kit pages'][0]['details'], 'contact #21' ) );
+	check( 'form without recipients -> admin e-mail', 'ok' === $by['Form notifications'][0]['state'] && false !== strpos( $by['Form notifications'][0]['message'], 'site admin' ) );
+
+	echo "Form with several recipients, one invalid\n";
+	reset_state();
+	$GLOBALS['T']['posts'][21]['meta']['_elementor_data'] = str_replace( '"settings":[]', '"settings":{"recipient":"owner@site.fr, staff@site.fr\\nnot-an-email"}', $GLOBALS['T']['posts'][21]['meta']['_elementor_data'] );
+	$by = rows_by_label( $d->checks() );
+	$fr = $by['Form notifications'][0];
+	check( 'both addresses listed', false !== strpos( $fr['message'], 'owner@site.fr, staff@site.fr' ) );
+	check( 'invalid entry reported', 'warn' === $fr['state'] && false !== strpos( $fr['message'], 'not-an-email' ) );
 
 	echo "Sticky switched off + animation on the container\n";
 	reset_state();
