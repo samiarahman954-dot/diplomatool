@@ -377,11 +377,14 @@
 
 	function keepHeaderFixed() {
 		var roots = document.querySelectorAll('[data-dpk-header]');
-		if (!roots.length) { return; }
 		var editor = inEditor();
+		var state = window.__dpkKit = window.__dpkKit || { runs: 0, lifted: 0 };
+		state.runs++;
+		state.editor = editor;
+		if (!roots.length) { return; }
 		for (var i = 0; i < roots.length; i++) {
 			var lift = !editor && roots[i].classList.contains('dpk-header--fixed');
-			if (lift) { liftHeader(roots[i]); }
+			if (lift) { liftHeader(roots[i]); state.lifted = document.querySelectorAll('.dpk-header-portal [data-dpk-header]').length; }
 			// Otherwise (editor, or header not fixed but with its full-screen mobile menu) the widget stays
 			// in place and its ancestors are neutralised instead.
 			for (var el = roots[i].parentElement; el && el !== document.documentElement; el = el.parentElement) {

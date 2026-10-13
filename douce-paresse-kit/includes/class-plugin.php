@@ -48,10 +48,12 @@ final class Plugin {
 		require_once DPK_PATH . 'includes/class-spam.php';
 		require_once DPK_PATH . 'includes/class-forms.php';
 		require_once DPK_PATH . 'includes/class-admin.php';
+		require_once DPK_PATH . 'includes/class-debug.php';
 
 		Spam::instance();
 		Forms::instance();
 		Admin::instance();
+		Debug::instance();
 
 		if ( ! did_action( 'elementor/loaded' ) ) {
 			add_action( 'admin_notices', array( $this, 'notice_missing_elementor' ) );
@@ -61,6 +63,7 @@ final class Plugin {
 		add_action( 'wp_enqueue_scripts', array( $this, 'register_assets' ), 5 );
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_global' ), 20 );
 		add_action( 'wp_head', array( $this, 'preload_fonts' ), 2 );
+		add_filter( 'script_loader_tag', array( $this, 'script_tag' ), 10, 2 );
 		add_action( 'elementor/editor/before_enqueue_scripts', array( $this, 'register_assets' ), 5 );
 		add_action( 'elementor/elements/categories_registered', array( $this, 'register_category' ) );
 		add_action( 'elementor/widgets/register', array( $this, 'register_widgets' ) );
@@ -113,6 +116,18 @@ final class Plugin {
 		}
 		wp_enqueue_style( 'dpk-frontend' );
 		wp_enqueue_script( 'dpk-frontend' );
+	}
+
+	/**
+	 * Ask optimisation plugins not to delay / combine the kit script: the header, menu and forms must
+	 * work on first paint. (WP Rocket: nowprocket, LiteSpeed: data-no-optimize/defer, Autoptimize:
+	 * data-noptimize, Cloudflare Rocket Loader: data-cfasync="false", SiteGround: data-wpfc-render.)
+	 */
+	public function script_tag( $tag, $handle ) {
+		if ( 'dpk-frontend' !== $handle || false !== strpos( $tag, 'data-cfasync' ) ) {
+			return $tag;
+		}
+		return preg_replace( '/<script(?=[^>]*\bsrc=)/', '<script data-cfasync="false" data-no-optimize="1" data-no-defer="1" data-noptimize="1" data-wpfc-render="false" nowprocket', $tag, 1 );
 	}
 
 	public function preload_fonts() {

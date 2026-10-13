@@ -1,0 +1,28 @@
+/* Douce Paresse Kit — debug panel (administrators, ?dpk-debug=1). Self-contained so theme CSS cannot change it. */
+.dpkdbg, .dpkdbg * { box-sizing: border-box; margin: 0; padding: 0; border: 0; font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; color: #1d2327; letter-spacing: normal; text-transform: none; text-decoration: none; text-align: left; background: none; box-shadow: none; }
+.dpkdbg { position: fixed; right: 16px; bottom: 16px; z-index: 2147483000; width: min(520px, calc(100vw - 32px)); max-height: 72vh; display: flex; flex-direction: column; background: #fff; border: 1px solid #c3c4c7; border-radius: 8px; box-shadow: 0 10px 40px rgba(0, 0, 0, .25); overflow: hidden; }
+.dpkdbg.is-min { max-height: none; }
+.dpkdbg.is-min .dpkdbg__list { display: none; }
+.dpkdbg__head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 10px 12px; background: #16233F; }
+.dpkdbg__head strong { color: #fff; font-weight: 600; }
+.dpkdbg .dpkdbg__sum { color: #b6e3c1; }
+.dpkdbg .dpkdbg__sum.is-bad { color: #ffb4b4; }
+.dpkdbg__tools { display: flex; gap: 6px; margin-left: auto; }
+.dpkdbg .dpkdbg__btn { padding: 3px 9px; border: 1px solid rgba(255, 255, 255, .5); border-radius: 4px; color: #fff; background: transparent; cursor: pointer; white-space: nowrap; }
+.dpkdbg .dpkdbg__btn:hover { background: rgba(255, 255, 255, .15); color: #fff; }
+.dpkdbg__list { overflow: auto; padding: 4px 0 10px; }
+.dpkdbg .dpkdbg__group { padding: 10px 12px 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: #646970; }
+.dpkdbg__row { display: flex; gap: 8px; padding: 5px 12px; }
+.dpkdbg__row.is-error { background: #fcf0f1; }
+.dpkdbg__row.is-warn { background: #fcf9e8; }
+.dpkdbg .dpkdbg__icon { flex: none; width: 18px; font-weight: 700; text-align: center; }
+.dpkdbg .is-ok .dpkdbg__icon { color: #008a20; }
+.dpkdbg .is-warn .dpkdbg__icon { color: #996800; }
+.dpkdbg .is-error .dpkdbg__icon { color: #d63638; }
+.dpkdbg .is-info .dpkdbg__icon { color: #2271b1; }
+.dpkdbg__txt { min-width: 0; flex: 1; }
+.dpkdbg .dpkdbg__txt b { font-weight: 600; }
+.dpkdbg details { margin-top: 3px; }
+.dpkdbg summary { cursor: pointer; color: #2271b1; font-size: 12px; }
+.dpkdbg pre { margin-top: 4px; padding: 6px 8px; max-height: 220px; overflow: auto; white-space: pre-wrap; word-break: break-word; background: #f6f7f7; border-radius: 4px; font: 11px/1.45 Menlo, Consolas, monospace; }
+.dpkdbg-mark { outline: 3px dashed #d63638 !important; outline-offset: -3px !important; }

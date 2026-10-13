@@ -107,6 +107,17 @@
 }
 .dpk.dpk-header--fixed .dpk-header__bar { position: fixed !important; top: 0; left: 0; right: 0; }
 .dpk-header-portal { display: block; position: static; margin: 0; padding: 0; }
+/* Same protection without JavaScript (script delayed by an optimisation plugin, Rocket Loader…):
+   no ancestor of a fixed kit header may become its containing block or a lower stacking context. */
+:has(> .dpk-header--fixed),
+:has(.dpk-header--fixed) {
+	transform: none !important; translate: none !important; rotate: none !important; scale: none !important;
+	filter: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+	perspective: none !important; will-change: auto !important; contain: none !important; container-type: normal !important;
+	content-visibility: visible !important;
+	animation-name: none !important; opacity: 1 !important; z-index: auto !important;
+	isolation: auto !important; mix-blend-mode: normal !important; clip-path: none !important; -webkit-mask: none !important; mask: none !important;
+}
 body.admin-bar .dpk.dpk-header--fixed .dpk-header__bar { top: 32px; }
 @media (max-width: 782px) { body.admin-bar .dpk.dpk-header--fixed .dpk-header__bar { top: 46px; } }
 

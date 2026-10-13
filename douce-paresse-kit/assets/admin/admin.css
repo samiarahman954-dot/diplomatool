@@ -27,3 +27,13 @@
 .dpk-log li { margin: 2px 0; }
 .dpk-spam-row { display: block; margin: 10px 0; }
 .dpk-spam-row .small-text { width: 70px; }
+.dpk-diag__sum { font-size: 14px; }
+.dpk-diag__table th { width: 210px; font-weight: 600; }
+.dpk-diag__table td, .dpk-diag__table th { vertical-align: top; }
+.dpk-diag__icon { width: 1.6em; font-weight: 700; text-align: center; }
+.dpk-diag--ok .dpk-diag__icon { color: #008a20; }
+.dpk-diag--warn .dpk-diag__icon { color: #dba617; }
+.dpk-diag--error .dpk-diag__icon { color: #d63638; }
+.dpk-diag--error th { color: #b32d2e; }
+.dpk-diag--info .dpk-diag__icon { color: #2271b1; }
+.dpk-diag pre { white-space: pre-wrap; word-break: break-word; max-height: 240px; overflow: auto; background: #f6f7f7; padding: 8px; margin: 6px 0 0; font-size: 12px; }

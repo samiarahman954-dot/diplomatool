@@ -83,13 +83,19 @@ Every sync/reset that changes a page first saves a backup (*Restore backup* link
 2. When the kit is updated (new plugin version, `demo/demo-data.php` changed), upload the new plugin and run **Smart sync**: the table shows *Kit update available* and *N edits of yours (protected)*; your edits stay, the kit changes arrive.
 3. Changes to a widget's design (PHP/CSS) apply automatically after updating the plugin — no re-import needed, your content is untouched.
 
+## Diagnostics
+
+*WP Admin → Douce Paresse → Diagnostics* checks the server side: versions, duplicate plugin copies, whether the kit files on disk are current, cache / optimisation plugins and their “delay / combine JavaScript” settings, Elementor settings, every Theme Builder header/footer and its conditions, the DP Header “Fixed on scroll” setting and animation / motion / z-index settings on its containers, kit pages and images, e-mail failures, kit-related lines of `debug.log`, and the home page as a visitor receives it (cached copy, old CSS/JS version, delayed script, which header template is really shown).
+
+**Browser check**: open any page with `?dpk-debug=1` (or click *DP Debug* in the admin bar; administrators only, never cached). A panel checks the live page in the browser: kit script/CSS loaded and their version, header lifted under `<body>`, the CSS rules that set its position (selector + file), wrappers and their CSS that break `position:fixed`, a real scroll test, what covers the header, other headers, fonts, broken images, horizontal overflow, underlined/active menu links, duplicate ids, JavaScript errors, the form token endpoint and Turnstile. **Copy report** puts everything (server summary included) on the clipboard.
+
 ## Troubleshooting
 
 | Symptom | Cause / fix |
 |---|---|
 | Header not fixed, unstyled for a moment | Fixed in 1.1.2: the kit CSS is now loaded in `<head>` on every page. Clear any cache after updating. |
 | Every menu link underlined | Happened with *Settings → Permalinks → Plain* (all pages are `/?page_id=N`). Fixed in 1.1.2; links saved as `?page_id=` are shown as the current permalink since 1.1.3. “Post name” permalinks are recommended. |
-| Header scrolls away or slides under the content | An entrance animation, motion effect, z-index or theme CSS on the Theme Builder wrappers breaks `position:fixed`. Since 1.1.4 the header widget is moved into its own wrapper directly under `<body>` on the live site (like the original), so nothing around it can affect it; its Style-tab settings still apply. In the Elementor editor it stays in place. |
+| Header scrolls away or slides under the content | An entrance animation, motion effect, z-index or theme CSS on the Theme Builder wrappers breaks `position:fixed`. Since 1.1.4 the header widget is moved into its own wrapper directly under `<body>` on the live site (like the original); since 1.1.5 the same protection also works in CSS alone (script delayed by an optimisation plugin / Rocket Loader). Run *Diagnostics* + the browser check if it still happens. |
 | No header/footer at all | A block theme (Twenty Twenty-Four/Five…) is active — Theme Builder needs a classic theme such as Hello Elementor. Also check that Elementor Pro is active. |
 
 ## Developers
@@ -99,7 +105,8 @@ demo/demo-data.php     demo content (tokens {{img:file}} and {{page:key}})
 widgets/               one class per section widget
 includes/class-sync.php      three-way merge (pure PHP)
 includes/class-importer.php  import / sync / backup
-tests/                 php tests/sync-test.php && php tests/importer-test.php && php tests/spam-test.php && php tests/links-test.php
+tests/                 php tests/sync-test.php && php tests/importer-test.php && php tests/spam-test.php && php tests/links-test.php && php tests/debug-test.php
 includes/class-spam.php      anti-spam layers + settings screen
+includes/class-debug.php     Diagnostics screen + ?dpk-debug=1 browser panel (assets/js/debug.js)
 build.sh               creates douce-paresse-kit.zip (without tests)
 ```
