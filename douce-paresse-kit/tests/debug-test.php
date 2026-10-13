@@ -93,7 +93,7 @@ namespace {
 	function rows_by_label( $rows ) { $o = array(); foreach ( $rows as $r ) { $o[ $r['label'] ][] = $r; } return $o; }
 
 	function header_data( $sticky, $container_settings = array() ) {
-		$w = array( 'id' => 'w1', 'elType' => 'widget', 'widgetType' => 'dpk-header', 'settings' => null === $sticky ? array() : array( 'sticky' => $sticky ) );
+		$w = array( 'id' => 'w1', 'elType' => 'widget', 'widgetType' => 'dpk-header', 'settings' => null === $sticky ? array() : array( 'dpk_fixed' => $sticky ) );
 		return json_encode( array( array( 'id' => 'c1', 'elType' => 'container', 'settings' => $container_settings, 'elements' => array( $w ) ) ) );
 	}
 

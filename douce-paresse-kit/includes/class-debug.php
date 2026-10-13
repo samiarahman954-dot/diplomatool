@@ -230,13 +230,13 @@ var b=r.querySelector('.dpk-header__bar');d.snapshot={chain:c,bar:b?{position:ge
 						$risky[ ( $p['elType'] ?? '?' ) . ' ' . ( $p['id'] ?? '' ) ] = $r;
 					}
 				}
-				$own = self::risky_settings( array_diff_key( $s, array( 'sticky' => 1 ) ) );
+				$own = self::risky_settings( $s );
 				if ( $own ) {
 					$risky[ 'widget ' . ( $el['id'] ?? '' ) ] = $own;
 				}
 				$info['widgets'][] = array(
 					'id'     => $el['id'] ?? '',
-					'sticky' => array_key_exists( 'sticky', $s ) ? (string) $s['sticky'] : '(default: yes)',
+					'fixed'  => array_key_exists( 'dpk_fixed', $s ) ? (string) $s['dpk_fixed'] : '(default: yes)',
 					'risky'  => $risky,
 				);
 			}
@@ -291,7 +291,7 @@ var b=r.querySelector('.dpk-header__bar');d.snapshot={chain:c,bar:b?{position:ge
 		}
 		$h = $this->header_info();
 		foreach ( $h['widgets'] as $w ) {
-			$lines[] = 'DP Header widget ' . $w['id'] . ': sticky=' . $w['sticky'] . ( $w['risky'] ? ' | settings: ' . wp_json_encode( $w['risky'] ) : '' );
+			$lines[] = 'DP Header widget ' . $w['id'] . ': fixed=' . $w['fixed'] . ( $w['risky'] ? ' | settings: ' . wp_json_encode( $w['risky'] ) : '' );
 		}
 		return $lines;
 	}
@@ -427,7 +427,7 @@ var b=r.querySelector('.dpk-header__bar');d.snapshot={chain:c,bar:b?{position:ge
 				$rows[] = self::row( 'error', 'DP Header widget', 'The kit header template contains no DP Header widget.' );
 			}
 			foreach ( $h['widgets'] as $w ) {
-				$sticky = 'yes' === $w['sticky'] || '(default: yes)' === $w['sticky'];
+				$sticky = 'yes' === $w['fixed'] || '(default: yes)' === $w['fixed'];
 				$rows[] = self::row( $sticky ? 'ok' : 'error', 'Header “Fixed on scroll”', $sticky ? 'On.' : 'OFF in the widget (Content → Fixed on scroll). Switch it on and update the header.' );
 				if ( $w['risky'] ) {
 					$rows[] = self::row( 'warn', 'Header wrapper settings', 'Animation / motion / position / z-index settings found on the header or its containers. The kit lifts the header out of them on the live site; remove them if anything still looks wrong.', wp_json_encode( $w['risky'], JSON_PRETTY_PRINT ) );

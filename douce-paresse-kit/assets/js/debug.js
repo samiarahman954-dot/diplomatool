@@ -215,7 +215,7 @@
 			});
 			// Computed values above are already neutralised by the kit CSS: also list the site's own rules.
 			for (var a = root.parentElement; a; a = a.parentElement) {
-				var own = rulesFor(a, BREAKERS.concat(STACKING, ['animationName', 'animation'])).filter(function (l) { return !/dpk-header--fixed|^\(/.test(l) && !/style="" attribute/.test(l); });
+				var own = rulesFor(a, BREAKERS.concat(STACKING, ['animationName', 'animation'])).filter(function (l) { return !/dpk-header--fixed|^\(/.test(l) && !/style="" attribute/.test(l) && !/: var\(--[a-z-]+\)\s+← [^\n]*\[plugins\/elementor(-pro)?\//.test(l); });
 				if (own.length) { bad.push(desc(a) + ' (site CSS):\n      ' + own.join('\n      ')); }
 			}
 			add(bad.length ? 'warn' : 'ok', G, 'Wrappers around the header (site settings)', bad.length ? bad.length + ' wrapper(s) carry CSS/settings that break a fixed header on their own. The kit neutralises them; remove them if anything still looks wrong.' : 'Nothing in the wrappers breaks position:fixed.', bad.join('\n'));

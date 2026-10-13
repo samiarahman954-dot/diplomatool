@@ -95,6 +95,7 @@ Every sync/reset that changes a page first saves a backup (*Restore backup* link
 |---|---|
 | Header not fixed, unstyled for a moment | Fixed in 1.1.2: the kit CSS is now loaded in `<head>` on every page. Clear any cache after updating. |
 | Every menu link underlined | Happened with *Settings → Permalinks → Plain* (all pages are `/?page_id=N`). Fixed in 1.1.2; links saved as `?page_id=` are shown as the current permalink since 1.1.3. “Post name” permalinks are recommended. |
+| Header never fixed although “Fixed on scroll” is on | Before 1.1.6 the switch was named `sticky`, the same id as the Elementor Pro *Motion Effects → Sticky* control that Pro adds to every widget; Pro’s control (default: none) replaced it. Renamed to `dpk_fixed` (`tests/controls-test.php` guards against reserved ids). |
 | Header scrolls away or slides under the content | An entrance animation, motion effect, z-index or theme CSS on the Theme Builder wrappers breaks `position:fixed`. Since 1.1.4 the header widget is moved into its own wrapper directly under `<body>` on the live site (like the original); since 1.1.5 the same protection also works in CSS alone (script delayed by an optimisation plugin / Rocket Loader). Run *Diagnostics* + the browser check if it still happens. |
 | No header/footer at all | A block theme (Twenty Twenty-Four/Five…) is active — Theme Builder needs a classic theme such as Hello Elementor. Also check that Elementor Pro is active. |
 
@@ -105,7 +106,7 @@ demo/demo-data.php     demo content (tokens {{img:file}} and {{page:key}})
 widgets/               one class per section widget
 includes/class-sync.php      three-way merge (pure PHP)
 includes/class-importer.php  import / sync / backup
-tests/                 php tests/sync-test.php && php tests/importer-test.php && php tests/spam-test.php && php tests/links-test.php && php tests/debug-test.php
+tests/                 php tests/sync-test.php && php tests/importer-test.php && php tests/spam-test.php && php tests/links-test.php && php tests/debug-test.php && php tests/controls-test.php
 includes/class-spam.php      anti-spam layers + settings screen
 includes/class-debug.php     Diagnostics screen + ?dpk-debug=1 browser panel (assets/js/debug.js)
 build.sh               creates douce-paresse-kit.zip (without tests)

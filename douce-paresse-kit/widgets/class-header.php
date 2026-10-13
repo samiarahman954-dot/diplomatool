@@ -63,8 +63,10 @@ class Header extends Base {
 				array( 'text' => 'Contact', 'link' => $this->link_default( '#' ) ),
 			)
 		);
+		// Not "sticky": Elementor Pro adds its own "sticky" control (Advanced → Motion Effects) to every
+		// widget, and that one (default: none) replaced this switch, so the header was never fixed.
 		$this->add_control(
-			'sticky',
+			'dpk_fixed',
 			array(
 				'label'        => __( 'Fixed on scroll', 'douce-paresse-kit' ),
 				'type'         => Controls_Manager::SWITCHER,
@@ -139,7 +141,7 @@ class Header extends Base {
 		$logo_h    = $logo_h ? $logo_h : $logo;
 		$overlay   = 'dpk-menu-' . $this->get_id();
 		$all_links = array_merge( (array) $s['menu_left'], (array) $s['menu_right'] );
-		$classes   = 'dpk dpk-header' . ( 'yes' === $s['sticky'] ? ' dpk-header--fixed' : '' );
+		$classes   = 'dpk dpk-header' . ( 'yes' === ( isset( $s['dpk_fixed'] ) ? $s['dpk_fixed'] : 'yes' ) ? ' dpk-header--fixed' : '' );
 		?>
 		<div class="<?php echo esc_attr( $classes ); ?>" data-dpk-header>
 			<header class="dpk-header__bar">
