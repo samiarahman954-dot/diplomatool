@@ -394,10 +394,31 @@
 		neutralise(document.documentElement);
 	}
 
+	/* WordPress admin bar (logged-in users): fixed above 600px, but it scrolls away on smaller screens.
+	   Publish the height it really covers so the fixed header (and the mobile menu) sit right under it. */
+	var adminBarTicking = false;
+	function adminBarOffset() {
+		adminBarTicking = false;
+		var bar = document.getElementById('wpadminbar');
+		if (!bar || !document.body.classList.contains('admin-bar')) { return; }
+		var h = Math.max(0, Math.round(bar.getBoundingClientRect().bottom));
+		var v = h + 'px';
+		if (document.documentElement.style.getPropertyValue('--dpk-adminbar') !== v) {
+			document.documentElement.style.setProperty('--dpk-adminbar', v);
+		}
+	}
+	function queueAdminBar() {
+		if (!adminBarTicking) { adminBarTicking = true; window.requestAnimationFrame(adminBarOffset); }
+	}
+	window.addEventListener('scroll', queueAdminBar, { passive: true });
+	window.addEventListener('resize', queueAdminBar);
+	window.addEventListener('load', adminBarOffset);
+
 	if (document.readyState === 'loading') {
-		document.addEventListener('DOMContentLoaded', function () { keepHeaderFixed(); markActive(); initForms(); });
+		document.addEventListener('DOMContentLoaded', function () { keepHeaderFixed(); adminBarOffset(); markActive(); initForms(); });
 	} else {
 		keepHeaderFixed();
+		adminBarOffset();
 		markActive();
 		initForms();
 	}
