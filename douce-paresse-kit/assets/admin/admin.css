@@ -25,3 +25,5 @@
 .dpk-progress__bar { height: 100%; width: 0; background: #2271b1; transition: width .3s ease; }
 .dpk-log { max-height: 280px; overflow: auto; margin: 12px 0 0 1.4em; font-family: Menlo, Consolas, monospace; font-size: 12px; }
 .dpk-log li { margin: 2px 0; }
+.dpk-spam-row { display: block; margin: 10px 0; }
+.dpk-spam-row .small-text { width: 70px; }

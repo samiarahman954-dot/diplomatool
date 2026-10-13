@@ -24,6 +24,10 @@ class Pro_Form extends Base {
 		return 'eicon-form-horizontal';
 	}
 
+	public function get_script_depends() {
+		return $this->form_script_depends();
+	}
+
 	public static function default_fields() {
 		return array(
 			array( 'label' => 'Nom et prénom', 'name' => 'nom', 'type' => 'text', 'auto' => 'name', 'required' => 'yes' ),

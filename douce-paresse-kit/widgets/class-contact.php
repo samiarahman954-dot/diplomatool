@@ -25,6 +25,10 @@ class Contact extends Base {
 		return 'eicon-mail';
 	}
 
+	public function get_script_depends() {
+		return $this->form_script_depends();
+	}
+
 	public static function default_fields() {
 		return array(
 			array( 'label' => 'Nom', 'name' => 'nom', 'type' => 'text', 'auto' => 'family-name', 'required' => 'yes' ),
@@ -113,7 +117,7 @@ class Contact extends Base {
 				<?php endif; ?>
 			</aside>
 			<div class="dpk-contact__form">
-				<?php $this->render_form( $s, 'light' ); ?>
+				<?php $this->render_form( $s, 'light', 6 ); ?>
 			</div>
 		</section>
 		<?php

@@ -44,9 +44,11 @@ final class Plugin {
 	private function __construct() {
 		require_once DPK_PATH . 'includes/class-sync.php';
 		require_once DPK_PATH . 'includes/class-importer.php';
+		require_once DPK_PATH . 'includes/class-spam.php';
 		require_once DPK_PATH . 'includes/class-forms.php';
 		require_once DPK_PATH . 'includes/class-admin.php';
 
+		Spam::instance();
 		Forms::instance();
 		Admin::instance();
 
@@ -74,17 +76,24 @@ final class Plugin {
 		wp_register_style( 'dpk-fonts', DPK_URL . 'assets/css/fonts.css', array(), DPK_VERSION );
 		wp_register_style( 'dpk-frontend', DPK_URL . 'assets/css/frontend.css', array( 'dpk-fonts' ), DPK_VERSION );
 		wp_register_script( 'dpk-frontend', DPK_URL . 'assets/js/frontend.js', array(), DPK_VERSION, true );
+		$spam = Spam::get();
+		wp_register_script( 'dpk-turnstile', 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit', array(), null, true ); // phpcs:ignore WordPress.WP.EnqueuedResourceParameters.MissingVersion
 		wp_localize_script(
 			'dpk-frontend',
 			'DPK',
 			array(
-				'ajax'  => admin_url( 'admin-ajax.php' ),
-				'nonce' => wp_create_nonce( 'dpk_form' ),
-				'i18n'  => array(
-					'required' => __( 'Ce champ est requis.', 'douce-paresse-kit' ),
-					'email'    => __( 'Adresse e-mail invalide.', 'douce-paresse-kit' ),
-					'select'   => __( 'Veuillez choisir une option.', 'douce-paresse-kit' ),
-					'error'    => __( 'Une erreur est survenue. Merci de réessayer.', 'douce-paresse-kit' ),
+				'ajax'      => admin_url( 'admin-ajax.php' ),
+				'turnstile' => Spam::turnstile_enabled() ? array(
+					'sitekey'    => $spam['ts_site'],
+					'theme'      => $spam['ts_theme'],
+					'appearance' => $spam['ts_appearance'],
+				) : null,
+				'i18n'      => array(
+					'required'  => __( 'Ce champ est requis.', 'douce-paresse-kit' ),
+					'email'     => __( 'Adresse e-mail invalide.', 'douce-paresse-kit' ),
+					'select'    => __( 'Veuillez choisir une option.', 'douce-paresse-kit' ),
+					'error'     => __( 'Une erreur est survenue. Merci de réessayer.', 'douce-paresse-kit' ),
+					'challenge' => __( 'Merci de valider la vérification anti-spam.', 'douce-paresse-kit' ),
 				),
 			)
 		);

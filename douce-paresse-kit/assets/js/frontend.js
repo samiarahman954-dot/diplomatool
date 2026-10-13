@@ -3,7 +3,7 @@
 (function () {
 	'use strict';
 
-	var cfg = window.DPK || { ajax: '', nonce: '', i18n: {} };
+	var cfg = window.DPK || { ajax: '', i18n: {} };
 	var i18n = cfg.i18n || {};
 
 	function closest(el, sel) {
@@ -133,43 +133,149 @@
 		return ok;
 	}
 
+	/* ---------- Anti-spam: signed time token (fetched fresh, so page caching never breaks it) ---------- */
+	var tok = { value: '', at: 0, min: 4, promise: null };
+
+	function fetchToken() {
+		if (tok.promise) { return tok.promise; }
+		var body = new FormData();
+		body.append('action', 'dpk_form_token');
+		tok.promise = fetch(cfg.ajax, { method: 'POST', body: body, credentials: 'same-origin' })
+			.then(function (r) { return r.json(); })
+			.then(function (res) {
+				tok.value = res.data.token;
+				tok.min = parseInt(res.data.min, 10) || 0;
+				tok.at = Date.now();
+				tok.promise = null;
+				return tok.value;
+			})
+			.catch(function () { tok.promise = null; return ''; });
+		return tok.promise;
+	}
+
+	/* Resolves with a token old enough for the server's minimum delay. */
+	function readyToken() {
+		return (tok.value ? Promise.resolve(tok.value) : fetchToken()).then(function (value) {
+			var wait = tok.min * 1000 + 300 - (Date.now() - tok.at);
+			return wait > 0 ? new Promise(function (r) { setTimeout(function () { r(tok.value); }, wait); }) : value;
+		});
+	}
+
+	/* ---------- Cloudflare Turnstile ---------- */
+	var ts = cfg.turnstile;
+
+	function renderTurnstile(scope) {
+		if (!ts || !window.turnstile) { return; }
+		var els = (scope || document).querySelectorAll('[data-dpk-turnstile]');
+		for (var i = 0; i < els.length; i++) {
+			if (els[i].getAttribute('data-widget-id')) { continue; }
+			var id = window.turnstile.render(els[i], {
+				sitekey: ts.sitekey,
+				theme: ts.theme,
+				appearance: ts.appearance,
+				action: 'dpk-form',
+				'response-field-name': 'cf-turnstile-response'
+			});
+			els[i].setAttribute('data-widget-id', id);
+		}
+	}
+
+	function whenTurnstile(cb) {
+		if (!ts) { return; }
+		var n = 0;
+		(function poll() {
+			if (window.turnstile) { cb(); return; }
+			if (++n < 150) { setTimeout(poll, 200); }
+		})();
+	}
+
+	function resetTurnstile(form) {
+		var el = form.querySelector('[data-dpk-turnstile]');
+		var id = el && el.getAttribute('data-widget-id');
+		if (id && window.turnstile) { window.turnstile.reset(id); }
+	}
+
+	/* Turnstile fills its hidden field asynchronously; wait a little for it. */
+	function turnstileReady(form, ms) {
+		if (!ts || !form.querySelector('[data-dpk-turnstile]')) { return Promise.resolve(true); }
+		return new Promise(function (resolve) {
+			var start = Date.now();
+			(function poll() {
+				var input = form.querySelector('[name="cf-turnstile-response"]');
+				if (input && input.value) { resolve(true); return; }
+				if (Date.now() - start > ms) { resolve(false); return; }
+				setTimeout(poll, 200);
+			})();
+		});
+	}
+
+	function setStatus(form, msg) {
+		var status = form.querySelector('.dpk-form__status');
+		if (status) { status.textContent = msg || ''; }
+	}
+
+	function send(form, allowRetry) {
+		form.classList.add('is-sending');
+		readyToken().then(function (token) {
+			if (!token) { throw new Error('token'); }
+			form.querySelector('[name="dpk_token"]').value = token;
+			return turnstileReady(form, 6000);
+		}).then(function (tsOk) {
+			if (!tsOk) {
+				form.classList.remove('is-sending');
+				setStatus(form, i18n.challenge);
+				return null;
+			}
+			var data = new FormData(form);
+			data.append('action', 'dpk_form');
+			data.append('post_id', form.getAttribute('data-post'));
+			data.append('widget_id', form.getAttribute('data-widget'));
+			return fetch(cfg.ajax, { method: 'POST', body: data, credentials: 'same-origin' })
+				.then(function (r) { return r.json(); })
+				.then(function (res) {
+					form.classList.remove('is-sending');
+					resetTurnstile(form);
+					if (res && res.success) {
+						tok.value = '';
+						fetchToken(); // ready for a new message
+						var wrap = closest(form, '[data-dpk-formwrap]');
+						form.hidden = true;
+						wrap.querySelector('[data-dpk-success]').hidden = false;
+						return;
+					}
+					var d = (res && res.data) || {};
+					if (d.retry && allowRetry) {
+						tok.value = ''; // expired / used / too fast: get a fresh token and try once more
+						send(form, false);
+						return;
+					}
+					var errs = d.fields || {};
+					Object.keys(errs).forEach(function (name) {
+						var input = form.querySelector('[name="' + name + '"]');
+						if (input) { fieldError(input, errs[name]); }
+					});
+					setStatus(form, d.message || i18n.error);
+				});
+		}).catch(function () {
+			form.classList.remove('is-sending');
+			setStatus(form, i18n.error);
+		});
+	}
+
 	document.addEventListener('submit', function (e) {
 		var form = closest(e.target, '[data-dpk-form]');
 		if (!form) { return; }
 		e.preventDefault();
-		var status = form.querySelector('.dpk-form__status');
-		if (status) { status.textContent = ''; }
+		setStatus(form, '');
 		if (!validate(form) || form.classList.contains('is-sending')) { return; }
-
-		var data = new FormData(form);
-		data.append('action', 'dpk_form');
-		data.append('nonce', cfg.nonce);
-		data.append('post_id', form.getAttribute('data-post'));
-		data.append('widget_id', form.getAttribute('data-widget'));
-		form.classList.add('is-sending');
-
-		fetch(cfg.ajax, { method: 'POST', body: data, credentials: 'same-origin' })
-			.then(function (r) { return r.json(); })
-			.then(function (res) {
-				form.classList.remove('is-sending');
-				if (res && res.success) {
-					var wrap = closest(form, '[data-dpk-formwrap]');
-					form.hidden = true;
-					wrap.querySelector('[data-dpk-success]').hidden = false;
-					return;
-				}
-				var errs = res && res.data && res.data.fields ? res.data.fields : {};
-				Object.keys(errs).forEach(function (name) {
-					var input = form.querySelector('[name="' + name + '"]');
-					if (input) { fieldError(input, errs[name]); }
-				});
-				if (status) { status.textContent = (res && res.data && res.data.message) || i18n.error; }
-			})
-			.catch(function () {
-				form.classList.remove('is-sending');
-				if (status) { status.textContent = i18n.error; }
-			});
+		send(form, true);
 	});
+
+	function initForms(scope) {
+		if (!(scope || document).querySelector('[data-dpk-form]')) { return; }
+		if (!tok.value) { fetchToken(); }
+		whenTurnstile(function () { renderTurnstile(scope); });
+	}
 
 	document.addEventListener('input', function (e) {
 		if (e.target.classList && e.target.classList.contains('dpk-field__input')) { fieldError(e.target, ''); }
@@ -197,15 +303,21 @@
 	}
 
 	if (document.readyState === 'loading') {
-		document.addEventListener('DOMContentLoaded', function () { markActive(); });
+		document.addEventListener('DOMContentLoaded', function () { markActive(); initForms(); });
 	} else {
 		markActive();
+		initForms();
 	}
 
 	window.addEventListener('elementor/frontend/init', function () {
 		if (!window.elementorFrontend || !window.elementorFrontend.hooks) { return; }
 		window.elementorFrontend.hooks.addAction('frontend/element_ready/dpk-header.default', function ($scope) {
 			markActive($scope && $scope[0]);
+		});
+		['dpk-pro-form', 'dpk-contact'].forEach(function (name) {
+			window.elementorFrontend.hooks.addAction('frontend/element_ready/' + name + '.default', function ($scope) {
+				initForms($scope && $scope[0]);
+			});
 		});
 	});
 })();

@@ -449,7 +449,7 @@ return array(
 						'scheme'      => 'light',
 						'ornament'    => 'line',
 						'title'       => 'Douce Paresse s’adresse aux établissements soucieux d’apporter une attention singulière à l’accueil de leurs clients.',
-						'title_style' => 'lead',
+						'title_mode'  => 'lead',
 						'subtitle'    => '',
 						'paragraphs'  => array(
 							array( 'text' => 'À travers le Coffret Luxury, la Maison propose une nouvelle interprétation du plateau de courtoisie en chambre. Pensé comme un ensemble, il réunit les essentiels du thé dans une présentation cohérente, élégante et prête à intégrer votre univers.', 'style' => 'body' ),

@@ -451,7 +451,9 @@ html.dpk-lock, html.dpk-lock body { overflow: hidden; }
 .dpk .dpk-form { position: relative; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: 36px 40px; }
 .dpk .dpk-form[hidden],
 .dpk .dpk-success[hidden] { display: none; }
-.dpk .dpk-hp { position: absolute !important; left: -9999px; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.dpk .dpk-hp { position: absolute !important; left: -9999px !important; top: auto; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
+.dpk .dpk-turnstile { grid-column: 1 / -1; }
+.dpk .dpk-turnstile:empty { display: none; }
 .dpk .dpk-field { display: flex; flex-direction: column; gap: 10px; margin: 0; }
 .dpk .dpk-field--full { grid-column: 1 / -1; }
 .dpk .dpk-field__label { display: flex; justify-content: space-between; gap: 12px; font-size: 11px; font-weight: 400; letter-spacing: .22em; text-transform: uppercase; color: var(--dpk-navy); }

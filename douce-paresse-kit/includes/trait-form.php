@@ -191,17 +191,26 @@ trait Form_Trait {
 		$this->end_controls_section();
 	}
 
+	protected function form_script_depends() {
+		return \DPK\Spam::turnstile_enabled() ? array( 'dpk-turnstile', 'dpk-frontend' ) : array( 'dpk-frontend' );
+	}
+
 	protected function form_post_id() {
 		$doc = \Elementor\Plugin::$instance->documents->get_current();
 		return $doc ? (int) $doc->get_main_id() : (int) get_the_ID();
 	}
 
-	protected function render_form( $s, $success_scheme = 'light' ) {
+	protected function render_form( $s, $success_scheme = 'light', $rows = 5 ) {
 		$fields = is_array( $s['fields'] ) ? $s['fields'] : array();
 		?>
 		<div class="dpk-formwrap" data-dpk-formwrap>
 			<form class="dpk-form" novalidate data-dpk-form data-post="<?php echo esc_attr( $this->form_post_id() ); ?>" data-widget="<?php echo esc_attr( $this->get_id() ); ?>">
-				<input type="text" name="dpk_hp" class="dpk-hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+				<div class="dpk-hp" aria-hidden="true">
+					<label><?php esc_html_e( 'Laissez ce champ vide', 'douce-paresse-kit' ); ?>
+						<input type="text" name="dpk_hp" value="" tabindex="-1" autocomplete="off">
+					</label>
+				</div>
+				<input type="hidden" name="dpk_token" value="">
 				<?php
 				foreach ( $fields as $f ) :
 					$f    = wp_parse_args(
@@ -213,7 +222,7 @@ trait Form_Trait {
 					$req  = 'yes' === $f['required'];
 					$full = 'yes' === $f['full'] || 'textarea' === $type;
 					$cls  = 'dpk-field' . ( $full ? ' dpk-field--full' : '' );
-					$attr = ' name="' . esc_attr( $name ) . '"' . ( $req ? ' data-required="1"' : '' );
+					$attr = ' name="' . esc_attr( $name ) . '"' . ( $req ? ' data-required="1"' : '' ) . ( 'select' === $type ? '' : ' maxlength="' . ( 'textarea' === $type ? \DPK\Forms::MAX_AREA : \DPK\Forms::MAX_TEXT ) . '"' );
 					?>
 					<label class="<?php echo esc_attr( $cls ); ?>">
 						<span class="dpk-field__label"><?php echo esc_html( $f['label'] ); ?>
@@ -222,7 +231,7 @@ trait Form_Trait {
 							<?php endif; ?>
 						</span>
 						<?php if ( 'textarea' === $type ) : ?>
-							<textarea class="dpk-field__input dpk-field__input--area" rows="<?php echo esc_attr( 'message' === $name ? 6 : 5 ); ?>"<?php echo $attr; // phpcs:ignore ?> placeholder="<?php echo esc_attr( $f['placeholder'] ); ?>"></textarea>
+							<textarea class="dpk-field__input dpk-field__input--area" rows="<?php echo (int) $rows; ?>"<?php echo $attr; // phpcs:ignore ?> placeholder="<?php echo esc_attr( $f['placeholder'] ); ?>"></textarea>
 						<?php elseif ( 'select' === $type ) : ?>
 							<span class="dpk-field__select">
 								<select class="dpk-field__input"<?php echo $attr; // phpcs:ignore ?>>
@@ -240,6 +249,9 @@ trait Form_Trait {
 					</label>
 				<?php endforeach; ?>
 
+				<?php if ( \DPK\Spam::turnstile_enabled() ) : ?>
+					<div class="dpk-turnstile" data-dpk-turnstile></div>
+				<?php endif; ?>
 				<?php if ( ! empty( $s['privacy_text'] ) ) : ?>
 					<p class="dpk-form__privacy"><?php echo wp_kses_post( $s['privacy_text'] ); ?></p>
 				<?php endif; ?>

@@ -47,6 +47,10 @@ final class Admin {
 	}
 
 	public function assets( $hook ) {
+		if ( false !== strpos( (string) $hook, Spam::PAGE ) ) {
+			wp_enqueue_style( 'dpk-admin', DPK_URL . 'assets/admin/admin.css', array(), DPK_VERSION );
+			return;
+		}
 		if ( 'toplevel_page_' . self::SLUG !== $hook ) {
 			return;
 		}

@@ -61,7 +61,7 @@ class Statement extends Base {
 		$this->add_control( 'eyebrow', array( 'label' => __( 'Small label', 'douce-paresse-kit' ), 'type' => Controls_Manager::TEXT, 'default' => '', 'label_block' => true ) );
 		$this->add_control( 'title', array( 'label' => __( 'Title', 'douce-paresse-kit' ), 'type' => Controls_Manager::TEXTAREA, 'rows' => 3, 'default' => 'Le Coffret Luxury en est le premier geste.' ) );
 		$this->add_control(
-			'title_style',
+			'title_mode',
 			array(
 				'label'   => __( 'Title style', 'douce-paresse-kit' ),
 				'type'    => Controls_Manager::SELECT,
@@ -110,7 +110,7 @@ class Statement extends Base {
 		$s      = $this->get_settings_for_display();
 		$scheme = 'dark' === $s['scheme'] ? 'dark' : 'light';
 		$max    = ! empty( $s['max_width'] ) ? '--dpk-max:' . absint( $s['max_width'] ) . 'px' : '';
-		$tag    = 'lead' === $s['title_style'] ? 'p' : 'h2';
+		$tag    = 'lead' === $s['title_mode'] ? 'p' : 'h2';
 		?>
 		<section class="dpk dpk-statement dpk-statement--<?php echo esc_attr( $scheme ); ?><?php echo 'airy' === $s['spacing'] ? ' dpk-statement--airy' : ''; ?>">
 			<div class="dpk-statement__inner" style="<?php echo esc_attr( $max ); ?>">
@@ -123,7 +123,7 @@ class Statement extends Base {
 					<span class="dpk-statement__eyebrow"><?php echo esc_html( $s['eyebrow'] ); ?></span>
 				<?php endif; ?>
 				<?php if ( $s['title'] ) : ?>
-					<<?php echo esc_attr( $tag ); ?> class="dpk-statement__title dpk-statement__title--<?php echo esc_attr( $s['title_style'] ); ?>"><?php echo $this->text( $s['title'] ); // phpcs:ignore ?></<?php echo esc_attr( $tag ); ?>>
+					<<?php echo esc_attr( $tag ); ?> class="dpk-statement__title dpk-statement__title--<?php echo esc_attr( $s['title_mode'] ); ?>"><?php echo $this->text( $s['title'] ); // phpcs:ignore ?></<?php echo esc_attr( $tag ); ?>>
 				<?php endif; ?>
 				<?php if ( $s['subtitle'] ) : ?>
 					<p class="dpk-statement__subtitle"><?php echo $this->text( $s['subtitle'] ); // phpcs:ignore ?></p>

@@ -48,6 +48,24 @@ Every widget has its content in the *Content* tab and colors / typography / spac
 Forms send an e-mail (recipient set in the widget, default = site admin e-mail) and keep a copy under *Douce Paresse → Messages*.
 Fonts (Cormorant Garamond, Jost) are bundled locally — no Google Fonts request.
 
+## Anti-spam (Contact + Professional request forms)
+
+*WP Admin → Douce Paresse → Anti-spam.* Layers, in order:
+
+1. **Honeypot** — invisible field; bots that fill it are silently discarded.
+2. **Signed, single-use token + time trap** — fetched by JavaScript (bots posting directly have none), must be at least *N* seconds old (default 4) and can be used once. Unlike a nonce in the HTML it keeps working with page caching.
+3. **Cloudflare Turnstile** — free; paste the site key + secret key from *dash.cloudflare.com → Turnstile*. Appearance “only when needed” (invisible for most visitors) or always visible.
+4. **Rate limits** — per IP (default 5 / 10 min) and per e-mail address (3 / hour).
+5. **Real visitor IP behind Cloudflare** — the orange-cloud proxy *and* Cloudflare Tunnel (cloudflared) are detected; `CF-Connecting-IP` is only trusted when the request really comes from a Cloudflare range or the local tunnel, so it cannot be spoofed from outside.
+6. **Content rules** — more than 2 links, `[url]` BBCode / HTML links, blocked words (editable list, whole words), WordPress *Disallowed Comment Keys*, mostly non-Latin text (Cyrillic/Chinese spam on a French site), length limits.
+7. **E-mail rules** — disposable addresses refused, domains without MX/A record refused (shown to the visitor so typos can be fixed).
+8. **Akismet** — used automatically when the Akismet plugin is active and connected.
+9. **Duplicates** — the same message sent twice within an hour is not e-mailed twice.
+
+Bots get a fake “sent” (they learn nothing); blocked messages appear under *Messages → Spam* with the reason and are deleted after 30 days. Humans only ever see a message when they can fix something (wait, solve the challenge, correct the e-mail).
+
+> Privacy: Turnstile (Cloudflare) and Akismet process visitor data outside the site. If you enable them, mention them in *Politique de confidentialité* (section 5 “Destinataires et prestataires” and section 8 “Cookies et autres traceurs”).
+
 ## Import modes (when an item already exists)
 
 - **Smart sync (recommended)** — three-way merge between *what the kit imported last time*, *what is on the site now* and *the new kit version*:
@@ -72,6 +90,7 @@ demo/demo-data.php     demo content (tokens {{img:file}} and {{page:key}})
 widgets/               one class per section widget
 includes/class-sync.php      three-way merge (pure PHP)
 includes/class-importer.php  import / sync / backup
-tests/                 php tests/sync-test.php && php tests/importer-test.php
+tests/                 php tests/sync-test.php && php tests/importer-test.php && php tests/spam-test.php
+includes/class-spam.php      anti-spam layers + settings screen
 build.sh               creates douce-paresse-kit.zip (without tests)
 ```
