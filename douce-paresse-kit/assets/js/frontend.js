@@ -333,32 +333,72 @@
 		}
 	}
 
-	/* position:fixed is relative to the nearest ancestor with a transform/filter/etc. (e.g. an entrance
-	   animation on the header container). Neutralise those on the header's ancestors so it stays fixed. */
+	/* ---------- Fixed header ----------
+	 * The original header is position:fixed directly under <body>. In Elementor it sits inside several
+	 * wrappers (Theme Builder document, containers, widget). position:fixed breaks as soon as one of them
+	 * has a transform / filter / will-change (entrance animation, motion effect, theme CSS), and the header
+	 * slides under the page content when one of them is a stacking context (z-index, opacity…).
+	 * On the live site the header widget is therefore moved into its own wrapper directly under <body>;
+	 * the wrapper repeats the document class (elementor-123) so the widget's Style-tab CSS still applies. */
+	var BREAKS_FIXED = ['transform', 'filter', 'backdropFilter', 'perspective'];
+
+	function inEditor() {
+		return document.body.classList.contains('elementor-editor-active') ||
+			/[?&]elementor-preview=/.test(window.location.search) ||
+			!!(window.elementorFrontend && window.elementorFrontend.isEditMode && window.elementorFrontend.isEditMode());
+	}
+
+	function neutralise(el) {
+		var cs = getComputedStyle(el);
+		// Always set (not only when present now): an entrance animation may add a transform later, and
+		// Chrome keeps a containing block while a transform animation is in effect, even when overridden.
+		BREAKS_FIXED.forEach(function (prop) {
+			el.style.setProperty(prop.replace(/[A-Z]/g, function (c) { return '-' + c.toLowerCase(); }), 'none', 'important');
+		});
+		if (cs.animationName !== 'none' || el.classList.contains('elementor-invisible') || /"(_?animation|motion_fx)/.test(el.getAttribute('data-settings') || '')) {
+			el.style.setProperty('animation', 'none', 'important');
+			el.style.setProperty('visibility', 'visible', 'important');
+		}
+		if (/transform|filter|perspective/.test(cs.willChange)) { el.style.setProperty('will-change', 'auto', 'important'); }
+		if (cs.contain && cs.contain !== 'none') { el.style.setProperty('contain', 'none', 'important'); }
+		if (cs.containerType && cs.containerType !== 'normal') { el.style.setProperty('container-type', 'normal', 'important'); }
+	}
+
+	function liftHeader(root) {
+		var widget = closest(root, '.elementor-widget') || root;
+		var parent = widget.parentNode;
+		if (!parent || parent === document.body || (parent.classList && parent.classList.contains('dpk-header-portal'))) { return; }
+		var doc = closest(widget, '[data-elementor-id]');
+		var wrap = document.createElement('div');
+		wrap.className = 'dpk-header-portal' + (doc ? ' elementor elementor-' + doc.getAttribute('data-elementor-id') : '');
+		document.body.insertBefore(wrap, document.body.firstChild);
+		wrap.appendChild(widget);
+	}
+
 	function keepHeaderFixed() {
-		var bars = document.querySelectorAll('.dpk-header--fixed');
-		for (var i = 0; i < bars.length; i++) {
-			for (var el = bars[i].parentElement; el && el !== document.body; el = el.parentElement) {
-				var cs = getComputedStyle(el);
-				if (cs.transform !== 'none') { el.style.transform = 'none'; }
-				if (cs.filter !== 'none') { el.style.filter = 'none'; }
-				if (cs.backdropFilter && cs.backdropFilter !== 'none') { el.style.backdropFilter = 'none'; }
-				if (cs.perspective !== 'none') { el.style.perspective = 'none'; }
-				if (/transform|filter|perspective/.test(cs.willChange)) { el.style.willChange = 'auto'; }
-				if (cs.contain && cs.contain !== 'none') { el.style.contain = 'none'; }
-				if (cs.containerType && cs.containerType !== 'normal') { el.style.containerType = 'normal'; }
+		var roots = document.querySelectorAll('[data-dpk-header]');
+		if (!roots.length) { return; }
+		var editor = inEditor();
+		for (var i = 0; i < roots.length; i++) {
+			var lift = !editor && roots[i].classList.contains('dpk-header--fixed');
+			if (lift) { liftHeader(roots[i]); }
+			// Otherwise (editor, or header not fixed but with its full-screen mobile menu) the widget stays
+			// in place and its ancestors are neutralised instead.
+			for (var el = roots[i].parentElement; el && el !== document.documentElement; el = el.parentElement) {
+				if (!lift || el === document.body) { neutralise(el); }
 			}
 		}
+		neutralise(document.documentElement);
 	}
 
 	if (document.readyState === 'loading') {
-		document.addEventListener('DOMContentLoaded', function () { markActive(); keepHeaderFixed(); initForms(); });
+		document.addEventListener('DOMContentLoaded', function () { keepHeaderFixed(); markActive(); initForms(); });
 	} else {
-		markActive();
 		keepHeaderFixed();
+		markActive();
 		initForms();
 	}
-	window.addEventListener('load', keepHeaderFixed); // after entrance animations have been applied
+	window.addEventListener('load', keepHeaderFixed); // editor: after entrance animations have been applied
 
 	window.addEventListener('elementor/frontend/init', function () {
 		if (!window.elementorFrontend || !window.elementorFrontend.hooks) { return; }

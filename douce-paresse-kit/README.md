@@ -89,7 +89,7 @@ Every sync/reset that changes a page first saves a backup (*Restore backup* link
 |---|---|
 | Header not fixed, unstyled for a moment | Fixed in 1.1.2: the kit CSS is now loaded in `<head>` on every page. Clear any cache after updating. |
 | Every menu link underlined | Happened with *Settings → Permalinks → Plain* (all pages are `/?page_id=N`). Fixed in 1.1.2; links saved as `?page_id=` are shown as the current permalink since 1.1.3. “Post name” permalinks are recommended. |
-| Header scrolls away | An entrance animation / motion effect on the header container creates a transform; the kit neutralises it since 1.1.2. |
+| Header scrolls away or slides under the content | An entrance animation, motion effect, z-index or theme CSS on the Theme Builder wrappers breaks `position:fixed`. Since 1.1.4 the header widget is moved into its own wrapper directly under `<body>` on the live site (like the original), so nothing around it can affect it; its Style-tab settings still apply. In the Elementor editor it stays in place. |
 | No header/footer at all | A block theme (Twenty Twenty-Four/Five…) is active — Theme Builder needs a classic theme such as Hello Elementor. Also check that Elementor Pro is active. |
 
 ## Developers
