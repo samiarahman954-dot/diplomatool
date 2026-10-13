@@ -58,6 +58,8 @@ final class Plugin {
 		}
 
 		add_action( 'wp_enqueue_scripts', array( $this, 'register_assets' ), 5 );
+		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_global' ), 20 );
+		add_action( 'wp_head', array( $this, 'preload_fonts' ), 2 );
 		add_action( 'elementor/editor/before_enqueue_scripts', array( $this, 'register_assets' ), 5 );
 		add_action( 'elementor/elements/categories_registered', array( $this, 'register_category' ) );
 		add_action( 'elementor/widgets/register', array( $this, 'register_widgets' ) );
@@ -77,7 +79,6 @@ final class Plugin {
 		wp_register_style( 'dpk-frontend', DPK_URL . 'assets/css/frontend.css', array( 'dpk-fonts' ), DPK_VERSION );
 		wp_register_script( 'dpk-frontend', DPK_URL . 'assets/js/frontend.js', array(), DPK_VERSION, true );
 		$spam = Spam::get();
-		wp_register_script( 'dpk-turnstile', 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit', array(), null, true ); // phpcs:ignore WordPress.WP.EnqueuedResourceParameters.MissingVersion
 		wp_localize_script(
 			'dpk-frontend',
 			'DPK',
@@ -97,6 +98,29 @@ final class Plugin {
 				),
 			)
 		);
+	}
+
+	/**
+	 * The kit styles the whole site (header/footer come from the Theme Builder), so its CSS is loaded
+	 * in <head> on every page. Relying only on widget dependencies printed the CSS late in the footer
+	 * (unstyled header flash) and, with Elementor "Element Caching", cached widgets could skip it entirely
+	 * (header not fixed, links underlined).
+	 */
+	public function enqueue_global() {
+		if ( ! apply_filters( 'dpk_enqueue_globally', true ) ) {
+			return;
+		}
+		wp_enqueue_style( 'dpk-frontend' );
+		wp_enqueue_script( 'dpk-frontend' );
+	}
+
+	public function preload_fonts() {
+		if ( ! apply_filters( 'dpk_enqueue_globally', true ) ) {
+			return;
+		}
+		foreach ( array( 'cormorant-latin', 'cormorant-italic-latin', 'jost-latin' ) as $font ) {
+			printf( '<link rel="preload" href="%s" as="font" type="font/woff2" crossorigin>' . "\n", esc_url( DPK_URL . 'assets/fonts/' . $font . '.woff2' ) );
+		}
 	}
 
 	public function register_category( $elements_manager ) {

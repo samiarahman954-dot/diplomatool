@@ -25,6 +25,10 @@ class Contact extends Base {
 		return 'eicon-mail';
 	}
 
+	protected function is_dynamic_content(): bool {
+		return true;
+	}
+
 	public function get_script_depends() {
 		return $this->form_script_depends();
 	}

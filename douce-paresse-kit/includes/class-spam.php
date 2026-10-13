@@ -60,6 +60,7 @@ final class Spam {
 		add_action( 'admin_init', array( $this, 'register_setting' ) );
 		add_action( 'dpk_purge_spam', array( $this, 'purge' ) );
 		add_action( 'init', array( $this, 'schedule' ) );
+		add_action( 'update_option_' . self::OPTION, array( $this, 'flush_elementor' ) );
 	}
 
 	/* ------------------------------------------------------------------
@@ -431,6 +432,12 @@ final class Spam {
 		}
 
 		return array( 'status' => 'ok' );
+	}
+
+	public function flush_elementor() {
+		if ( did_action( 'elementor/loaded' ) && isset( \Elementor\Plugin::$instance->files_manager ) ) {
+			\Elementor\Plugin::$instance->files_manager->clear_cache();
+		}
 	}
 
 	/* ------------------------------------------------------------------

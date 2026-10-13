@@ -192,7 +192,7 @@ trait Form_Trait {
 	}
 
 	protected function form_script_depends() {
-		return \DPK\Spam::turnstile_enabled() ? array( 'dpk-turnstile', 'dpk-frontend' ) : array( 'dpk-frontend' );
+		return array( 'dpk-frontend' ); // Turnstile's api.js is injected by frontend.js only when a form is on the page.
 	}
 
 	protected function form_post_id() {

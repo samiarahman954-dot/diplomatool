@@ -465,18 +465,18 @@ html.dpk-lock, html.dpk-lock body { overflow: hidden; }
 .dpk .dpk-field--full { grid-column: 1 / -1; }
 .dpk .dpk-field__label { display: flex; justify-content: space-between; gap: 12px; font-size: 11px; font-weight: 400; letter-spacing: .22em; text-transform: uppercase; color: var(--dpk-navy); }
 .dpk .dpk-field__hint { font-size: 12px; letter-spacing: .08em; text-transform: none; color: var(--dpk-brown); }
-.dpk .dpk-field__input {
+.dpk .dpk-form .dpk-field .dpk-field__input {
 	width: 100%; min-height: 48px; margin: 0; padding: 10px 0;
 	background: transparent; border: none; border-bottom: 1px solid rgba(22, 35, 63, .3); border-radius: 0; box-shadow: none; outline: none;
 	color: var(--dpk-navy); font-family: var(--dpk-sans); font-size: 16px; font-weight: 300; line-height: normal; transition: border-color .3s ease;
 }
-.dpk .dpk-field__input:focus { border-bottom-color: var(--dpk-gold); box-shadow: none; outline: none; }
+.dpk .dpk-form .dpk-field .dpk-field__input:focus { border-bottom-color: var(--dpk-gold); box-shadow: none; outline: none; }
 .dpk .dpk-field__input::placeholder { color: #8A8C99; }
-.dpk .dpk-field__input--area { padding: 12px 0; line-height: 1.7; resize: vertical; }
+.dpk .dpk-form .dpk-field .dpk-field__input--area { padding: 12px 0; line-height: 1.7; resize: vertical; }
 .dpk .dpk-field__select { position: relative; display: block; }
-.dpk .dpk-field__select .dpk-field__input { padding-right: 32px; -webkit-appearance: none; appearance: none; cursor: pointer; }
+.dpk .dpk-form .dpk-field .dpk-field__select .dpk-field__input { padding-right: 32px; -webkit-appearance: none; appearance: none; cursor: pointer; }
 .dpk .dpk-field__caret { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); pointer-events: none; font-size: 12px; color: var(--dpk-brown); }
-.dpk .dpk-field.has-error .dpk-field__input { border-bottom-color: var(--dpk-error); }
+.dpk .dpk-form .dpk-field.has-error .dpk-field__input { border-bottom-color: var(--dpk-error); }
 .dpk .dpk-field__error { font-size: 13px; color: var(--dpk-error); }
 .dpk .dpk-field__error:empty { display: none; }
 .dpk .dpk-form__privacy { grid-column: 1 / -1; font-size: 13px; line-height: 1.7; font-weight: 300; color: var(--dpk-muted); }

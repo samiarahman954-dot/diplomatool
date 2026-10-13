@@ -189,6 +189,12 @@
 
 	function whenTurnstile(cb) {
 		if (!ts) { return; }
+		if (!window.turnstile && !document.querySelector('script[src*="challenges.cloudflare.com/turnstile"]')) {
+			var sc = document.createElement('script');
+			sc.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+			sc.async = true;
+			document.head.appendChild(sc);
+		}
 		var n = 0;
 		(function poll() {
 			if (window.turnstile) { cb(); return; }
@@ -280,6 +286,17 @@
 
 	function initForms(scope) {
 		if (!(scope || document).querySelector('[data-dpk-form]')) { return; }
+		if (ts) {
+			var forms = (scope || document).querySelectorAll('[data-dpk-form]');
+			for (var i = 0; i < forms.length; i++) {
+				if (forms[i].querySelector('[data-dpk-turnstile]')) { continue; }
+				var box = document.createElement('div');
+				box.className = 'dpk-turnstile';
+				box.setAttribute('data-dpk-turnstile', '');
+				var anchor = forms[i].querySelector('.dpk-form__privacy') || forms[i].querySelector('.dpk-form__footer');
+				forms[i].insertBefore(box, anchor);
+			}
+		}
 		if (!tok.value) { fetchToken(); }
 		whenTurnstile(function () { renderTurnstile(scope); });
 	}
@@ -289,11 +306,18 @@
 	});
 
 	/* ---------- Active menu links ---------- */
+	var NOISE = /^(utm_.*|fbclid|gclid|msclkid|ver|elementor-preview|preview|preview_id|preview_nonce|_ga|lang)$/;
+
+	/* Comparable form of a URL: path + meaningful query (?page_id=12 with "Plain" permalinks), no hash. */
 	function norm(url) {
 		try {
 			var u = new URL(url, window.location.href);
 			if (u.origin !== window.location.origin) { return null; }
-			return u.pathname.replace(/\/+$/, '') || '/';
+			var params = [];
+			u.searchParams.forEach(function (v, k) { if (!NOISE.test(k)) { params.push(k + '=' + v); } });
+			params.sort();
+			var path = u.pathname.replace(/\/index\.php$/, '/').replace(/\/+$/, '') || '/';
+			return path + (params.length ? '?' + params.join('&') : '');
 		} catch (err) {
 			return null;
 		}
@@ -304,17 +328,37 @@
 		var links = (scope || document).querySelectorAll('.dpk-header__menu a, .dpk-header__overlay-links a');
 		for (var i = 0; i < links.length; i++) {
 			var href = links[i].getAttribute('href');
-			if (!href || href.charAt(0) === '#') { continue; }
-			if (norm(links[i].href) === here) { links[i].setAttribute('aria-current', 'page'); }
+			var match = href && href.charAt(0) !== '#' && norm(links[i].href) === here;
+			if (match) { links[i].setAttribute('aria-current', 'page'); } else { links[i].removeAttribute('aria-current'); }
+		}
+	}
+
+	/* position:fixed is relative to the nearest ancestor with a transform/filter/etc. (e.g. an entrance
+	   animation on the header container). Neutralise those on the header's ancestors so it stays fixed. */
+	function keepHeaderFixed() {
+		var bars = document.querySelectorAll('.dpk-header--fixed');
+		for (var i = 0; i < bars.length; i++) {
+			for (var el = bars[i].parentElement; el && el !== document.body; el = el.parentElement) {
+				var cs = getComputedStyle(el);
+				if (cs.transform !== 'none') { el.style.transform = 'none'; }
+				if (cs.filter !== 'none') { el.style.filter = 'none'; }
+				if (cs.backdropFilter && cs.backdropFilter !== 'none') { el.style.backdropFilter = 'none'; }
+				if (cs.perspective !== 'none') { el.style.perspective = 'none'; }
+				if (/transform|filter|perspective/.test(cs.willChange)) { el.style.willChange = 'auto'; }
+				if (cs.contain && cs.contain !== 'none') { el.style.contain = 'none'; }
+				if (cs.containerType && cs.containerType !== 'normal') { el.style.containerType = 'normal'; }
+			}
 		}
 	}
 
 	if (document.readyState === 'loading') {
-		document.addEventListener('DOMContentLoaded', function () { markActive(); initForms(); });
+		document.addEventListener('DOMContentLoaded', function () { markActive(); keepHeaderFixed(); initForms(); });
 	} else {
 		markActive();
+		keepHeaderFixed();
 		initForms();
 	}
+	window.addEventListener('load', keepHeaderFixed); // after entrance animations have been applied
 
 	window.addEventListener('elementor/frontend/init', function () {
 		if (!window.elementorFrontend || !window.elementorFrontend.hooks) { return; }

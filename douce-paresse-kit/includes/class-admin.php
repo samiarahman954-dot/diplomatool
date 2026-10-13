@@ -89,6 +89,11 @@ final class Admin {
 				'help'  => __( 'Required to place the header and footer on every page. Without it they are saved as section templates.', 'douce-paresse-kit' ),
 			),
 			array(
+				'ok'    => ! ( function_exists( 'wp_is_block_theme' ) && wp_is_block_theme() ),
+				'label' => __( 'Classic (non-block) theme', 'douce-paresse-kit' ),
+				'help'  => __( 'Block themes (Twenty Twenty-Four, Twenty Twenty-Five…) do not support Elementor Theme Builder headers/footers. Use Hello Elementor.', 'douce-paresse-kit' ),
+			),
+			array(
 				'ok'    => in_array( $theme->get_template(), array( 'hello-elementor', 'hello-biz' ), true ),
 				'label' => __( 'Hello Elementor theme (recommended)', 'douce-paresse-kit' ),
 				'help'  => __( 'Any theme works with the Theme Builder, Hello gives the cleanest result.', 'douce-paresse-kit' ),
