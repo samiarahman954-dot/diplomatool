@@ -56,6 +56,7 @@ abstract class Base extends Widget_Base {
 	 */
 	protected function link_attrs( $link ) {
 		$url = is_array( $link ) ? ( isset( $link['url'] ) ? $link['url'] : '' ) : (string) $link;
+		$url = \DPK\Links::url( $url );
 		if ( '' === $url ) {
 			return '';
 		}
@@ -120,11 +121,15 @@ abstract class Base extends Widget_Base {
 	}
 
 	protected function text( $value ) {
-		return wp_kses_post( nl2br( (string) $value ) );
+		return \DPK\Links::html( wp_kses_post( nl2br( (string) $value ) ) );
 	}
 
 	/** Plain one-liners (labels, buttons). Allows inline tags only. */
 	protected function inline( $value ) {
+		return \DPK\Links::html( $this->inline_kses( $value ) );
+	}
+
+	private function inline_kses( $value ) {
 		return wp_kses(
 			(string) $value,
 			array(

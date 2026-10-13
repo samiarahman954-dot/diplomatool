@@ -44,6 +44,7 @@ final class Plugin {
 	private function __construct() {
 		require_once DPK_PATH . 'includes/class-sync.php';
 		require_once DPK_PATH . 'includes/class-importer.php';
+		require_once DPK_PATH . 'includes/class-links.php';
 		require_once DPK_PATH . 'includes/class-spam.php';
 		require_once DPK_PATH . 'includes/class-forms.php';
 		require_once DPK_PATH . 'includes/class-admin.php';

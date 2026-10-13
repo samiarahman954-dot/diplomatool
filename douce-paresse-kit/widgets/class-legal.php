@@ -103,11 +103,11 @@ class Legal extends Base {
 						<h2 class="dpk-legal__title"><?php echo esc_html( $a['title'] ); ?></h2>
 					</div>
 					<?php if ( trim( wp_strip_all_tags( $a['content'] ) ) ) : ?>
-						<div class="dpk-legal__content"><?php echo wp_kses_post( wpautop( $a['content'] ) ); ?></div>
+						<div class="dpk-legal__content"><?php echo \DPK\Links::html( wp_kses_post( wpautop( $a['content'] ) ) ); // phpcs:ignore ?></div>
 					<?php endif; ?>
 					<?php $this->rows( $a['rows'] ); ?>
 					<?php if ( trim( wp_strip_all_tags( $a['content_after'] ) ) ) : ?>
-						<div class="dpk-legal__content"><?php echo wp_kses_post( wpautop( $a['content_after'] ) ); ?></div>
+						<div class="dpk-legal__content"><?php echo \DPK\Links::html( wp_kses_post( wpautop( $a['content_after'] ) ) ); // phpcs:ignore ?></div>
 					<?php endif; ?>
 				</article>
 			<?php endforeach; ?>

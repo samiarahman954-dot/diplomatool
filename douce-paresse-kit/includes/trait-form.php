@@ -253,7 +253,7 @@ trait Form_Trait {
 					<div class="dpk-turnstile" data-dpk-turnstile></div>
 				<?php endif; ?>
 				<?php if ( ! empty( $s['privacy_text'] ) ) : ?>
-					<p class="dpk-form__privacy"><?php echo wp_kses_post( $s['privacy_text'] ); ?></p>
+					<p class="dpk-form__privacy"><?php echo \DPK\Links::html( wp_kses_post( $s['privacy_text'] ) ); // phpcs:ignore ?></p>
 				<?php endif; ?>
 				<div class="dpk-form__footer<?php echo empty( $s['required_note'] ) ? ' dpk-form__footer--end' : ''; ?>">
 					<?php if ( ! empty( $s['required_note'] ) ) : ?>

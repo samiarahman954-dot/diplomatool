@@ -83,6 +83,15 @@ Every sync/reset that changes a page first saves a backup (*Restore backup* link
 2. When the kit is updated (new plugin version, `demo/demo-data.php` changed), upload the new plugin and run **Smart sync**: the table shows *Kit update available* and *N edits of yours (protected)*; your edits stay, the kit changes arrive.
 3. Changes to a widget's design (PHP/CSS) apply automatically after updating the plugin — no re-import needed, your content is untouched.
 
+## Troubleshooting
+
+| Symptom | Cause / fix |
+|---|---|
+| Header not fixed, unstyled for a moment | Fixed in 1.1.2: the kit CSS is now loaded in `<head>` on every page. Clear any cache after updating. |
+| Every menu link underlined | Happened with *Settings → Permalinks → Plain* (all pages are `/?page_id=N`). Fixed in 1.1.2; links saved as `?page_id=` are shown as the current permalink since 1.1.3. “Post name” permalinks are recommended. |
+| Header scrolls away | An entrance animation / motion effect on the header container creates a transform; the kit neutralises it since 1.1.2. |
+| No header/footer at all | A block theme (Twenty Twenty-Four/Five…) is active — Theme Builder needs a classic theme such as Hello Elementor. Also check that Elementor Pro is active. |
+
 ## Developers
 
 ```
@@ -90,7 +99,7 @@ demo/demo-data.php     demo content (tokens {{img:file}} and {{page:key}})
 widgets/               one class per section widget
 includes/class-sync.php      three-way merge (pure PHP)
 includes/class-importer.php  import / sync / backup
-tests/                 php tests/sync-test.php && php tests/importer-test.php && php tests/spam-test.php
+tests/                 php tests/sync-test.php && php tests/importer-test.php && php tests/spam-test.php && php tests/links-test.php
 includes/class-spam.php      anti-spam layers + settings screen
 build.sh               creates douce-paresse-kit.zip (without tests)
 ```
