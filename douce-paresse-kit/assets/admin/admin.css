@@ -1,0 +1,27 @@
+.dpk-admin { max-width: 1100px; }
+.dpk-admin .dpk-lead { font-size: 14px; max-width: 760px; }
+.dpk-admin .dpk-card { background: #fff; border: 1px solid #dcdcde; border-radius: 4px; padding: 4px 20px 20px; margin: 20px 0; }
+.dpk-admin .dpk-card h2 { font-size: 16px; }
+.dpk-req { margin: 0; }
+.dpk-req li { display: flex; align-items: center; gap: 6px; margin: 6px 0; }
+.dpk-req .is-ok .dashicons { color: #008a20; }
+.dpk-req .is-bad .dashicons { color: #d63638; }
+.dpk-req .is-soft .dashicons { color: #dba617; }
+.dpk-table .check-column { width: 2.2em; }
+.dpk-table td, .dpk-table th { vertical-align: middle; }
+.dpk-sub { color: #646970; font-size: 12px; margin-top: 2px; }
+.dpk-badge { display: inline-block; padding: 2px 8px; margin: 2px 0; border-radius: 10px; font-size: 12px; line-height: 1.6; background: #f0f0f1; color: #3c434a; }
+.dpk-badge--ok { background: #edfaef; color: #00450c; }
+.dpk-badge--new { background: #f0f6fc; color: #0a4b78; }
+.dpk-badge--warn { background: #fcf9e8; color: #614a00; }
+.dpk-badge--edit { background: #f6f0fc; color: #4b2a78; }
+.dpk-badge--update { background: #fff4e5; color: #8a4b00; }
+.dpk-modes { display: grid; gap: 10px; }
+.dpk-modes label { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; padding: 10px 12px; border: 1px solid #dcdcde; border-radius: 4px; cursor: pointer; }
+.dpk-modes label span { grid-column: 2; color: #50575e; }
+.dpk-modes input { margin-top: 2px; }
+.dpk-go { margin: 18px 0 10px; }
+.dpk-progress { height: 6px; background: #f0f0f1; border-radius: 3px; overflow: hidden; }
+.dpk-progress__bar { height: 100%; width: 0; background: #2271b1; transition: width .3s ease; }
+.dpk-log { max-height: 280px; overflow: auto; margin: 12px 0 0 1.4em; font-family: Menlo, Consolas, monospace; font-size: 12px; }
+.dpk-log li { margin: 2px 0; }
