@@ -84,6 +84,44 @@ class Header extends Base {
 		$this->add_control( 'overlay_tagline', array( 'label' => __( 'Overlay tagline', 'douce-paresse-kit' ), 'type' => Controls_Manager::TEXT, 'default' => 'l’art de la courtoisie française' ) );
 		$this->end_controls_section();
 
+		$this->start_controls_section( 'lang_section', array( 'label' => __( 'Languages (GTranslate)', 'douce-paresse-kit' ) ) );
+		$this->add_control(
+			'lang_mode',
+			array(
+				'label'       => __( 'Show the FR | EN switcher', 'douce-paresse-kit' ),
+				'type'        => Controls_Manager::SELECT,
+				'default'     => 'auto',
+				'options'     => array(
+					'auto' => __( 'Automatic (when GTranslate is active)', 'douce-paresse-kit' ),
+					'show' => __( 'Always', 'douce-paresse-kit' ),
+					'hide' => __( 'Never', 'douce-paresse-kit' ),
+				),
+				'description' => __( 'Desktop: next to the menu. Tablet / mobile: inside the menu.', 'douce-paresse-kit' ),
+			)
+		);
+		$this->add_control(
+			'lang_items',
+			array(
+				'label'       => __( 'Languages (Label | code, one per line)', 'douce-paresse-kit' ),
+				'type'        => Controls_Manager::TEXTAREA,
+				'rows'        => 3,
+				'default'     => "FR | fr\nEN | en",
+				'description' => __( 'The first line is the original language of the site. Codes as in GTranslate (fr, en, de, es…).', 'douce-paresse-kit' ),
+				'condition'   => array( 'lang_mode!' => 'hide' ),
+			)
+		);
+		$this->add_control(
+			'lang_hide_float',
+			array(
+				'label'        => __( 'Hide the GTranslate floating button', 'douce-paresse-kit' ),
+				'type'         => Controls_Manager::SWITCHER,
+				'return_value' => 'yes',
+				'default'      => 'yes',
+				'condition'    => array( 'lang_mode!' => 'hide' ),
+			)
+		);
+		$this->end_controls_section();
+
 		// Style.
 		$this->start_controls_section( 'bar_style', array( 'label' => __( 'Bar', 'douce-paresse-kit' ), 'tab' => Controls_Manager::TAB_STYLE ) );
 		$this->add_control( 'bar_bg', array( 'label' => __( 'Background', 'douce-paresse-kit' ), 'type' => Controls_Manager::COLOR, 'selectors' => array( '{{WRAPPER}} .dpk-header__bar' => 'background-color: {{VALUE}};' ) ) );
@@ -114,6 +152,8 @@ class Header extends Base {
 		$this->add_group_control( Group_Control_Typography::get_type(), array( 'name' => 'links_typo', 'selector' => '{{WRAPPER}} .dpk-header__menu a' ) );
 		$this->add_control( 'links_color', array( 'label' => __( 'Color', 'douce-paresse-kit' ), 'type' => Controls_Manager::COLOR, 'selectors' => array( '{{WRAPPER}} .dpk-header__menu a, {{WRAPPER}} .dpk-header__brand, {{WRAPPER}} .dpk .dpk-header__toggle' => 'color: {{VALUE}};', '{{WRAPPER}} .dpk-header__burger span' => 'background-color: {{VALUE}};' ) ) );
 		$this->add_control( 'links_hover_line', array( 'label' => __( 'Hover / active underline', 'douce-paresse-kit' ), 'type' => Controls_Manager::COLOR, 'selectors' => array( '{{WRAPPER}} .dpk-header__menu a:hover, {{WRAPPER}} .dpk-header__menu a[aria-current="page"]' => 'border-bottom-color: {{VALUE}};' ) ) );
+		$this->add_control( 'lang_color', array( 'label' => __( 'Language switcher', 'douce-paresse-kit' ), 'type' => Controls_Manager::COLOR, 'separator' => 'before', 'selectors' => array( '{{WRAPPER}} .dpk-lang--bar .dpk-lang__btn, {{WRAPPER}} .dpk-lang--bar .dpk-lang__sep' => 'color: {{VALUE}};' ) ) );
+		$this->add_control( 'lang_active_color', array( 'label' => __( 'Language switcher: current language', 'douce-paresse-kit' ), 'type' => Controls_Manager::COLOR, 'selectors' => array( '{{WRAPPER}} .dpk-lang--bar .dpk-lang__btn[aria-pressed="true"], {{WRAPPER}} .dpk-lang--bar .dpk-lang__btn:hover' => 'color: {{VALUE}};' ) ) );
 		$this->end_controls_section();
 
 		$this->start_controls_section( 'overlay_style', array( 'label' => __( 'Mobile overlay', 'douce-paresse-kit' ), 'tab' => Controls_Manager::TAB_STYLE ) );
@@ -133,6 +173,34 @@ class Header extends Base {
 		}
 	}
 
+	/** [ [label, code], … ] or empty when the switcher is off. */
+	private function languages( $s ) {
+		$mode = isset( $s['lang_mode'] ) ? $s['lang_mode'] : 'auto';
+		if ( 'hide' === $mode || ( 'auto' === $mode && ! ( class_exists( 'DPK\\I18n' ) && \DPK\I18n::gtranslate_active() ) ) ) {
+			return array();
+		}
+		$langs = array();
+		foreach ( $this->lines( isset( $s['lang_items'] ) ? $s['lang_items'] : "FR | fr\nEN | en", 2 ) as $l ) {
+			$code = strtolower( preg_replace( '/[^A-Za-z-]/', '', $l[1] ) );
+			if ( '' !== trim( $l[0] ) && '' !== $code ) {
+				$langs[] = array( trim( $l[0] ), 'zh-cn' === $code ? 'zh-CN' : ( 'zh-tw' === $code ? 'zh-TW' : $code ) );
+			}
+		}
+		return count( $langs ) > 1 ? $langs : array();
+	}
+
+	private function lang_switch( $langs, $variant, $hide_float ) {
+		$classes = 'dpk-lang dpk-lang--' . $variant . ' notranslate' . ( $hide_float ? ' dpk-lang--hidegt' : '' );
+		echo '<div class="' . esc_attr( $classes ) . '" translate="no" role="group" aria-label="' . esc_attr__( 'Langue', 'douce-paresse-kit' ) . '" data-dpk-lang-switch data-source="' . esc_attr( $langs[0][1] ) . '">';
+		foreach ( $langs as $i => $l ) {
+			if ( $i ) {
+				echo '<span class="dpk-lang__sep" aria-hidden="true">|</span>';
+			}
+			echo '<button type="button" class="dpk-lang__btn" data-dpk-lang="' . esc_attr( $l[1] ) . '" lang="' . esc_attr( $l[1] ) . '" aria-pressed="' . ( $i ? 'false' : 'true' ) . '">' . esc_html( $l[0] ) . '</button>';
+		}
+		echo '</div>';
+	}
+
 	protected function render() {
 		$s         = $this->get_settings_for_display();
 		$home      = ! empty( $s['logo_link']['url'] ) ? $s['logo_link'] : array( 'url' => home_url( '/' ) );
@@ -142,13 +210,22 @@ class Header extends Base {
 		$overlay   = 'dpk-menu-' . $this->get_id();
 		$all_links = array_merge( (array) $s['menu_left'], (array) $s['menu_right'] );
 		$classes   = 'dpk dpk-header' . ( 'yes' === ( isset( $s['dpk_fixed'] ) ? $s['dpk_fixed'] : 'yes' ) ? ' dpk-header--fixed' : '' );
+		$langs     = $this->languages( $s );
+		$hide_gt   = 'yes' === ( isset( $s['lang_hide_float'] ) ? $s['lang_hide_float'] : 'yes' );
 		?>
 		<div class="<?php echo esc_attr( $classes ); ?>" data-dpk-header>
 			<header class="dpk-header__bar">
 				<nav class="dpk-header__desktop" aria-label="<?php esc_attr_e( 'Navigation principale', 'douce-paresse-kit' ); ?>">
 					<div class="dpk-header__menu"><?php $this->links( $s['menu_left'] ); ?></div>
 					<a class="dpk-header__logo"<?php echo $this->link_attrs( $home ); // phpcs:ignore ?> aria-label="<?php echo esc_attr( $s['logo_label'] ); ?>" style="<?php echo esc_attr( '--dpk-logo:url(' . esc_url( $logo ) . ');--dpk-logo-hover:url(' . esc_url( $logo_h ) . ')' ); ?>"></a>
-					<div class="dpk-header__menu dpk-header__menu--right"><?php $this->links( $s['menu_right'] ); ?></div>
+					<div class="dpk-header__menu dpk-header__menu--right">
+						<?php
+						$this->links( $s['menu_right'] );
+						if ( $langs ) {
+							$this->lang_switch( $langs, 'bar', $hide_gt );
+						}
+						?>
+					</div>
 				</nav>
 				<nav class="dpk-header__mobile" aria-label="<?php esc_attr_e( 'Navigation', 'douce-paresse-kit' ); ?>">
 					<a class="dpk-header__brand"<?php echo $this->link_attrs( $home ); // phpcs:ignore ?> aria-label="<?php echo esc_attr( $s['logo_label'] ); ?>">
@@ -171,6 +248,9 @@ class Header extends Base {
 					<button type="button" class="dpk-header__close" data-dpk-menu-toggle><?php echo esc_html( $s['close_label'] ); ?></button>
 				</div>
 				<div class="dpk-header__overlay-links"><?php $this->links( $all_links ); ?></div>
+				<?php if ( $langs ) : ?>
+					<div class="dpk-header__overlay-lang"><?php $this->lang_switch( $langs, 'overlay', $hide_gt ); ?></div>
+				<?php endif; ?>
 				<?php if ( $s['overlay_tagline'] ) : ?>
 					<div class="dpk-header__overlay-tagline"><?php echo esc_html( $s['overlay_tagline'] ); ?></div>
 				<?php endif; ?>

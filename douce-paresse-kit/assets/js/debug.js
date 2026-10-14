@@ -396,6 +396,26 @@
 		});
 		if (under.length) { add('error', G, 'Menu underline', 'Menu links are underlined by another stylesheet.', under.join('\n') + '\n' + rulesFor(document.querySelector('.dpk-header__menu a'), ['textDecoration', 'textDecorationLine']).join('\n')); }
 
+		// Brand protected from automatic translation
+		var terms = (window.DPK && window.DPK.brand) || [];
+		if (terms.length) {
+			var bare = [];
+			var re = new RegExp('(^|[^\\p{L}\\p{N}])(' + terms.map(function (t) { return t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+'); }).join('|') + ')(?![\\p{L}\\p{N}])', 'iu');
+			var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+			var node;
+			while ((node = walker.nextNode()) && bare.length < 10) {
+				var pe = node.parentElement;
+				if (!pe || !re.test(node.nodeValue) || pe.closest('script,style,noscript,textarea,.notranslate,[translate="no"],.dpkdbg')) { continue; }
+				bare.push(desc(pe) + ': “' + node.nodeValue.trim().slice(0, 60) + '”');
+			}
+			add(bare.length ? 'warn' : 'ok', G, 'Brand protection', bare.length ? bare.length + ' occurrence(s) of ' + terms.join(', ') + ' can still be translated (page cached before the update, or text added by a script).' : terms.join(', ') + ' is protected from automatic translation everywhere on this page.', bare.join('\n'));
+		}
+		var gtFloat = document.getElementById('gt_float_wrapper');
+		var kitLang = document.querySelector('.dpk-lang');
+		if (kitLang) {
+			add(typeof window.doGTranslate === 'function' || (window.gtranslateSettings && true) ? 'ok' : 'warn', G, 'Language switcher', 'FR | EN switcher present' + (typeof window.doGTranslate === 'function' ? ', GTranslate ready' : ', GTranslate script not found (switching falls back to reloading the page)') + (gtFloat ? (getComputedStyle(gtFloat).display === 'none' ? ', floating button hidden.' : ', floating button still visible.') : '.'));
+		}
+
 		// Duplicate ids
 		var ids = {};
 		var dups = [];

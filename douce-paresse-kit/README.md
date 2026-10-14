@@ -48,6 +48,13 @@ Every widget has its content in the *Content* tab and colors / typography / spac
 Forms send an e-mail to every address listed in the widget (*Send notifications to*: one per line or separated by commas, e.g. you and your staff; default = site admin e-mail) and keep a copy under *Douce Paresse → Messages* with the addresses it was sent to. *Diagnostics* lists each form’s recipients and flags entries that are not valid addresses.
 Fonts (Cormorant Garamond, Jost) are bundled locally — no Google Fonts request.
 
+## Languages (GTranslate)
+
+The site is translated with the [GTranslate](https://wordpress.org/plugins/gtranslate/) plugin (French = original language). *WP Admin → Douce Paresse → Languages.*
+
+- **Brand name never translated**: every “Douce Paresse” (any case, also with a non-breaking space) in the page body (header, footer, page content, any Elementor widget) is wrapped in `<span class="notranslate" translate="no">`, which Google Translate and GTranslate (free and paid plans) leave as is; images/inputs whose alt/placeholder contain it get `translate="no"`; the browser tab title is corrected after translation. More words can be added (one per line).
+- **FR | EN switcher** instead of the floating GTranslate button: discreet “FR | EN” at the right of the desktop menu, and inside the hamburger menu on tablet / mobile. Settings in the DP Header widget → *Languages (GTranslate)*: show (Automatic = when GTranslate is active / Always / Never), labels and codes (`FR | fr`, `EN | en`, first line = original language), hide the floating button (on by default; GTranslate keeps running in the background). Free GTranslate switches instantly (`doGTranslate`), paid sub-directory / sub-domain plans go to the translated URL.
+
 ## Anti-spam (Contact + Professional request forms)
 
 *WP Admin → Douce Paresse → Anti-spam.* Layers, in order:
@@ -108,8 +115,9 @@ demo/demo-data.php     demo content (tokens {{img:file}} and {{page:key}})
 widgets/               one class per section widget
 includes/class-sync.php      three-way merge (pure PHP)
 includes/class-importer.php  import / sync / backup
-tests/                 php tests/sync-test.php && php tests/importer-test.php && php tests/spam-test.php && php tests/links-test.php && php tests/debug-test.php && php tests/controls-test.php && php tests/forms-test.php
+tests/                 php tests/sync-test.php && php tests/importer-test.php && php tests/spam-test.php && php tests/links-test.php && php tests/debug-test.php && php tests/controls-test.php && php tests/forms-test.php && php tests/i18n-test.php
 includes/class-spam.php      anti-spam layers + settings screen
+includes/class-i18n.php      brand protection for translation + Languages screen
 includes/class-debug.php     Diagnostics screen + ?dpk-debug=1 browser panel (assets/js/debug.js)
 build.sh               creates douce-paresse-kit.zip (without tests)
 ```

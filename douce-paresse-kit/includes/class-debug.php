@@ -473,6 +473,10 @@ var b=r.querySelector('.dpk-header__bar');d.snapshot={chain:c,bar:b?{position:ge
 				$f['page'] . ' (' . $f['widget'] . '): ' . ( $f['valid'] ? implode( ', ', $f['valid'] ) : 'site admin e-mail ' . get_option( 'admin_email' ) ) . ( $f['invalid'] ? ' | IGNORED (not valid e-mail addresses): ' . implode( ', ', $f['invalid'] ) : '' )
 			);
 		}
+		if ( class_exists( 'DPK\\I18n' ) ) {
+			$terms  = I18n::terms();
+			$rows[] = self::row( I18n::gtranslate_active() ? 'ok' : 'info', 'Translation', ( I18n::gtranslate_active() ? 'GTranslate active' : 'GTranslate not active (FR | EN switcher hidden in Automatic mode)' ) . ' · never translated: ' . ( $terms ? implode( ', ', $terms ) : 'nothing (protection off)' ) . '.' );
+		}
 		$rows[] = self::row( Spam::turnstile_enabled() ? 'ok' : 'info', 'Cloudflare Turnstile', Spam::turnstile_enabled() ? 'On.' : 'Off (other anti-spam layers are active).' );
 
 		/* PHP errors in the log */

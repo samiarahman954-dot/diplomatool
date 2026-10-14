@@ -394,6 +394,121 @@
 		neutralise(document.documentElement);
 	}
 
+	/* ---------- Languages: FR | EN switcher driving GTranslate ----------
+	 * Free GTranslate (Google Translate, cookie "googtrans"): doGTranslate('fr|en'). It only loads
+	 * Google's library when its floating button is hovered, so the hidden button is "woken up" first;
+	 * if nothing happened after a few seconds the cookie is set and the page reloaded (same result).
+	 * Paid GTranslate (/en/ sub-directory or sub-domain): go to the URL of GTranslate's own link. */
+	function gtSettings() {
+		var g = window.gtranslateSettings;
+		if (!g || typeof g !== 'object') { return {}; }
+		if (g.default_language) { return g; }
+		for (var k in g) { if (g[k] && g[k].default_language) { return g[k]; } }
+		return {};
+	}
+
+	function langCookie() {
+		var m = document.cookie.match(/(?:^|;)\s*googtrans=([^;]*)/);
+		var parts = m ? decodeURIComponent(m[1]).split('/') : [];
+		return parts[2] || null;
+	}
+
+	function sourceLang(sw) {
+		return gtSettings().default_language || (sw && sw.getAttribute('data-source')) || 'fr';
+	}
+
+	function translatedPage() {
+		return /\btranslated-(ltr|rtl)\b/.test(document.documentElement.className);
+	}
+
+	function currentLang(sw) {
+		var g = gtSettings();
+		var src = sourceLang(sw);
+		if (g.url_structure && g.url_structure !== 'none') {
+			var html = (document.documentElement.getAttribute('lang') || '').split('-')[0];
+			return html || src;
+		}
+		return langCookie() || src;
+	}
+
+	function sameLang(a, b) {
+		return String(a).toLowerCase() === String(b).toLowerCase() || String(a).toLowerCase().split('-')[0] === String(b).toLowerCase();
+	}
+
+	function markLang() {
+		var sws = document.querySelectorAll('[data-dpk-lang-switch]');
+		for (var i = 0; i < sws.length; i++) {
+			var cur = currentLang(sws[i]);
+			var btns = sws[i].querySelectorAll('[data-dpk-lang]');
+			for (var j = 0; j < btns.length; j++) {
+				btns[j].setAttribute('aria-pressed', sameLang(cur, btns[j].getAttribute('data-dpk-lang')) ? 'true' : 'false');
+			}
+		}
+	}
+
+	function setLangCookie(value) {
+		var host = window.location.hostname;
+		var exp = value ? '' : '; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+		['', '; domain=' + host, '; domain=.' + host.replace(/^www\./, '')].forEach(function (d) {
+			document.cookie = 'googtrans=' + (value || '') + '; path=/' + d + exp;
+		});
+	}
+
+	function reloadIn(code, src) {
+		setLangCookie(code === src ? '' : '/' + src + '/' + code);
+		window.location.reload();
+	}
+
+	function switchLang(sw, code) {
+		var g = gtSettings();
+		var src = sourceLang(sw);
+		if (sameLang(currentLang(sw), code)) { return; }
+		if (g.url_structure && g.url_structure !== 'none') {
+			var a = document.querySelector('a[data-gt-lang="' + code + '"]');
+			if (a && a.href && !/#$/.test(a.href)) { window.location.href = a.href; return; }
+		}
+		if (typeof window.doGTranslate !== 'function') { reloadIn(code, src); return; }
+		var wake = document.querySelectorAll('.gtranslate_wrapper, [class*="gt_container-"]');
+		for (var i = 0; i < wake.length; i++) {
+			try { wake[i].dispatchEvent(new Event('pointerenter')); } catch (e) { /* old browser */ }
+		}
+		window.doGTranslate(src + '|' + code);
+		// Optimistic state, then check that Google really switched.
+		var btns = document.querySelectorAll('[data-dpk-lang]');
+		for (var j = 0; j < btns.length; j++) { btns[j].setAttribute('aria-pressed', sameLang(code, btns[j].getAttribute('data-dpk-lang')) ? 'true' : 'false'); }
+		setTimeout(function () {
+			var done = code === src ? !translatedPage() : translatedPage();
+			if (!done) { reloadIn(code, src); } else { markLang(); }
+		}, 6000);
+	}
+
+	document.addEventListener('click', function (e) {
+		var btn = closest(e.target, '[data-dpk-lang]');
+		if (!btn) { return; }
+		e.preventDefault();
+		if (document.body.classList.contains('elementor-editor-active') || /[?&]elementor-preview=/.test(window.location.search)) { return; }
+		var sw = closest(btn, '[data-dpk-lang-switch]');
+		var header = closest(btn, '[data-dpk-header]');
+		if (header && header.classList.contains('is-open')) { setMenu(header, false); }
+		switchLang(sw, btn.getAttribute('data-dpk-lang'));
+	});
+
+	// The brand name stays French in the tab title too (<title> cannot carry translate="no").
+	function keepBrandInTitle() {
+		var brand = (cfg.brand || []).filter(function (t) { return /^douce\s+paresse$/i.test(t); })[0];
+		var titleEl = document.querySelector('title');
+		if (!brand || !titleEl || !window.MutationObserver || document.title.toLowerCase().indexOf('douce paresse') < 0) { return; }
+		new MutationObserver(function () {
+			if (/douce\s+paresse/i.test(document.title)) { return; }
+			var fixed = document.title.replace(/\b(sweet|gentle|soft|mild|pleasant|lovely|delightful)\s+(laziness|idleness|sloth|indolence)\b/i, 'Douce Paresse');
+			if (fixed !== document.title) { document.title = fixed; }
+		}).observe(titleEl, { childList: true, characterData: true, subtree: true });
+	}
+
+	if (window.MutationObserver) {
+		new MutationObserver(markLang).observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'lang'] });
+	}
+
 	/* WordPress admin bar (logged-in users): fixed above 600px, but it scrolls away on smaller screens.
 	   Publish the height it really covers so the fixed header (and the mobile menu) sit right under it. */
 	var adminBarTicking = false;
@@ -415,11 +530,13 @@
 	window.addEventListener('load', adminBarOffset);
 
 	if (document.readyState === 'loading') {
-		document.addEventListener('DOMContentLoaded', function () { keepHeaderFixed(); adminBarOffset(); markActive(); initForms(); });
+		document.addEventListener('DOMContentLoaded', function () { keepHeaderFixed(); adminBarOffset(); markActive(); markLang(); keepBrandInTitle(); initForms(); });
 	} else {
 		keepHeaderFixed();
 		adminBarOffset();
 		markActive();
+		markLang();
+		keepBrandInTitle();
 		initForms();
 	}
 	window.addEventListener('load', keepHeaderFixed); // editor: after entrance animations have been applied

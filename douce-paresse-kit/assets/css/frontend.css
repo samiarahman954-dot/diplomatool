@@ -172,6 +172,42 @@ body.admin-bar .dpk .dpk-header__overlay { top: var(--dpk-adminbar, 32px); }
 .dpk .dpk-header__overlay-tagline { font-family: var(--dpk-serif); font-style: italic; font-size: 20px; color: var(--dpk-gold-l); }
 html.dpk-lock, html.dpk-lock body { overflow: hidden; }
 
+/* ---------- Language switcher (FR | EN, drives GTranslate) ---------- */
+.dpk .dpk-lang { display: inline-flex; align-items: center; gap: 10px; }
+.dpk .dpk-lang .dpk-lang__btn,
+.dpk .dpk-lang .dpk-lang__btn:hover,
+.dpk .dpk-lang .dpk-lang__btn:focus {
+	-webkit-appearance: none; appearance: none; width: auto; min-height: 0; margin: 0; padding: 8px 0;
+	background: none; border: 0; border-bottom: 1px solid transparent; border-radius: 0; box-shadow: none;
+	font-family: var(--dpk-sans); font-size: 11px; font-weight: 400; line-height: normal; letter-spacing: .2em; text-transform: uppercase;
+	color: rgba(22, 35, 63, .5); cursor: pointer; transition: color .3s ease, border-color .3s ease;
+}
+.dpk .dpk-lang .dpk-lang__btn:hover { color: var(--dpk-navy); }
+.dpk .dpk-lang .dpk-lang__btn[aria-pressed="true"] { color: var(--dpk-navy); border-bottom-color: var(--dpk-gold); cursor: default; }
+.dpk .dpk-lang .dpk-lang__btn:focus-visible { outline: 1px solid var(--dpk-gold); outline-offset: 4px; }
+.dpk .dpk-lang__sep { font-size: 11px; color: rgba(22, 35, 63, .3); }
+.dpk .dpk-lang--bar { margin-left: clamp(0px, .6vw, 8px); padding-left: clamp(18px, 2vw, 32px); border-left: 1px solid rgba(22, 35, 63, .14); }
+.dpk .dpk-header__overlay-lang { margin: 0 0 28px; }
+.dpk .dpk-lang--overlay { gap: 14px; }
+.dpk .dpk-lang--overlay .dpk-lang__btn,
+.dpk .dpk-lang--overlay .dpk-lang__btn:hover,
+.dpk .dpk-lang--overlay .dpk-lang__btn:focus { font-size: 12px; letter-spacing: .24em; color: rgba(245, 240, 230, .55); min-height: 44px; }
+.dpk .dpk-lang--overlay .dpk-lang__btn:hover { color: var(--dpk-ivory); }
+.dpk .dpk-lang--overlay .dpk-lang__btn[aria-pressed="true"] { color: var(--dpk-gold-l); border-bottom-color: var(--dpk-gold-l); }
+.dpk .dpk-lang--overlay .dpk-lang__sep { font-size: 12px; color: rgba(245, 240, 230, .3); }
+/* The kit switcher replaces the GTranslate floating button (GTranslate itself keeps running). */
+body:has(.dpk-lang--hidegt) #gt_float_wrapper,
+body:has(.dpk-lang--hidegt) .gt_float_switcher { display: none !important; }
+/* Google Translate: no top banner / page shift. */
+body:has(.dpk-lang) .goog-te-banner-frame { display: none !important; }
+body:has(.dpk-lang) { top: 0 !important; }
+
+/* Protected brand name (see DPK\I18n): the wrapper must never change the layout. */
+span[data-dpk-brand] {
+	display: inline !important; position: static !important; width: auto !important; height: auto !important;
+	margin: 0 !important; padding: 0 !important; border: 0 !important; background: none !important; transform: none !important;
+}
+
 /* ==========================================================================
    Footer
    ========================================================================== */

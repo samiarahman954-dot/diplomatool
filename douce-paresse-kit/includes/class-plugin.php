@@ -49,11 +49,13 @@ final class Plugin {
 		require_once DPK_PATH . 'includes/class-forms.php';
 		require_once DPK_PATH . 'includes/class-admin.php';
 		require_once DPK_PATH . 'includes/class-debug.php';
+		require_once DPK_PATH . 'includes/class-i18n.php';
 
 		Spam::instance();
 		Forms::instance();
 		Admin::instance();
 		Debug::instance();
+		I18n::instance();
 
 		if ( ! did_action( 'elementor/loaded' ) ) {
 			add_action( 'admin_notices', array( $this, 'notice_missing_elementor' ) );
@@ -88,6 +90,7 @@ final class Plugin {
 			'DPK',
 			array(
 				'ajax'      => admin_url( 'admin-ajax.php' ),
+				'brand'     => class_exists( 'DPK\\I18n' ) ? I18n::terms() : array(),
 				'turnstile' => Spam::turnstile_enabled() ? array(
 					'sitekey'    => $spam['ts_site'],
 					'theme'      => $spam['ts_theme'],
