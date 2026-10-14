@@ -2,7 +2,7 @@
 Requires at least: 6.0
 Requires PHP: 7.4
 Requires Plugins: elementor
-Stable tag: 1.3.2
+Stable tag: 1.4.0
 
 The Just Move DFW home page rebuilt as 18 custom Elementor widgets (one per section) with one-click demo import. No default Elementor widgets are used.
 
@@ -78,6 +78,19 @@ The demo import also creates a "Get a Quote" page at /quote/ (unless one exists)
 * Spam protection: honeypot + max 20 requests per 10 minutes per IP; customer copies are
   capped at 3 per email address per hour.
 * Developers: `jmk_quote_received` ( $record, $post_id ) fires after each request.
+
+== Smartsheet (all leads in one sheet) ==
+
+Every lead from the quote builder and the quick quote form is also added to a Smartsheet sheet as a new row.
+
+1. In Smartsheet: Account → Personal Settings → API Access → Generate new access token.
+2. In WordPress: Just Move Kit → Smartsheet. Paste the token, pick the region and click "Save & test connection".
+3. Choose one of your sheets, or click "Create … for me" to get a sheet with every lead column.
+4. Click "Send a test row", then "Send leads not in Smartsheet yet" to copy over leads you already have.
+
+* Rows are matched to columns by title (Name, Phone, Email, Received, Lead source, Estimate #, Move type, Move size, From, To, Move date, Flexibility, Crew, Packing service, Packing materials, Specialty items, Estimate, Photos, Page, Lead link). Other columns are left alone, so you can add your own (e.g. Status) and move or hide columns freely. "Add missing columns" adds any that are not there.
+* Sending happens after the visitor gets their answer, so the form never slows down. If Smartsheet is unreachable, the lead is kept and retried every hour; the Leads list shows Sent / Failed with a Retry link.
+* The token is stored only in your database and is never shown again on the page. Disconnect removes it.
 
 == Quote form ==
 

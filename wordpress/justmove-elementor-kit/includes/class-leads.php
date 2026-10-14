@@ -154,6 +154,7 @@ final class JMK_Leads {
 			'jmk_route'  => __( 'From → To', 'jmk' ),
 			'jmk_size'   => __( 'Move size', 'jmk' ),
 			'jmk_est'    => __( 'Estimate', 'jmk' ),
+		) + ( '' !== JMK_Smartsheet::settings()['token'] ? array( 'jmk_ss' => __( 'Smartsheet', 'jmk' ) ) : array() ) + array(
 			'date'       => $cols['date'],
 		);
 	}
@@ -174,6 +175,9 @@ final class JMK_Leads {
 					$to   = get_post_meta( $post_id, '_jmk_to_zip', true );
 				}
 				echo esc_html( implode( ' → ', array_filter( array( $from, $to ), 'strlen' ) ) );
+				break;
+			case 'jmk_ss':
+				echo JMK_Smartsheet::status_html( $post_id ); // phpcs:ignore WordPress.Security.EscapeOutput -- escaped inside.
 				break;
 			case 'jmk_size':
 				echo esc_html( get_post_meta( $post_id, '_jmk_size', true ) );

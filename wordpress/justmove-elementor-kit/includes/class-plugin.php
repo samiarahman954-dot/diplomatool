@@ -53,6 +53,7 @@ final class JMK_Plugin {
 	private function __construct() {
 		JMK_Leads::init();
 		JMK_Quote::init();
+		JMK_Smartsheet::init();
 		JMK_Admin::init();
 
 		if ( ! self::elementor_ready() ) {
