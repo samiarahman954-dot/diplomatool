@@ -405,7 +405,7 @@
 			var node;
 			while ((node = walker.nextNode()) && bare.length < 10) {
 				var pe = node.parentElement;
-				if (!pe || !re.test(node.nodeValue) || pe.closest('script,style,noscript,textarea,.notranslate,[translate="no"],.dpkdbg,#wpadminbar')) { continue; }
+				if (!pe || !re.test(node.nodeValue) || (function (el) { for (; el && el !== document.documentElement; el = el.parentElement) { if (el.matches('script,style,noscript,textarea,.notranslate,[translate="no"],.dpkdbg,#wpadminbar')) { return true; } } return false; })(pe)) { continue; }
 				bare.push(desc(pe) + ': “' + node.nodeValue.trim().slice(0, 60) + '”');
 			}
 			add(bare.length ? 'warn' : 'ok', G, 'Brand protection', bare.length ? bare.length + ' occurrence(s) of ' + terms.join(', ') + ' can still be translated (page cached before the update, or text added by a script).' : terms.join(', ') + ' is protected from automatic translation everywhere on this page.', bare.join('\n'));

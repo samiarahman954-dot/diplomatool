@@ -443,6 +443,8 @@
 			return first && first !== src && codes.indexOf(first) > -1 ? first : src;
 		}
 		var c = langCookie();
+		var choice = choiceLang();
+		if (choice && sameLang(choice, src)) { return src; } // Explicit FR choice: the page is locked to French.
 		if (translatedPage()) {
 			// What the page shows wins: Google does not always write the cookie the kit can read.
 			if (c && !sameLang(c, src)) { return c; }
@@ -451,7 +453,6 @@
 			var others = switchCodes().filter(function (x) { return !sameLang(x, src); });
 			if (others.length === 1) { return others[0]; }
 		}
-		var choice = choiceLang();
 		if (choice) { return choice; }
 		return c || src;
 	}
@@ -513,6 +514,19 @@
 
 	function setChoice(code) {
 		document.cookie = 'dpk_lang=' + code + '; path=/; max-age=31536000; SameSite=Lax';
+	}
+
+	// Visitor chose the original language: Google may not translate this page, whatever cookie or script
+	// (GTranslate, an undeletable cookie…) asks for it. Only set after an explicit FR choice.
+	function lockOriginal(on) {
+		var h = document.documentElement;
+		if (on) {
+			h.setAttribute('translate', 'no');
+			h.classList.add('notranslate');
+		} else {
+			if (h.getAttribute('translate') === 'no') { h.removeAttribute('translate'); }
+			h.classList.remove('notranslate');
+		}
 	}
 
 	function reloadIn(code, src) {
@@ -594,6 +608,7 @@
 			reloadIn(src, src);
 			return;
 		}
+		lockOriginal(false);
 		if (typeof window.doGTranslate === 'function') {
 			var wake = document.querySelectorAll('.gtranslate_wrapper, [class*="gt_container-"]');
 			for (var i = 0; i < wake.length; i++) {
@@ -692,7 +707,10 @@
 		var src = sourceLang(sw);
 		var choice = choiceLang();
 		if (!choice && langCookie()) { choice = langCookie(); setChoice(choice); } // Chosen with an older version.
-		if (choice && sameLang(choice, src) && langCookie()) { setLangCookie(''); }
+		if (choice && sameLang(choice, src)) {
+			lockOriginal(true);
+			if (langCookie()) { setLangCookie(''); }
+		}
 	})();
 
 	window.addEventListener('load', function () {
