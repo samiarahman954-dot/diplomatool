@@ -143,7 +143,70 @@ class Sync {
 	 * Repeater rows the owner changed: their rows (and their edits) are kept, untouched rows follow the
 	 * kit, rows the owner deleted stay deleted, new kit rows are inserted after their previous sibling.
 	 */
+	/** What a repeater row is about: its link, else its first text. */
+	private static function row_key( $row ) {
+		foreach ( $row as $field => $v ) {
+			if ( is_array( $v ) && isset( $v['url'] ) && is_string( $v['url'] ) && '' !== trim( $v['url'] ) && '#' !== trim( $v['url'] ) && '_' !== $field[0] ) {
+				return 'u:' . strtolower( trim( $v['url'] ) );
+			}
+		}
+		foreach ( array( 'text', 'title', 'label', 'name', 'card_title', 'value', 'key' ) as $field ) {
+			if ( isset( $row[ $field ] ) && is_scalar( $row[ $field ] ) && '' !== trim( (string) $row[ $field ] ) ) {
+				return 't:' . strtolower( trim( preg_replace( '/\s+/', ' ', strip_tags( (string) $row[ $field ] ) ) ) );
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Gives $rows the _ids of the matching rows of $ref. Kit row _ids come from the row position, so a row
+	 * inserted or removed in the middle of a kit list shifts the _ids of the rows after it: rows are
+	 * matched by what they are (link / text) first, by position only when that row was edited in place.
+	 * Unmatched rows whose _id is already taken get a new one.
+	 */
+	private static function align_rows( $ref, $rows, $taken = array() ) {
+		$ref_id_key = array();
+		$ref_key_id = array();
+		foreach ( $ref as $r ) {
+			$k                          = self::row_key( $r );
+			$ref_id_key[ $r['_id'] ]    = $k;
+			if ( null !== $k && ! isset( $ref_key_id[ $k ] ) ) {
+				$ref_key_id[ $k ] = $r['_id'];
+			}
+		}
+		$row_keys = array();
+		foreach ( $rows as $r ) {
+			$k = self::row_key( $r );
+			if ( null !== $k ) {
+				$row_keys[ $k ] = true;
+			}
+		}
+		$used = array();
+		$out  = array();
+		foreach ( $rows as $r ) {
+			$id     = $r['_id'];
+			$k      = self::row_key( $r );
+			$target = null;
+			if ( null !== $k && isset( $ref_key_id[ $k ] ) && ! isset( $used[ $ref_key_id[ $k ] ] ) ) {
+				$target = $ref_key_id[ $k ]; // Same row, possibly moved.
+			} elseif ( array_key_exists( $id, $ref_id_key ) && ! isset( $used[ $id ] ) && ( null === $ref_id_key[ $id ] || ! isset( $row_keys[ $ref_id_key[ $id ] ] ) ) ) {
+				$target = $id; // Same place, content edited.
+			} else {
+				$target = $id;
+				if ( array_key_exists( $id, $ref_id_key ) || isset( $taken[ $id ] ) || isset( $used[ $id ] ) ) {
+					$target = $id . '-' . substr( md5( (string) $k . json_encode( $r ) ), 0, 5 );
+				}
+			}
+			$used[ $target ] = true;
+			$r['_id']        = $target;
+			$out[]           = $r;
+		}
+		return $out;
+	}
+
 	private function merge_rows( $base, $local, $remote ) {
+		$base   = self::align_rows( $local, $base );
+		$remote = self::align_rows( $base, $remote, array_column( $local, null, '_id' ) );
 		$bmap = array_column( $base, null, '_id' );
 		$lmap = array_column( $local, null, '_id' );
 		$rmap = array_column( $remote, null, '_id' );

@@ -59,6 +59,8 @@ $plain = '<html><body><p>Rien à protéger</p></body></html>';
 check( 'page without the term → identical', $plain === $p( $plain ) );
 check( 'fragment when asked', $span . 'Douce Paresse</span> Kit' === DPK\I18n::protect( 'Douce Paresse Kit', $t, true ) );
 check( 'inline SVG text unchanged', '<body><svg><text>Douce Paresse</text></svg> ' . $span . 'Douce Paresse</span></body>' === $p( '<body><svg><text>Douce Paresse</text></svg> Douce Paresse</body>' ) );
+check( 'a "<" inside a script does not stop protection', '<body><script>for(var i=0;i<n;i++){x()}</script><h1>' . $span . 'Douce Paresse</span></h1><style>a>b{}</style><p>' . $span . 'Douce Paresse</span></p></body>' === $p( '<body><script>for(var i=0;i<n;i++){x()}</script><h1>Douce Paresse</h1><style>a>b{}</style><p>Douce Paresse</p></body>' ) );
+check( 'HTML entities never split (&amp; &copy;)', '<body>Tom &amp; Jerry &copy; ' . $span . 'amp</span></body>' === DPK\I18n::protect( '<body>Tom &amp; Jerry &copy; amp</body>', array( 'copy', 'amp' ) ) );
 echo "Not an HTML page: unchanged\n";
 foreach ( array(
 	'JSON'           => '{"name":"Douce Paresse","url":"/"}',
@@ -71,7 +73,7 @@ foreach ( array(
 	check( $label, $in === $p( $in ), $p( $in ) );
 }
 check( 'several terms', '<body>' . $span . 'Le Coffret</span> de ' . $span . 'Douce Paresse</span></body>' === DPK\I18n::protect( '<body>Le Coffret de Douce Paresse</body>', array( 'Douce Paresse', 'Le Coffret' ) ) );
-$big = '<html><body>' . str_repeat( '<div class="a" data-s=\'{"x":1}\'><p>Texte Douce Paresse</p></div>', 20000 ) . '</body></html>';
+$big = '<html><body>' . str_repeat( '<div class="a" data-s=\'{"x":1}\'><p>Texte Douce Paresse</p><script>if(a<b){c()}</script></div>', 20000 ) . '</body></html>';
 $t0  = microtime( true );
 $res = $p( $big );
 check( 'large page (' . round( strlen( $big ) / 1048576, 1 ) . ' MB) processed in ' . round( ( microtime( true ) - $t0 ) * 1000 ) . ' ms', 20000 === substr_count( $res, 'data-dpk-brand' ) );

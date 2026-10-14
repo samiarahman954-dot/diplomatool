@@ -134,6 +134,31 @@ $merged = ( new Sync( $defaults ) )->merge_list( $base, $local7b, $remote7 );
 $items  = find_el( $merged, 'w3' )['settings']['items'];
 check( 'row deleted by the owner stays deleted', array( 'r2', 'r3' ) === array_column( $items, '_id' ) );
 
+echo "7b. Kit rows inserted / removed in the middle (kit _ids follow the row position)\n";
+$row  = function ( $id, $prefix, $text, $url ) { return array( '_id' => $id, 'prefix' => $prefix, 'text' => $text, 'link' => array( 'url' => $url ) ); };
+$sync = function ( $b, $l, $r ) { return ( new Sync( function () { return array(); } ) )->merge_settings( array( 'c' => $b ), array( 'c' => $l ), array( 'c' => $r ) )['c']; };
+$fmt  = function ( $rows ) { return implode( ' / ', array_map( function ( $r ) { return $r['prefix'] . ':' . $r['text']; }, $rows ) ); };
+$b0   = array( $row( 'e0', 'Email', 'contact@dp.com', 'mailto:contact@dp.com' ), $row( 'e1', '', 'Instagram', 'https://instagram.com/dp' ) );
+$l0   = $b0;
+$l0[1]['text'] = '@douceparesse';
+$r0   = array( $row( 'e0', 'Email', 'contact@dp.com', 'mailto:contact@dp.com' ), $row( 'e1', 'Tél', '01 23', 'tel:+331' ), $row( 'e2', '', 'Instagram', 'https://instagram.com/dp' ) );
+$m0   = $sync( $b0, $l0, $r0 );
+check( 'row inserted in the middle: owner edit kept, no mixed row, no duplicate', 'Email:contact@dp.com / Tél:01 23 / :@douceparesse' === $fmt( $m0 ) );
+check( 'ids stay unique', count( $m0 ) === count( array_unique( array_column( $m0, '_id' ) ) ) );
+check( 'second sync (snapshot = raw kit rows) changes nothing', $m0 === $sync( $r0, $m0, $r0 ) );
+$r1 = array( $row( 'e0', 'Email', 'contact@dp.com', 'mailto:contact@dp.com' ), $row( 'e1', 'Tél', '01 23', 'tel:+331' ), $row( 'e2', '', 'Instagram', 'https://instagram.com/dp' ) );
+$r1[1]['text'] = '01 99';
+check( 'later kit change of the inserted row reaches it', 'Email:contact@dp.com / Tél:01 99 / :@douceparesse' === $fmt( $sync( $r0, $m0, $r1 ) ) );
+$b2 = array( $row( 'e0', 'Email', 'a@dp.com', 'mailto:a@dp.com' ), $row( 'e1', '', 'Instagram', 'https://instagram.com/dp' ), $row( 'e2', '', 'LinkedIn', 'https://linkedin.com/dp' ) );
+$l2 = $b2;
+$l2[2]['text'] = 'Mon LinkedIn';
+$r2 = array( $row( 'e0', 'Email', 'a@dp.com', 'mailto:a@dp.com' ), $row( 'e1', '', 'LinkedIn', 'https://linkedin.com/dp' ) );
+check( 'row removed in the middle: untouched row dropped, edited row kept', 'Email:a@dp.com / :Mon LinkedIn' === $fmt( $sync( $b2, $l2, $r2 ) ) );
+$r3 = $b0;
+$r3[1]['link']['url'] = 'https://instagram.com/new';
+$m3 = $sync( $b0, $l0, $r3 );
+check( 'kit edits a row in place (new URL): merged into the same row', 2 === count( $m3 ) && 'https://instagram.com/new' === $m3[1]['link']['url'] && '@douceparesse' === $m3[1]['text'] );
+
 echo "8. Idempotent when nothing changed + type-insensitive comparison\n";
 $local8 = $base;
 $local8[0]['elements'][0]['settings']['image']['id'] = '5'; // string vs int after a save

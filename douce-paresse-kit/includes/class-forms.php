@@ -31,7 +31,9 @@ final class Forms {
 		foreach ( preg_split( '/[\s,;]+/', (string) $raw, -1, PREG_SPLIT_NO_EMPTY ) as $part ) {
 			$part  = trim( $part, " \t<>\"'" );
 			$email = sanitize_email( $part );
-			if ( $email && is_email( $email ) ) {
+			// sanitize_email() silently drops characters (équipe@ → quipe@): an address it changes is not
+			// the one that was typed, so it is reported as invalid instead of mailing someone else.
+			if ( $email && $email === $part && is_email( $email ) ) {
 				if ( ! isset( $valid[ strtolower( $email ) ] ) ) {
 					$valid[ strtolower( $email ) ] = $email;
 				}

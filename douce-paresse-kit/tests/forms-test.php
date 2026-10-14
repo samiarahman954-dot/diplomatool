@@ -61,6 +61,8 @@ namespace {
 	check( 'lines, commas, semicolons, <>', array( 'owner@site.fr', 'staff@site.fr', 'sales@site.fr', 'boss@site.fr' ) === $v );
 	check( 'duplicates removed (case-insensitive)', 4 === count( $v ) );
 	check( 'invalid entry reported', array( 'oops' ) === $bad );
+	list( $v, $bad ) = DPK\Forms::parse_recipients( 'équipe@douceparesse.com, contact@café.fr, ok@site.fr' );
+	check( 'addresses sanitize_email would rewrite are invalid, not changed', array( 'ok@site.fr' ) === $v && array( 'équipe@douceparesse.com', 'contact@café.fr' ) === $bad );
 	check( 'empty -> admin e-mail', array( 'admin@site.fr' ) === DPK\Forms::recipients( '' ) );
 	check( 'only invalid -> admin e-mail', array( 'admin@site.fr' ) === DPK\Forms::recipients( 'nope, still-nope' ) );
 	check( 'single address still works', array( 'me@site.fr' ) === DPK\Forms::recipients( 'me@site.fr' ) );

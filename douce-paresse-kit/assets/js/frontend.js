@@ -490,7 +490,11 @@
 			if (url) { window.location.href = url; }
 			return;
 		}
-		if (typeof window.doGTranslate !== 'function') { reloadIn(code, src); return; }
+		var libLoaded = function () { return !!(window.google && window.google.translate); };
+		if (typeof window.doGTranslate !== 'function' || (code === src && !libLoaded())) {
+			reloadIn(code, src); // Back to the original without Google's library: clear the cookie and reload.
+			return;
+		}
 		var wake = document.querySelectorAll('.gtranslate_wrapper, [class*="gt_container-"]');
 		for (var i = 0; i < wake.length; i++) {
 			try { wake[i].dispatchEvent(new Event('pointerenter')); } catch (e) { /* old browser */ }
@@ -502,10 +506,10 @@
 		// Google's library can be slow on a weak connection: give it time before reloading.
 		var tries = 0;
 		setTimeout(function verify() {
-			var done = code === src ? !translatedPage() : translatedPage();
+			var cookie = langCookie();
+			var done = code === src ? !translatedPage() && (!cookie || cookie === src) : translatedPage();
 			if (done) { markLang(); return; }
-			var libLoaded = !!(window.google && window.google.translate);
-			if (++tries < (libLoaded ? 4 : 2)) { setTimeout(verify, 4000); return; }
+			if (++tries < (libLoaded() ? 4 : 2)) { setTimeout(verify, 4000); return; }
 			reloadIn(code, src);
 		}, 4000);
 	}

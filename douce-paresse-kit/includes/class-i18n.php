@@ -118,7 +118,7 @@ final class I18n {
 				return strlen( $b ) - strlen( $a );
 			}
 		);
-		return '/(?<![\p{L}\p{N}])(?:' . implode( '|', $alts ) . ')(?![\p{L}\p{N}])/iu';
+		return '/(?<![\p{L}\p{N}&#])(?:' . implode( '|', $alts ) . ')(?![\p{L}\p{N}])/iu'; // Not inside &copy; / &#…;
 	}
 
 	/**
@@ -142,13 +142,27 @@ final class I18n {
 				return $html; // Not an HTML page (JSON, XML, text…) or a document without body: leave it.
 			}
 		}
-		$head  = substr( $html, 0, $start );
-		$body  = substr( $html, $start );
-		$parts = preg_split( '/(<!--.*?-->|<(?:[^>"\']++|"[^"]*+"|\'[^\']*+\')*+>)/s', $body, -1, PREG_SPLIT_DELIM_CAPTURE );
+		$head = substr( $html, 0, $start );
+		$body = substr( $html, $start );
+
+		// Set whole raw-text / foreign blocks aside first: a "<" inside a script (i<n) must not be read as
+		// a tag, and nothing inside them may be changed.
+		$kept = array();
+		$body = preg_replace_callback(
+			'#<!--.*?-->|<(script|style|textarea|title|option|template|noscript|svg|math)\b(?:[^>"\']++|"[^"]*+"|\'[^\']*+\')*+>.*?</\1\s*>#is',
+			function ( $m ) use ( &$kept ) {
+				$kept[] = $m[0];
+				return "\x1A" . ( count( $kept ) - 1 ) . "\x1A";
+			},
+			$body
+		);
+		if ( null === $body ) {
+			return $html;
+		}
+		$parts = preg_split( '/(<(?:[^>"\']++|"[^"]*+"|\'[^\']*+\')*+>)/s', $body, -1, PREG_SPLIT_DELIM_CAPTURE );
 		if ( ! is_array( $parts ) ) {
 			return $html;
 		}
-		$skip    = '';
 		$wrapped = false;
 		$open    = '<span class="notranslate" translate="no" data-dpk-brand>';
 		foreach ( $parts as $i => $part ) {
@@ -156,19 +170,6 @@ final class I18n {
 				continue;
 			}
 			if ( '<' === $part[0] ) {
-				if ( $skip ) {
-					if ( preg_match( '#^</' . $skip . '\s*>#i', $part ) ) {
-						$skip = '';
-					}
-					continue;
-				}
-				if ( 0 === strpos( $part, '<!--' ) ) {
-					continue;
-				}
-				if ( preg_match( '#^<(script|style|textarea|title|option|template|noscript|svg|math)[\s>]#i', $part, $m ) && ! preg_match( '#/>$#', $part ) ) {
-					$skip = strtolower( $m[1] );
-					continue;
-				}
 				// Images / inputs: their alt, title, placeholder or value are translated too.
 				if ( preg_match( '#^<(img|input|area)\b#i', $part ) && false === stripos( $part, 'translate=' )
 					&& preg_match( '/\s(?:alt|title|placeholder|value)\s*=\s*("[^"]*"|\'[^\']*\')/i', $part, $attr ) && preg_match( $pattern, html_entity_decode( $attr[1], ENT_QUOTES, 'UTF-8' ) ) ) {
@@ -177,13 +178,23 @@ final class I18n {
 				$wrapped = false !== strpos( $part, 'data-dpk-brand' );
 				continue;
 			}
-			if ( $skip || $wrapped ) {
+			if ( $wrapped ) {
 				$wrapped = false;
-				continue; // Inside a skipped element, or already wrapped by an earlier pass.
+				continue; // Already wrapped by an earlier pass.
 			}
 			$parts[ $i ] = preg_replace( $pattern, $open . '$0</span>', $part );
 		}
-		return $head . implode( '', $parts );
+		$body = implode( '', $parts );
+		if ( $kept ) {
+			$body = preg_replace_callback(
+				'/\x1A(\d+)\x1A/',
+				function ( $m ) use ( $kept ) {
+					return $kept[ (int) $m[1] ];
+				},
+				$body
+			);
+		}
+		return $head . $body;
 	}
 
 	/* ------------------------------------------------------------------
