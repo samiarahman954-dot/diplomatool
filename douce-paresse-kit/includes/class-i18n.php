@@ -32,6 +32,8 @@ final class I18n {
 		add_action( 'admin_init', array( $this, 'register_setting' ) );
 		add_action( 'template_redirect', array( $this, 'start_buffer' ), 1 );
 		add_action( 'update_option_' . self::OPTION, array( $this, 'flush_elementor' ) );
+		add_action( 'activated_plugin', array( $this, 'plugin_toggled' ) );
+		add_action( 'deactivated_plugin', array( $this, 'plugin_toggled' ) );
 	}
 
 	public static function defaults() {
@@ -72,7 +74,8 @@ final class I18n {
 	 * ------------------------------------------------------------------ */
 
 	public function start_buffer() {
-		if ( is_admin() || wp_doing_ajax() || is_feed() || is_embed() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) || ( defined( 'XMLRPC_REQUEST' ) && XMLRPC_REQUEST ) ) {
+		if ( is_admin() || wp_doing_ajax() || is_feed() || is_embed() || is_robots() || ( function_exists( 'is_favicon' ) && is_favicon() ) || get_query_var( 'sitemap' ) || get_query_var( 'sitemap-stylesheet' )
+			|| ( defined( 'REST_REQUEST' ) && REST_REQUEST ) || ( defined( 'XMLRPC_REQUEST' ) && XMLRPC_REQUEST ) || ( defined( 'DOING_CRON' ) && DOING_CRON ) ) {
 			return;
 		}
 		if ( isset( $_GET['elementor-preview'] ) || isset( $_GET['preview_id'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
@@ -84,9 +87,22 @@ final class I18n {
 		}
 		ob_start(
 			function ( $html ) use ( $terms ) {
-				return self::protect( $html, $terms );
+				return self::is_html_response() ? self::protect( $html, $terms ) : $html;
 			}
 		);
+	}
+
+	/**
+	 * Only HTML pages are touched: sitemaps (Yoast, Rank Math…), JSON, XML, plain text or files sent by
+	 * other plugins from template_redirect keep their exact output.
+	 */
+	private static function is_html_response() {
+		foreach ( headers_list() as $h ) {
+			if ( 0 === stripos( $h, 'content-type:' ) ) {
+				return false !== stripos( $h, 'text/html' );
+			}
+		}
+		return true; // PHP's default content type is text/html.
 	}
 
 	/** Regex matching any protected term (spaces may be any whitespace or a non-breaking space). */
@@ -110,7 +126,7 @@ final class I18n {
 	 * <title>, <textarea> and <option> are left as they are; images and inputs whose alt / title /
 	 * placeholder / value contain a term get translate="no". Running it twice changes nothing.
 	 */
-	public static function protect( $html, $terms ) {
+	public static function protect( $html, $terms, $fragment = false ) {
 		if ( ! is_string( $html ) || '' === $html || ! $terms ) {
 			return $html;
 		}
@@ -118,12 +134,13 @@ final class I18n {
 		if ( ! preg_match( $pattern, $html ) ) {
 			return $html;
 		}
-		$start = stripos( $html, '<body' );
-		if ( false === $start ) {
-			if ( preg_match( '/<html[\s>]|<head[\s>]/i', $html ) ) {
-				return $html; // A document without body: leave it.
+		if ( $fragment ) {
+			$start = 0;
+		} else {
+			$start = preg_match( '/<body[\s>]/i', $html, $m, PREG_OFFSET_CAPTURE ) ? $m[0][1] : false;
+			if ( false === $start || 0 === stripos( ltrim( $html ), '<?xml' ) ) {
+				return $html; // Not an HTML page (JSON, XML, text…) or a document without body: leave it.
 			}
-			$start = 0; // Fragment.
 		}
 		$head  = substr( $html, 0, $start );
 		$body  = substr( $html, $start );
@@ -148,7 +165,7 @@ final class I18n {
 				if ( 0 === strpos( $part, '<!--' ) ) {
 					continue;
 				}
-				if ( preg_match( '#^<(script|style|textarea|title|option|template|noscript)[\s>]#i', $part, $m ) && ! preg_match( '#/>$#', $part ) ) {
+				if ( preg_match( '#^<(script|style|textarea|title|option|template|noscript|svg|math)[\s>]#i', $part, $m ) && ! preg_match( '#/>$#', $part ) ) {
 					$skip = strtolower( $m[1] );
 					continue;
 				}
@@ -195,6 +212,13 @@ final class I18n {
 			'protect' => empty( $in['protect'] ) ? '' : 'yes',
 			'terms'   => implode( "\n", array_slice( array_filter( array_map( 'sanitize_text_field', preg_split( '/\r\n|\r|\n/', (string) ( $in['terms'] ?? '' ) ) ) ), 0, 50 ) ),
 		);
+	}
+
+	/** The header shows the switcher only while GTranslate is active (Automatic mode). */
+	public function plugin_toggled( $plugin ) {
+		if ( 0 === strpos( (string) $plugin, 'gtranslate/' ) ) {
+			$this->flush_elementor();
+		}
 	}
 
 	/** Cached Elementor output must be rebuilt after a change. */

@@ -425,8 +425,11 @@
 		var g = gtSettings();
 		var src = sourceLang(sw);
 		if (g.url_structure && g.url_structure !== 'none') {
-			var html = (document.documentElement.getAttribute('lang') || '').split('-')[0];
-			return html || src;
+			// Paid plans: the language is in the URL (/en/… or en.example.com). Not <html lang>: it follows
+			// the WordPress site language, which can be English on a French site.
+			var codes = (g.languages || []).concat(Array.prototype.map.call(document.querySelectorAll('[data-dpk-lang]'), function (b) { return b.getAttribute('data-dpk-lang'); }));
+			var first = g.url_structure === 'sub_domain' ? window.location.hostname.split('.')[0] : (window.location.pathname.split('/')[1] || '');
+			return first && first !== src && codes.indexOf(first) > -1 ? first : src;
 		}
 		return langCookie() || src;
 	}
@@ -459,13 +462,33 @@
 		window.location.reload();
 	}
 
+	/* Paid GTranslate plans without their own links on the page: /en/page/ or en.example.com. */
+	function translatedUrl(g, src, code) {
+		var loc = window.location;
+		var cur = currentLang();
+		if (g.url_structure === 'sub_directory') {
+			var path = loc.pathname;
+			if (cur && cur !== src && path.indexOf('/' + cur + '/') === 0) { path = path.slice(cur.length + 1); }
+			return loc.protocol + '//' + loc.host + (code === src ? '' : '/' + code) + path + loc.search + loc.hash;
+		}
+		if (g.url_structure === 'sub_domain') {
+			var host = loc.host;
+			if (cur && cur !== src && host.indexOf(cur + '.') === 0) { host = host.slice(cur.length + 1); }
+			var base = host.replace(/^www\./, '');
+			return loc.protocol + '//' + (code === src ? host : code + '.' + base) + loc.pathname + loc.search + loc.hash;
+		}
+		return '';
+	}
+
 	function switchLang(sw, code) {
 		var g = gtSettings();
 		var src = sourceLang(sw);
 		if (sameLang(currentLang(sw), code)) { return; }
 		if (g.url_structure && g.url_structure !== 'none') {
 			var a = document.querySelector('a[data-gt-lang="' + code + '"]');
-			if (a && a.href && !/#$/.test(a.href)) { window.location.href = a.href; return; }
+			var url = a && a.href && !/#$/.test(a.href) ? a.href : translatedUrl(g, src, code);
+			if (url) { window.location.href = url; }
+			return;
 		}
 		if (typeof window.doGTranslate !== 'function') { reloadIn(code, src); return; }
 		var wake = document.querySelectorAll('.gtranslate_wrapper, [class*="gt_container-"]');
@@ -476,10 +499,15 @@
 		// Optimistic state, then check that Google really switched.
 		var btns = document.querySelectorAll('[data-dpk-lang]');
 		for (var j = 0; j < btns.length; j++) { btns[j].setAttribute('aria-pressed', sameLang(code, btns[j].getAttribute('data-dpk-lang')) ? 'true' : 'false'); }
-		setTimeout(function () {
+		// Google's library can be slow on a weak connection: give it time before reloading.
+		var tries = 0;
+		setTimeout(function verify() {
 			var done = code === src ? !translatedPage() : translatedPage();
-			if (!done) { reloadIn(code, src); } else { markLang(); }
-		}, 6000);
+			if (done) { markLang(); return; }
+			var libLoaded = !!(window.google && window.google.translate);
+			if (++tries < (libLoaded ? 4 : 2)) { setTimeout(verify, 4000); return; }
+			reloadIn(code, src);
+		}, 4000);
 	}
 
 	document.addEventListener('click', function (e) {
@@ -528,6 +556,7 @@
 	window.addEventListener('scroll', queueAdminBar, { passive: true });
 	window.addEventListener('resize', queueAdminBar);
 	window.addEventListener('load', adminBarOffset);
+	window.addEventListener('load', markLang); // GTranslate settings may be printed after the kit script
 
 	if (document.readyState === 'loading') {
 		document.addEventListener('DOMContentLoaded', function () { keepHeaderFixed(); adminBarOffset(); markActive(); markLang(); keepBrandInTitle(); initForms(); });

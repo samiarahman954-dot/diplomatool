@@ -57,7 +57,19 @@ check( 'second pass changes nothing', $p( $out ) === $out );
 check( 'no term → identical', $doc === DPK\I18n::protect( $doc, array() ) );
 $plain = '<html><body><p>Rien à protéger</p></body></html>';
 check( 'page without the term → identical', $plain === $p( $plain ) );
-check( 'fragment (no <body>)', $span . 'Douce Paresse</span> Kit' === $p( 'Douce Paresse Kit' ) );
+check( 'fragment when asked', $span . 'Douce Paresse</span> Kit' === DPK\I18n::protect( 'Douce Paresse Kit', $t, true ) );
+check( 'inline SVG text unchanged', '<body><svg><text>Douce Paresse</text></svg> ' . $span . 'Douce Paresse</span></body>' === $p( '<body><svg><text>Douce Paresse</text></svg> Douce Paresse</body>' ) );
+echo "Not an HTML page: unchanged\n";
+foreach ( array(
+	'JSON'           => '{"name":"Douce Paresse","url":"/"}',
+	'XML sitemap'    => '<?xml version="1.0"?><urlset><url><image:title>Douce Paresse</image:title></url></urlset>',
+	'XML with body'  => '<?xml version="1.0"?><feed><body>Douce Paresse</body></feed>',
+	'robots.txt'     => "User-agent: *\n# Douce Paresse",
+	'plain fragment' => 'Douce Paresse Kit',
+	'tbody only'     => '<table><tbody><tr><td>Douce Paresse</td></tr></tbody></table>',
+) as $label => $in ) {
+	check( $label, $in === $p( $in ), $p( $in ) );
+}
 check( 'several terms', '<body>' . $span . 'Le Coffret</span> de ' . $span . 'Douce Paresse</span></body>' === DPK\I18n::protect( '<body>Le Coffret de Douce Paresse</body>', array( 'Douce Paresse', 'Le Coffret' ) ) );
 $big = '<html><body>' . str_repeat( '<div class="a" data-s=\'{"x":1}\'><p>Texte Douce Paresse</p></div>', 20000 ) . '</body></html>';
 $t0  = microtime( true );
