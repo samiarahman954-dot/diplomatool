@@ -615,6 +615,10 @@ var b=r.querySelector('.dpk-header__bar');d.snapshot={chain:c,bar:b?{position:ge
 			$kit   = ( new Importer() )->find_post( 'header' );
 			$rows[] = self::row( $shown === $kit ? 'ok' : 'error', 'Header template shown', 'Template #' . $shown . ( $shown === $kit ? ' (kit header).' : ' is shown, but the kit header is #' . $kit . '.' ) );
 		}
+		if ( false !== strpos( $html, 'data-dpk-lang-switch' ) ) {
+			$gt_html = (bool) preg_match( '/gtranslateSettings|cdn\.gtranslate\.net|gtranslate_wrapper|doGTranslate/i', $html );
+			$rows[]  = self::row( 'ok', 'FR | EN switcher', $gt_html ? 'In the header; GTranslate\'s widget is on the page and does the translation.' : 'In the header; GTranslate prints nothing on the pages (floating selector off / no widget), so the kit loads Google Translate itself when a visitor picks another language.' );
+		}
 		if ( preg_match_all( '/href="[^"]*[?&](?:page_id|p)=\d+/', $html, $mm ) ) {
 			$rows[] = self::row( 'warn', 'Plain links', count( $mm[0] ) . ' link(s) still use ?page_id= (old cached HTML or links typed by hand).' );
 		}

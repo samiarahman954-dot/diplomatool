@@ -200,7 +200,12 @@ html.dpk-lock, html.dpk-lock body { overflow: hidden; }
 body:has(.dpk-lang--hidegt) #gt_float_wrapper,
 body:has(.dpk-lang--hidegt) .gt_float_switcher { display: none !important; }
 /* Google Translate: no top banner / page shift. */
-body:has(.dpk-lang) .goog-te-banner-frame { display: none !important; }
+body:has(.dpk-lang) .goog-te-banner-frame,
+body:has(.dpk-lang) > .skiptranslate,
+body:has(.dpk-lang) #goog-gt-tt,
+body:has(.dpk-lang) .goog-te-balloon-frame,
+#dpk-gt-element { display: none !important; }
+body:has(.dpk-lang) .goog-text-highlight { background: none !important; box-shadow: none !important; }
 body:has(.dpk-lang) { top: 0 !important; }
 
 /* Protected brand name (see DPK\I18n): the wrapper must never change the layout. "contents" keeps

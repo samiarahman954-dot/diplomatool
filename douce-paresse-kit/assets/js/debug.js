@@ -405,7 +405,7 @@
 			var node;
 			while ((node = walker.nextNode()) && bare.length < 10) {
 				var pe = node.parentElement;
-				if (!pe || !re.test(node.nodeValue) || pe.closest('script,style,noscript,textarea,.notranslate,[translate="no"],.dpkdbg')) { continue; }
+				if (!pe || !re.test(node.nodeValue) || pe.closest('script,style,noscript,textarea,.notranslate,[translate="no"],.dpkdbg,#wpadminbar')) { continue; }
 				bare.push(desc(pe) + ': “' + node.nodeValue.trim().slice(0, 60) + '”');
 			}
 			add(bare.length ? 'warn' : 'ok', G, 'Brand protection', bare.length ? bare.length + ' occurrence(s) of ' + terms.join(', ') + ' can still be translated (page cached before the update, or text added by a script).' : terms.join(', ') + ' is protected from automatic translation everywhere on this page.', bare.join('\n'));
@@ -413,7 +413,10 @@
 		var gtFloat = document.getElementById('gt_float_wrapper');
 		var kitLang = document.querySelector('.dpk-lang');
 		if (kitLang) {
-			add(typeof window.doGTranslate === 'function' || (window.gtranslateSettings && true) ? 'ok' : 'warn', G, 'Language switcher', 'FR | EN switcher present' + (typeof window.doGTranslate === 'function' ? ', GTranslate ready' : ', GTranslate script not found (switching falls back to reloading the page)') + (gtFloat ? (getComputedStyle(gtFloat).display === 'none' ? ', floating button hidden.' : ', floating button still visible.') : '.'));
+			var gtMode = typeof window.doGTranslate === 'function' ? 'GTranslate widget on the page (free plan)'
+				: (window.gtranslateSettings ? 'GTranslate settings found (' + (((Object.values ? Object.values(window.gtranslateSettings) : []).filter(function (v) { return v && v.url_structure; })[0] || window.gtranslateSettings).url_structure || 'none') + ')'
+				: 'GTranslate prints nothing on this page (floating selector off / no widget): the kit loads Google Translate itself');
+			add('ok', G, 'Language switcher', 'FR | EN switcher present · ' + gtMode + (window.google && window.google.translate ? ' · Google Translate loaded' : '') + (gtFloat ? (getComputedStyle(gtFloat).display === 'none' ? ' · floating button hidden.' : ' · floating button still visible.') : '.'));
 		}
 
 		// Duplicate ids

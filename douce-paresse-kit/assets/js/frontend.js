@@ -462,6 +462,43 @@
 		window.location.reload();
 	}
 
+	/* Google's website translator, loaded by the kit when GTranslate's own widget is not on the page. */
+	function gtOnPage() {
+		return typeof window.doGTranslate === 'function' || !!window.gtranslateSettings || !!document.querySelector('script[src*="gtranslate"]');
+	}
+
+	function loadGoogle(src) {
+		if (window.dpkGoogleLoading) { return; }
+		window.dpkGoogleLoading = true;
+		var el = document.createElement('div');
+		el.id = 'dpk-gt-element';
+		el.className = 'skiptranslate';
+		el.setAttribute('aria-hidden', 'true');
+		document.body.appendChild(el);
+		window.dpkGoogleTranslateInit = function () {
+			new window.google.translate.TranslateElement({ pageLanguage: src, autoDisplay: false }, 'dpk-gt-element');
+		};
+		if (window.google && window.google.translate && window.google.translate.TranslateElement) {
+			window.dpkGoogleTranslateInit();
+			return;
+		}
+		var s = document.createElement('script');
+		s.src = 'https://translate.google.com/translate_a/element.js?cb=dpkGoogleTranslateInit';
+		document.body.appendChild(s);
+	}
+
+	function googleSwitch(code, tries) {
+		var sel = document.querySelector('select.goog-te-combo');
+		if (!sel || sel.options.length < 2) {
+			if (tries < 60) { setTimeout(function () { googleSwitch(code, tries + 1); }, 250); }
+			return;
+		}
+		sel.value = code;
+		for (var i = 0; i < 2; i++) { // GTranslate fires it twice too (first change only loads the language).
+			try { sel.dispatchEvent(new Event('change')); } catch (e) { /* old browser */ }
+		}
+	}
+
 	/* Paid GTranslate plans without their own links on the page: /en/page/ or en.example.com. */
 	function translatedUrl(g, src, code) {
 		var loc = window.location;
@@ -491,15 +528,22 @@
 			return;
 		}
 		var libLoaded = function () { return !!(window.google && window.google.translate); };
-		if (typeof window.doGTranslate !== 'function' || (code === src && !libLoaded())) {
+		if (code === src && !libLoaded()) {
 			reloadIn(code, src); // Back to the original without Google's library: clear the cookie and reload.
 			return;
 		}
-		var wake = document.querySelectorAll('.gtranslate_wrapper, [class*="gt_container-"]');
-		for (var i = 0; i < wake.length; i++) {
-			try { wake[i].dispatchEvent(new Event('pointerenter')); } catch (e) { /* old browser */ }
+		if (typeof window.doGTranslate === 'function') {
+			var wake = document.querySelectorAll('.gtranslate_wrapper, [class*="gt_container-"]');
+			for (var i = 0; i < wake.length; i++) {
+				try { wake[i].dispatchEvent(new Event('pointerenter')); } catch (e) { /* old browser */ }
+			}
+			window.doGTranslate(src + '|' + code);
+		} else {
+			// GTranslate prints nothing on the page (floating selector switched off, no widget placed):
+			// use Google's website translator directly, exactly as GTranslate's free widget does.
+			loadGoogle(src);
+			googleSwitch(code, 0);
 		}
-		window.doGTranslate(src + '|' + code);
 		// Optimistic state, then check that Google really switched.
 		var btns = document.querySelectorAll('[data-dpk-lang]');
 		for (var j = 0; j < btns.length; j++) { btns[j].setAttribute('aria-pressed', sameLang(code, btns[j].getAttribute('data-dpk-lang')) ? 'true' : 'false'); }
@@ -561,6 +605,15 @@
 	window.addEventListener('resize', queueAdminBar);
 	window.addEventListener('load', adminBarOffset);
 	window.addEventListener('load', markLang); // GTranslate settings may be printed after the kit script
+	window.addEventListener('load', function () {
+		// Visitor chose another language on a previous page and GTranslate is not on the page: Google's
+		// translator applies the googtrans cookie by itself once loaded.
+		var sw = document.querySelector('[data-dpk-lang-switch]');
+		var g = gtSettings();
+		if (!sw || gtOnPage() || (g.url_structure && g.url_structure !== 'none')) { return; }
+		var c = langCookie();
+		if (c && c !== sourceLang(sw)) { loadGoogle(sourceLang(sw)); }
+	});
 
 	if (document.readyState === 'loading') {
 		document.addEventListener('DOMContentLoaded', function () { keepHeaderFixed(); adminBarOffset(); markActive(); markLang(); keepBrandInTitle(); initForms(); });
