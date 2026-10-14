@@ -71,16 +71,16 @@ final class JMK_Smartsheet {
 		'Name'              => array( 'Customer', 'Customer name', 'Client', 'Client name', 'Full name', 'Lead name', 'Lead', 'Contact name', 'Name of customer' ),
 		'Phone'             => array( 'Phone number', 'Phone #', 'Phone no', 'Mobile', 'Mobile number', 'Cell', 'Cell phone', 'Telephone', 'Contact number', 'Customer phone' ),
 		'Email'             => array( 'E-mail', 'Email address', 'E-mail address', 'Customer email' ),
-		'Received'          => array( 'Date', 'Lead date', 'Date received', 'Received date', 'Date added', 'Created', 'Date created', 'Submitted', 'Submitted on', 'Inquiry date', 'Request date' ),
-		'Lead source'       => array( 'Source', 'Lead channel', 'Channel', 'Referral source', 'Where did they find us', 'How did they hear about us' ),
+		'Received'          => array( 'Date', 'Lead date', 'Date received', 'Received date', 'Date added', 'Created', 'Date created', 'Submitted', 'Submitted on', 'Inquiry date', 'Request date', 'Lead generated', 'Lead generated date', 'Date lead generated', 'First contact date' ),
+		'Lead source'       => array( 'Source', 'Lead channel', 'Channel', 'Referral source', 'Where did they find us', 'How did they hear about us', 'How did you hear about us', 'How did you find us', 'Marketing source' ),
 		'Estimate #'        => array( 'Estimate number', 'Estimate no', 'Quote #', 'Quote number', 'Quote no', 'Est #' ),
-		'Move type'         => array( 'Type of move', 'Service', 'Service type', 'Job type', 'Move category' ),
-		'Move size'         => array( 'Size', 'Home size', 'Size of move', 'Bedrooms', 'Job size' ),
-		'From'              => array( 'Origin', 'Origin address', 'Pickup', 'Pick up', 'Pickup address', 'Pick up address', 'From address', 'Moving from', 'Current address', 'Pickup location' ),
-		'To'                => array( 'Destination', 'Destination address', 'Drop off', 'Dropoff', 'Drop off address', 'Delivery address', 'To address', 'Moving to', 'New address', 'Drop off location' ),
-		'Move date'         => array( 'Moving date', 'Date of move', 'Job date', 'Service date', 'Requested date', 'Move day' ),
+		'Move type'         => array( 'Type of move', 'What type of move is this', 'What type of move', 'Service', 'Service type', 'Job type', 'Move category' ),
+		'Move size'         => array( 'Size', 'Home size', 'Size of move', 'Bedrooms', 'Job size', 'Number of rooms', 'Number of rooms (current)', 'Rooms' ),
+		'From'              => array( 'Origin', 'Origin address', 'Pickup', 'Pick up', 'Pickup address', 'Pick up address', 'From address', 'Moving from', 'Current address', 'Current address w/ zip code', 'Current address with zip code', 'Pickup location' ),
+		'To'                => array( 'Destination', 'Destination address', 'Destination address w/ zip code', 'Destination address with zip code', 'Drop off', 'Dropoff', 'Drop off address', 'Delivery address', 'To address', 'Moving to', 'New address', 'Drop off location' ),
+		'Move date'         => array( 'Moving date', 'Desired moving date', 'Desired move date', 'Date of move', 'Job date', 'Service date', 'Requested date', 'Move day' ),
 		'Flexibility'       => array( 'Date flexibility', 'Flexible', 'Flexible dates' ),
-		'Crew'              => array( 'Crew size', 'Movers', 'Number of movers', '# of movers', 'Men' ),
+		'Crew'              => array( 'Crew size', 'Number of movers requested', 'Movers requested', 'Movers', 'Number of movers', '# of movers', 'Number of movers needed', 'Men' ),
 		'Packing service'   => array( 'Packing', 'Full packing', 'Packing needed' ),
 		'Packing materials' => array( 'Materials', 'Boxes', 'Supplies', 'Packing supplies' ),
 		'Specialty items'   => array( 'Special items', 'Specialty', 'Heavy items' ),
@@ -88,7 +88,24 @@ final class JMK_Smartsheet {
 		'Photos'            => array( 'Pictures', 'Photos uploaded', 'Images' ),
 		'Page'              => array( 'Landing page', 'Page url', 'Website page', 'Url' ),
 		'Lead link'         => array( 'Link', 'WordPress link', 'Lead url', 'Details link' ),
-		'Details'           => array( 'Notes', 'Note', 'Comments', 'Comment', 'Description', 'Lead details', 'Job details', 'Move details', 'Summary', 'Info' ),
+		'Details'           => array( 'Notes', 'Note', 'Comments', 'Comment', 'Description', 'Lead details', 'Job details', 'Move details', 'Project details', 'Project details & what are you moving', 'What are you moving', 'Summary', 'Info' ),
+		'Pickup floor'      => array( 'What floor are you on', 'What floor are you on (current)', 'Floor (current)', 'Current floor', 'Floor', 'Pickup access', 'Access' ),
+		'Pickup elevator'   => array( 'Has elevator (current)', 'Has elevator', 'Elevator (current)', 'Elevator' ),
+		'Drop-off floor'    => array( 'What floor (destination)', 'Floor (destination)', 'Destination floor', 'Drop off access', 'Destination access' ),
+		'Drop-off elevator' => array( 'Has elevator (destination)', 'Elevator (destination)', 'Destination elevator' ),
+	);
+
+	/**
+	 * Fields that are sent when the sheet has a column for them, but are not part of the
+	 * "create a sheet" layout (there, From/To already include the access).
+	 */
+	const EXTRA_FIELDS = array( 'Details', 'Pickup floor', 'Pickup elevator', 'Drop-off floor', 'Drop-off elevator' );
+
+	/** Pickup/drop-off access as the builder stores it => how it reads in a "floor" column. */
+	const FLOORS = array(
+		'Ground floor / house' => 'Ground floor / house',
+		'Stairs'               => 'Upper floor – stairs',
+		'Elevator'             => 'Upper floor – elevator',
 	);
 
 	/** Leads queued in this request, sent once the response has gone out. */
@@ -208,7 +225,7 @@ final class JMK_Smartsheet {
 	 */
 	public static function columns( $fresh = false ) {
 		$s   = self::settings();
-		$key = 'jmk_ss_cols2_' . md5( $s['sheet_id'] );
+		$key = 'jmk_ss_cols3_' . md5( $s['sheet_id'] );
 		if ( ! $fresh ) {
 			$cached = get_transient( $key );
 			if ( is_array( $cached ) ) {
@@ -226,6 +243,9 @@ final class JMK_Smartsheet {
 					'id'    => $c['id'],
 					'title' => $c['title'],
 					'type'  => isset( $c['type'] ) ? $c['type'] : 'TEXT_NUMBER',
+					// Column formulas and system columns (auto number, created date…) can't be
+					// written; one such cell would make Smartsheet reject the whole row.
+					'auto'  => ! empty( $c['formula'] ) || ! empty( $c['systemColumnType'] ),
 				);
 			}
 		}
@@ -234,17 +254,18 @@ final class JMK_Smartsheet {
 	}
 
 	/**
-	 * Comparable form of a column title: case, spaces and punctuation (except #) ignored.
+	 * Comparable form of a column title: case, spaces and punctuation (except #) ignored,
+	 * so "FullName", "Full Name" and "full-name" are the same.
 	 */
 	private static function norm( $title ) {
-		return trim( preg_replace( '/[^a-z0-9#]+/', ' ', strtolower( (string) $title ) ) );
+		return preg_replace( '/[^a-z0-9#]+/', '', strtolower( (string) $title ) );
 	}
 
 	/**
 	 * Every lead field that can be sent, in display order.
 	 */
 	public static function fields() {
-		return array_merge( array_keys( self::COLUMNS ), array( 'Details' ) );
+		return array_merge( array_keys( self::COLUMNS ), self::EXTRA_FIELDS );
 	}
 
 	/**
@@ -257,7 +278,11 @@ final class JMK_Smartsheet {
 	public static function resolve( array $columns ) {
 		$map   = self::settings()['map'];
 		$by_id = array();
-		foreach ( $columns as $c ) {
+		foreach ( $columns as $k => $c ) {
+			if ( ! empty( $c['auto'] ) ) {
+				unset( $columns[ $k ] ); // Never offered, never filled.
+				continue;
+			}
 			$by_id[ (string) $c['id'] ] = $c;
 		}
 		$out   = array();
@@ -339,15 +364,21 @@ final class JMK_Smartsheet {
 			$v += array(
 				'Name'              => $q['name'],
 				'Email'             => $q['email'],
-				'Lead source'       => 'Quote builder',
+				'Lead source'       => 'Website – Quote builder',
 				'Estimate #'        => '#' . (int) $record['est_no'],
 				'Move type'         => $q['move_type'],
 				'Move size'         => isset( JMK_Quote::SIZES[ $q['size'] ] ) ? JMK_Quote::SIZES[ $q['size'] ] : $q['size'],
 				'From'              => $q['from_addr'] . ' (' . $q['from_access'] . ')',
 				'To'                => $q['to_addr'] . ' (' . $q['to_access'] . ')',
+				'Pickup floor'      => isset( self::FLOORS[ $q['from_access'] ] ) ? self::FLOORS[ $q['from_access'] ] : $q['from_access'],
+				'Pickup elevator'   => $yes( 'Elevator' === $q['from_access'] ),
+				'Drop-off floor'    => isset( self::FLOORS[ $q['to_access'] ] ) ? self::FLOORS[ $q['to_access'] ] : $q['to_access'],
+				'Drop-off elevator' => $yes( 'Elevator' === $q['to_access'] ),
+				'_From address'     => $q['from_addr'],
+				'_To address'       => $q['to_addr'],
 				'Move date'         => $q['move_date'],
 				'Flexibility'       => $q['flex'],
-				'Crew'              => $q['crew'] ? $q['crew'] . ' movers' : '',
+				'Crew'              => $q['crew'] ? (string) (int) $q['crew'] : '',
 				'Packing service'   => $yes( ! empty( $q['pack'] ) ),
 				'Packing materials' => $yes( ! empty( $q['supplies'] ) ),
 				'Specialty items'   => implode( ', ', (array) $q['specialty'] ),
@@ -364,7 +395,7 @@ final class JMK_Smartsheet {
 						$v['Move type'] . ' · ' . $v['Move size'],
 						$v['From'] . ' → ' . $v['To'],
 						'Move date: ' . $v['Move date'] . ' (' . $v['Flexibility'] . ')',
-						$v['Crew'] . ' · Packing: ' . $v['Packing service'] . ' · Materials: ' . $v['Packing materials'],
+						( '' !== $v['Crew'] ? $v['Crew'] . ' movers · ' : '' ) . 'Packing: ' . $v['Packing service'] . ' · Materials: ' . $v['Packing materials'],
 						'' !== $v['Specialty items'] ? 'Specialty: ' . $v['Specialty items'] : '',
 						'Estimate ' . $v['Estimate #'] . ': ' . $v['Estimate'],
 						'0' !== $v['Photos'] ? 'Photos: ' . $v['Photos'] . ' (see Lead link)' : '',
@@ -375,10 +406,9 @@ final class JMK_Smartsheet {
 		} else {
 			$from   = (string) get_post_meta( $post_id, '_jmk_from_zip', true );
 			$to     = (string) get_post_meta( $post_id, '_jmk_to_zip', true );
-			$source = (string) get_post_meta( $post_id, '_jmk_source', true );
 			$v     += array(
 				'Name'        => $post ? $post->post_title : '',
-				'Lead source' => 'Quick quote form' . ( '' !== $source ? ' (' . $source . ')' : '' ),
+				'Lead source' => 'Website – Quick quote form',
 				'Move size'   => (string) get_post_meta( $post_id, '_jmk_size', true ),
 				'From'        => '' !== $from ? 'ZIP ' . $from : '',
 				'To'          => '' !== $to ? 'ZIP ' . $to : '',
@@ -404,7 +434,15 @@ final class JMK_Smartsheet {
 	 */
 	public static function cells( array $values, array $columns ) {
 		$cells = array();
-		foreach ( self::resolve( $columns ) as $field => $col ) {
+		$res   = self::resolve( $columns );
+		// The sheet asks for the floor separately: keep the address column to the address.
+		if ( $res['Pickup floor'] && isset( $values['_From address'] ) ) {
+			$values['From'] = $values['_From address'];
+		}
+		if ( $res['Drop-off floor'] && isset( $values['_To address'] ) ) {
+			$values['To'] = $values['_To address'];
+		}
+		foreach ( $res as $field => $col ) {
 			if ( ! $col || ! isset( $values[ $field ] ) ) {
 				continue;
 			}
@@ -437,7 +475,8 @@ final class JMK_Smartsheet {
 		}
 		switch ( $type ) {
 			case 'CHECKBOX':
-				return in_array( strtolower( $value ), array( 'yes', 'true', '1' ), true );
+				// Ticked for any real value (a date, "Yes"…), unticked for No.
+				return ! in_array( strtolower( $value ), array( 'no', 'false', '0' ), true );
 			case 'DATE':
 				$t = strtotime( $value );
 				return false === $t ? $value : gmdate( 'Y-m-d', $t );
@@ -763,7 +802,11 @@ final class JMK_Smartsheet {
 										<td><select name="map[<?php echo esc_attr( $f ); ?>]" style="max-width:340px">
 											<option value=""><?php echo esc_html( '' !== $auto ? sprintf( /* translators: %s: column */ __( 'Automatic → %s', 'jmk' ), $auto ) : __( 'Automatic (no matching column – not sent)', 'jmk' ) ); ?></option>
 											<?php foreach ( $cols as $c ) : ?>
-												<option value="<?php echo esc_attr( $c['id'] ); ?>" <?php selected( $choice, (string) $c['id'] ); ?>><?php echo esc_html( $c['title'] ); ?></option>
+												<?php if ( ! empty( $c['auto'] ) ) : ?>
+													<option value="" disabled><?php echo esc_html( $c['title'] . ' ' . __( '(formula / automatic – can\'t be filled)', 'jmk' ) ); ?></option>
+												<?php else : ?>
+													<option value="<?php echo esc_attr( $c['id'] ); ?>" <?php selected( $choice, (string) $c['id'] ); ?>><?php echo esc_html( $c['title'] ); ?></option>
+												<?php endif; ?>
 											<?php endforeach; ?>
 											<option value="-" <?php selected( $choice, '-' ); ?>><?php esc_html_e( "Don't send", 'jmk' ); ?></option>
 										</select></td>
@@ -774,7 +817,7 @@ final class JMK_Smartsheet {
 							<?php submit_button( __( 'Save column choices', 'jmk' ), 'secondary', 'submit', false ); ?>
 						</form>
 						<?php if ( $missing ) : ?>
-							<p><?php echo esc_html( sprintf( /* translators: %s: field list */ __( 'Not sent because the sheet has no column for them: %s. Pick a column above, choose "Don\'t send", or add them as new columns at the end of the sheet:', 'jmk' ), implode( ', ', $missing ) ) ); ?></p>
+							<p><?php echo esc_html( sprintf( /* translators: %s: field list */ __( 'No column in this sheet for: %s. That is fine: they are simply left out (and are still in the Details summary if Details has a column). To give them their own columns, pick one above or add them at the end of the sheet:', 'jmk' ), implode( ', ', $missing ) ) ); ?></p>
 							<?php self::form_open( 'jmk_ss_columns' ); ?>
 								<?php submit_button( __( 'Add missing columns', 'jmk' ), 'secondary', 'submit', false ); ?>
 							</form>
@@ -861,7 +904,9 @@ final class JMK_Smartsheet {
 		}
 		$ids = array();
 		foreach ( $cols as $c ) {
-			$ids[ (string) $c['id'] ] = true;
+			if ( empty( $c['auto'] ) ) {
+				$ids[ (string) $c['id'] ] = true;
+			}
 		}
 		$in  = isset( $_POST['map'] ) && is_array( $_POST['map'] ) ? wp_unslash( $_POST['map'] ) : array(); // phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput -- each value is checked below.
 		$map = array();

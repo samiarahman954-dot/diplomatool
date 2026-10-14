@@ -2,7 +2,7 @@
 Requires at least: 6.0
 Requires PHP: 7.4
 Requires Plugins: elementor
-Stable tag: 1.4.1
+Stable tag: 1.4.2
 
 The Just Move DFW home page rebuilt as 18 custom Elementor widgets (one per section) with one-click demo import. No default Elementor widgets are used.
 
@@ -88,7 +88,7 @@ Every lead from the quote builder and the quick quote form is also added to a Sm
 3. Choose one of your sheets, or click "Create … for me" to get a sheet with every lead column.
 4. Click "Send a test row", then "Send leads not in Smartsheet yet" to copy over leads you already have.
 
-* Works with your existing tracker: each lead field is matched to a column automatically by title, including common alternatives ("Customer Name", "Phone Number", "Date", "Quote Amount", "Notes"…), and you can pick a different column or "Don't send" for any field under "Which column gets what". Columns you don't pick (Status, Booked, your own notes) are never touched. Date and checkbox columns get proper dates and ticks. "Details" puts the whole lead summary into one notes column.
+* Works with your existing tracker: each lead field is matched to a column automatically by title, including common alternatives ("Customer Name", "Phone Number", "Date", "Quote Amount", "Notes"…), and you can pick a different column or "Don't send" for any field under "Which column gets what". Columns you don't pick (Status, Booked, your own notes) are never touched, and formula or automatic columns are never written to. Date and checkbox columns get proper dates and ticks. "Details" puts the whole lead summary into one notes column, and pickup floor / elevator go to their own columns when the sheet has them.
 * "Add missing columns" adds any lead field that has no column yet at the end of the sheet (optional).
 * Sending happens after the visitor gets their answer, so the form never slows down. If Smartsheet is unreachable, the lead is kept and retried every hour; the Leads list shows Sent / Failed with a Retry link.
 * The token is stored only in your database and is never shown again on the page. Disconnect removes it.
