@@ -291,8 +291,9 @@ final class JMK_Smartsheet {
 			$choice = isset( $map[ $f ] ) ? (string) $map[ $f ] : '';
 			if ( '-' === $choice ) {
 				$out[ $f ] = null;
-			} elseif ( '' !== $choice && isset( $by_id[ $choice ] ) && ! isset( $taken[ $choice ] ) ) {
-				$out[ $f ]        = $by_id[ $choice ];
+			} elseif ( '' !== $choice && isset( $by_id[ $choice ] ) ) {
+				// Picked for two fields: the first one keeps it, the other is not sent.
+				$out[ $f ]        = isset( $taken[ $choice ] ) ? null : $by_id[ $choice ];
 				$taken[ $choice ] = true;
 			}
 		}
@@ -522,16 +523,15 @@ final class JMK_Smartsheet {
 			if ( is_wp_error( $cells ) ) {
 				$result = $cells;
 			} else {
-				$res = self::request(
-					'POST',
-					'/sheets/' . rawurlencode( self::settings()['sheet_id'] ) . '/rows',
-					array(
-						array(
-							'toBottom' => true,
-							'cells'    => $cells,
-						),
-					)
-				);
+				$res = self::add_row( $cells );
+				$bad = is_wp_error( $res ) ? $res->get_error_data() : null;
+				if ( is_array( $bad ) && 400 === $bad['status'] ) {
+					// Usually a column was deleted, renamed or changed type in Smartsheet since the
+					// column list was cached: read the columns again and try once more.
+					$columns = self::columns( true );
+					$cells   = is_wp_error( $columns ) ? $columns : self::cells( self::row_values( $post_id ), $columns );
+					$res     = is_wp_error( $cells ) ? $cells : self::add_row( $cells );
+				}
 				if ( is_wp_error( $res ) ) {
 					$result = $res;
 				} else {
@@ -552,6 +552,22 @@ final class JMK_Smartsheet {
 		}
 		delete_transient( $lock );
 		return $result;
+	}
+
+	/**
+	 * @return array|WP_Error
+	 */
+	private static function add_row( array $cells ) {
+		return self::request(
+			'POST',
+			'/sheets/' . rawurlencode( self::settings()['sheet_id'] ) . '/rows',
+			array(
+				array(
+					'toBottom' => true,
+					'cells'    => $cells,
+				),
+			)
+		);
 	}
 
 	/* ------------------------------------------------------------------
@@ -1006,6 +1022,9 @@ final class JMK_Smartsheet {
 				break;
 			}
 			$r = self::send( $id );
+			if ( is_wp_error( $r ) && 'jmk_ss_busy' === $r->get_error_code() ) {
+				continue; // Being sent right now by a form submission or the retry job.
+			}
 			if ( is_wp_error( $r ) ) {
 				$fail = $r;
 				break; // Same cause for the rest (token, sheet…): stop and show it.

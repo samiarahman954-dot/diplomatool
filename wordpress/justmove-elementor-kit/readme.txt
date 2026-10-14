@@ -2,7 +2,7 @@
 Requires at least: 6.0
 Requires PHP: 7.4
 Requires Plugins: elementor
-Stable tag: 1.4.2
+Stable tag: 1.4.3
 
 The Just Move DFW home page rebuilt as 18 custom Elementor widgets (one per section) with one-click demo import. No default Elementor widgets are used.
 
