@@ -407,10 +407,21 @@
 		return {};
 	}
 
+	// Target language of the googtrans cookie ("/fr/en" → "en"). Several cookies can coexist (Google
+	// writes it for the domain, the kit for the host): the first one naming a language wins.
 	function langCookie() {
-		var m = document.cookie.match(/(?:^|;)\s*googtrans=([^;]*)/);
-		var parts = m ? decodeURIComponent(m[1]).split('/') : [];
-		return parts[2] || null;
+		var re = /(?:^|;)\s*googtrans=([^;]*)/g;
+		var m;
+		while ((m = re.exec(document.cookie))) {
+			var t = decodeURIComponent(m[1]).split('/')[2];
+			if (t) { return t; }
+		}
+		return null;
+	}
+
+	function switchCodes() {
+		return Array.prototype.map.call(document.querySelectorAll('[data-dpk-lang]'), function (b) { return b.getAttribute('data-dpk-lang'); })
+			.filter(function (c, i, all) { return all.indexOf(c) === i; });
 	}
 
 	function sourceLang(sw) {
@@ -431,7 +442,16 @@
 			var first = g.url_structure === 'sub_domain' ? window.location.hostname.split('.')[0] : (window.location.pathname.split('/')[1] || '');
 			return first && first !== src && codes.indexOf(first) > -1 ? first : src;
 		}
-		return langCookie() || src;
+		var c = langCookie();
+		if (translatedPage()) {
+			// What the page shows wins: Google does not always write the cookie the kit can read.
+			if (c && !sameLang(c, src)) { return c; }
+			var hl = document.documentElement.getAttribute('lang') || '';
+			if (hl && !sameLang(hl, src) && switchCodes().some(function (x) { return sameLang(hl, x); })) { return hl.split('-')[0]; }
+			var others = switchCodes().filter(function (x) { return !sameLang(x, src); });
+			if (others.length === 1) { return others[0]; }
+		}
+		return c || src;
 	}
 
 	function sameLang(a, b) {
@@ -452,7 +472,8 @@
 	function setLangCookie(value) {
 		var host = window.location.hostname;
 		var exp = value ? '' : '; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-		['', '; domain=' + host, '; domain=.' + host.replace(/^www\./, '')].forEach(function (d) {
+		var base = host.replace(/^www\./, '');
+		['', '; domain=' + host, '; domain=.' + host, '; domain=' + base, '; domain=.' + base].filter(function (d, i, all) { return all.indexOf(d) === i; }).forEach(function (d) {
 			document.cookie = 'googtrans=' + (value || '') + '; path=/' + d + exp;
 		});
 	}
@@ -528,8 +549,10 @@
 			return;
 		}
 		var libLoaded = function () { return !!(window.google && window.google.translate); };
-		if (code === src && !libLoaded()) {
-			reloadIn(code, src); // Back to the original without Google's library: clear the cookie and reload.
+		if (sameLang(code, src)) {
+			// Back to the original: clearing the cookie and reloading is the only reliable way (Google's own
+			// "show original" depends on its library and does not always clear its cookie).
+			reloadIn(src, src);
 			return;
 		}
 		if (typeof window.doGTranslate === 'function') {
@@ -550,12 +573,14 @@
 		// Google's library can be slow on a weak connection: give it time before reloading.
 		var tries = 0;
 		setTimeout(function verify() {
-			var cookie = langCookie();
-			var done = code === src ? !translatedPage() && (!cookie || cookie === src) : translatedPage();
-			if (done) { markLang(); return; }
-			if (++tries < (libLoaded() ? 4 : 2)) { setTimeout(verify, 4000); return; }
+			if (translatedPage()) {
+				setLangCookie('/' + src + '/' + code); // Next pages open in this language too.
+				markLang();
+				return;
+			}
+			if (++tries < (libLoaded() ? 20 : 10)) { setTimeout(verify, 800); return; }
 			reloadIn(code, src);
-		}, 4000);
+		}, 800);
 	}
 
 	document.addEventListener('click', function (e) {
@@ -581,8 +606,20 @@
 		}).observe(titleEl, { childList: true, characterData: true, subtree: true });
 	}
 
+	// Google translated / restored the page: update the switcher and remember the language for the next
+	// pages right away (Google itself does not always write a cookie the kit can read).
+	function langChanged() {
+		markLang();
+		var sw = document.querySelector('[data-dpk-lang-switch]');
+		var g = gtSettings();
+		if (!sw || (g.url_structure && g.url_structure !== 'none') || !translatedPage()) { return; }
+		var src = sourceLang(sw);
+		var cur = currentLang(sw);
+		if (!sameLang(cur, src) && !sameLang(langCookie() || src, cur)) { setLangCookie('/' + src + '/' + cur); }
+	}
+
 	if (window.MutationObserver) {
-		new MutationObserver(markLang).observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'lang'] });
+		new MutationObserver(langChanged).observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'lang'] });
 	}
 
 	/* WordPress admin bar (logged-in users): fixed above 600px, but it scrolls away on smaller screens.
