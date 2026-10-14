@@ -394,11 +394,17 @@
 		neutralise(document.documentElement);
 	}
 
-	/* ---------- Languages: FR | EN switcher driving GTranslate ----------
-	 * Free GTranslate (Google Translate, cookie "googtrans"): doGTranslate('fr|en'). It only loads
-	 * Google's library when its floating button is hovered, so the hidden button is "woken up" first;
-	 * if nothing happened after a few seconds the cookie is set and the page reloaded (same result).
-	 * Paid GTranslate (/en/ sub-directory or sub-domain): go to the URL of GTranslate's own link. */
+	/* ---------- Languages: FR | EN switcher driving GTranslate 5 ----------
+	 * GTranslate (free plan) translates with its own library (cdn.gtranslate.net/widgets/latest/lib.min.js,
+	 * window.__GT.translator) and keeps the visitor's language in localStorage "__GT_TRANSLATE_LANGS"
+	 * ({ tgtLang }). On every page its widget script loads the library when tgtLang is not the original
+	 * language, and the library translates the page. Back to the original is doGTranslate('fr|fr'):
+	 * no reload, no cookie. When GTranslate's widget is not printed on the page (floating selector off),
+	 * the kit loads the same library the same way. Paid plans (/en/… or en.example.com): plain links. */
+	var GT_STORE = '__GT_TRANSLATE_LANGS';
+	var GT_LIB = 'https://cdn.gtranslate.net/widgets/latest/lib.min.js';
+	var pendingLang = null;
+
 	function gtSettings() {
 		var g = window.gtranslateSettings;
 		if (!g || typeof g !== 'object') { return {}; }
@@ -407,16 +413,27 @@
 		return {};
 	}
 
-	// Target language of the googtrans cookie ("/fr/en" → "en"). Several cookies can coexist (Google
-	// writes it for the domain, the kit for the host): the first one naming a language wins.
-	function langCookie() {
-		var re = /(?:^|;)\s*googtrans=([^;]*)/g;
-		var m;
-		while ((m = re.exec(document.cookie))) {
-			var t = decodeURIComponent(m[1]).split('/')[2];
-			if (t) { return t; }
-		}
-		return null;
+	// GTranslate's settings: from its widget on the page, else from the server (the kit reads its option).
+	function gtConfig() {
+		var c = cfg.gt || {};
+		var g = gtSettings();
+		return { source: g.default_language || c.source || '', mode: g.url_structure || c.mode || 'none', languages: g.languages || c.languages || [] };
+	}
+
+	function paidMode() {
+		var m = gtConfig().mode;
+		return m === 'sub_directory' || m === 'sub_domain';
+	}
+
+	function sourceLang(sw) {
+		sw = sw || document.querySelector('[data-dpk-lang-switch]');
+		return gtConfig().source || (sw && sw.getAttribute('data-source')) || 'fr';
+	}
+
+	function sameLang(a, b) {
+		a = String(a || '').toLowerCase();
+		b = String(b || '').toLowerCase();
+		return a === b || a.split('-')[0] === b.split('-')[0];
 	}
 
 	function switchCodes() {
@@ -424,41 +441,29 @@
 			.filter(function (c, i, all) { return all.indexOf(c) === i; });
 	}
 
-	function sourceLang(sw) {
-		return gtSettings().default_language || (sw && sw.getAttribute('data-source')) || 'fr';
-	}
-
-	function translatedPage() {
-		return /\btranslated-(ltr|rtl)\b/.test(document.documentElement.className);
+	function storedLang() {
+		try {
+			var st = JSON.parse(window.localStorage.getItem(GT_STORE));
+			return st && typeof st.tgtLang === 'string' && st.tgtLang ? st.tgtLang : null;
+		} catch (e) {
+			return null;
+		}
 	}
 
 	function currentLang(sw) {
-		var g = gtSettings();
 		var src = sourceLang(sw);
-		if (g.url_structure && g.url_structure !== 'none') {
-			// Paid plans: the language is in the URL (/en/… or en.example.com). Not <html lang>: it follows
-			// the WordPress site language, which can be English on a French site.
-			var codes = (g.languages || []).concat(Array.prototype.map.call(document.querySelectorAll('[data-dpk-lang]'), function (b) { return b.getAttribute('data-dpk-lang'); }));
-			var first = g.url_structure === 'sub_domain' ? window.location.hostname.split('.')[0] : (window.location.pathname.split('/')[1] || '');
+		if (paidMode()) {
+			// The language is in the URL. Not <html lang>: it follows the WordPress site language.
+			var codes = gtConfig().languages.concat(switchCodes());
+			var first = gtConfig().mode === 'sub_domain' ? window.location.hostname.split('.')[0] : (window.location.pathname.split('/')[1] || '');
 			return first && first !== src && codes.indexOf(first) > -1 ? first : src;
 		}
-		var c = langCookie();
-		var choice = choiceLang();
-		if (choice && sameLang(choice, src)) { return src; } // Explicit FR choice: the page is locked to French.
-		if (translatedPage()) {
-			// What the page shows wins: Google does not always write the cookie the kit can read.
-			if (c && !sameLang(c, src)) { return c; }
-			var hl = document.documentElement.getAttribute('lang') || '';
-			if (hl && !sameLang(hl, src) && switchCodes().some(function (x) { return sameLang(hl, x); })) { return hl.split('-')[0]; }
-			var others = switchCodes().filter(function (x) { return !sameLang(x, src); });
-			if (others.length === 1) { return others[0]; }
+		var stored = storedLang();
+		if (pendingLang && Date.now() - pendingLang.at < 15000 && !sameLang(stored || src, pendingLang.code)) {
+			return pendingLang.code; // Just clicked: GTranslate's library is still loading / translating.
 		}
-		if (choice) { return choice; }
-		return c || src;
-	}
-
-	function sameLang(a, b) {
-		return String(a).toLowerCase() === String(b).toLowerCase() || String(a).toLowerCase().split('-')[0] === String(b).toLowerCase();
+		pendingLang = null;
+		return stored || src;
 	}
 
 	function markLang() {
@@ -472,116 +477,57 @@
 		}
 	}
 
-	// Google writes googtrans without a path, so the browser binds it to the folder of the page where the
-	// language was chosen (/la-maison/ → path=/la-maison): it must be removed on every parent path and
-	// for every domain form, or it comes back after the reload.
-	function cookieVariants() {
-		var host = window.location.hostname;
-		var base = host.replace(/^www\./, '');
-		var domains = ['', '; domain=' + host, '; domain=.' + host, '; domain=' + base, '; domain=.' + base];
-		var paths = ['/'];
-		var acc = '';
-		window.location.pathname.split('/').forEach(function (part) {
-			if (!part) { return; }
-			acc += '/' + part;
-			paths.push(acc, acc + '/');
-		});
-		var out = [];
-		paths.forEach(function (pth) {
-			domains.forEach(function (d) {
-				var v = '; path=' + pth + d;
-				if (out.indexOf(v) < 0) { out.push(v); }
-			});
-		});
-		return out;
+	function gtWidgetOnPage() {
+		return typeof window.doGTranslate === 'function' || !!window.gtranslateSettings;
 	}
 
-	function setLangCookie(value) {
-		var exp = '; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-		cookieVariants().forEach(function (v) { document.cookie = 'googtrans=' + v + exp; });
-		if (value) {
-			var host = window.location.hostname.replace(/^www\./, '');
-			document.cookie = 'googtrans=' + value + '; path=/';
-			document.cookie = 'googtrans=' + value + '; path=/; domain=.' + host;
-		}
-	}
-
-	// The visitor's own choice, kept by the kit (Google's cookie alone is not reliable).
-	function choiceLang() {
-		var m = document.cookie.match(/(?:^|;)\s*dpk_lang=([A-Za-z-]+)/);
-		return m ? m[1] : null;
-	}
-
-	function setChoice(code) {
-		document.cookie = 'dpk_lang=' + code + '; path=/; max-age=31536000; SameSite=Lax';
-	}
-
-	// Visitor chose the original language: Google may not translate this page, whatever cookie or script
-	// (GTranslate, an undeletable cookie…) asks for it. Only set after an explicit FR choice.
-	function lockOriginal(on) {
-		var h = document.documentElement;
-		if (on) {
-			h.setAttribute('translate', 'no');
-			h.classList.add('notranslate');
-		} else {
-			if (h.getAttribute('translate') === 'no') { h.removeAttribute('translate'); }
-			h.classList.remove('notranslate');
-		}
-	}
-
-	function reloadIn(code, src) {
-		setChoice(code);
-		setLangCookie(sameLang(code, src) ? '' : '/' + src + '/' + code);
-		window.location.reload();
-	}
-
-	/* Google's website translator, loaded by the kit when GTranslate's own widget is not on the page. */
-	function gtOnPage() {
-		return typeof window.doGTranslate === 'function' || !!window.gtranslateSettings || !!document.querySelector('script[src*="gtranslate"]');
-	}
-
-	function loadGoogle(src) {
-		if (window.dpkGoogleLoading) { return; }
-		window.dpkGoogleLoading = true;
-		var el = document.createElement('div');
-		el.id = 'dpk-gt-element';
-		el.className = 'skiptranslate';
-		el.setAttribute('aria-hidden', 'true');
-		document.body.appendChild(el);
-		window.dpkGoogleTranslateInit = function () {
-			new window.google.translate.TranslateElement({ pageLanguage: src, autoDisplay: false }, 'dpk-gt-element');
-		};
-		if (window.google && window.google.translate && window.google.translate.TranslateElement) {
-			window.dpkGoogleTranslateInit();
+	// Same as GTranslate's own load_tlib().
+	function gtLib(cb) {
+		if (window.__GT && window.__GT.translator) {
+			if (cb) { cb(); }
 			return;
 		}
-		var s = document.createElement('script');
-		s.src = 'https://translate.google.com/translate_a/element.js?cb=dpkGoogleTranslateInit';
-		document.body.appendChild(s);
+		if (!window.gt_translate_script) {
+			var sc = document.createElement('script');
+			sc.src = GT_LIB;
+			window.gt_translate_script = sc;
+			document.body.appendChild(sc);
+		}
+		if (cb) { window.gt_translate_script.addEventListener('load', cb, { once: true }); }
 	}
 
-	function googleSwitch(code, tries) {
-		var sel = document.querySelector('select.goog-te-combo');
-		if (!sel || sel.options.length < 2) {
-			if (tries < 60) { setTimeout(function () { googleSwitch(code, tries + 1); }, 250); }
+	function gtReady() {
+		return !!(window.__GT && window.__GT.translator);
+	}
+
+	function gtTranslate(src, code) {
+		var run = function () { window.__GT.translator.translate(src, code); };
+		if (gtReady()) { run(); return; }
+		if (!window.gt_translate_script) {
+			// Nothing loading yet: let GTranslate's widget load its library, or load it the same way.
+			if (typeof window.doGTranslate === 'function') { window.doGTranslate(src + '|' + code); } else { gtLib(run); }
 			return;
 		}
-		sel.value = code;
-		for (var i = 0; i < 2; i++) { // GTranslate fires it twice too (first change only loads the language).
-			try { sel.dispatchEvent(new Event('change')); } catch (e) { /* old browser */ }
-		}
+		// The library is already on its way (GTranslate restoring a stored language): wait until it is ready.
+		// (Calling doGTranslate now would run before window.__GT exists – a race in GTranslate itself.)
+		var tries = 0;
+		(function wait() {
+			if (gtReady()) { run(); return; }
+			if (++tries < 80) { setTimeout(wait, 125); }
+		})();
 	}
 
 	/* Paid GTranslate plans without their own links on the page: /en/page/ or en.example.com. */
-	function translatedUrl(g, src, code) {
+	function translatedUrl(src, code) {
 		var loc = window.location;
 		var cur = currentLang();
-		if (g.url_structure === 'sub_directory') {
+		var mode = gtConfig().mode;
+		if (mode === 'sub_directory') {
 			var path = loc.pathname;
 			if (cur && cur !== src && path.indexOf('/' + cur + '/') === 0) { path = path.slice(cur.length + 1); }
 			return loc.protocol + '//' + loc.host + (code === src ? '' : '/' + code) + path + loc.search + loc.hash;
 		}
-		if (g.url_structure === 'sub_domain') {
+		if (mode === 'sub_domain') {
 			var host = loc.host;
 			if (cur && cur !== src && host.indexOf(cur + '.') === 0) { host = host.slice(cur.length + 1); }
 			var base = host.replace(/^www\./, '');
@@ -591,50 +537,18 @@
 	}
 
 	function switchLang(sw, code) {
-		var g = gtSettings();
 		var src = sourceLang(sw);
 		if (sameLang(currentLang(sw), code)) { return; }
-		if (g.url_structure && g.url_structure !== 'none') {
+		if (paidMode()) {
 			var a = document.querySelector('a[data-gt-lang="' + code + '"]');
-			var url = a && a.href && !/#$/.test(a.href) ? a.href : translatedUrl(g, src, code);
+			var url = a && a.href && !/#$/.test(a.href) ? a.href : translatedUrl(src, code);
 			if (url) { window.location.href = url; }
 			return;
 		}
-		setChoice(code);
-		var libLoaded = function () { return !!(window.google && window.google.translate); };
-		if (sameLang(code, src)) {
-			// Back to the original: clearing the cookie and reloading is the only reliable way (Google's own
-			// "show original" depends on its library and does not always clear its cookie).
-			reloadIn(src, src);
-			return;
-		}
-		lockOriginal(false);
-		if (typeof window.doGTranslate === 'function') {
-			var wake = document.querySelectorAll('.gtranslate_wrapper, [class*="gt_container-"]');
-			for (var i = 0; i < wake.length; i++) {
-				try { wake[i].dispatchEvent(new Event('pointerenter')); } catch (e) { /* old browser */ }
-			}
-			window.doGTranslate(src + '|' + code);
-		} else {
-			// GTranslate prints nothing on the page (floating selector switched off, no widget placed):
-			// use Google's website translator directly, exactly as GTranslate's free widget does.
-			loadGoogle(src);
-			googleSwitch(code, 0);
-		}
-		// Optimistic state, then check that Google really switched.
-		var btns = document.querySelectorAll('[data-dpk-lang]');
-		for (var j = 0; j < btns.length; j++) { btns[j].setAttribute('aria-pressed', sameLang(code, btns[j].getAttribute('data-dpk-lang')) ? 'true' : 'false'); }
-		// Google's library can be slow on a weak connection: give it time before reloading.
-		var tries = 0;
-		setTimeout(function verify() {
-			if (translatedPage()) {
-				setLangCookie('/' + src + '/' + code); // Next pages open in this language too.
-				markLang();
-				return;
-			}
-			if (++tries < (libLoaded() ? 20 : 10)) { setTimeout(verify, 800); return; }
-			reloadIn(code, src);
-		}, 800);
+		pendingLang = { code: code, at: Date.now() };
+		markLang();
+		gtTranslate(src, code); // Also for the original language: GTranslate restores it in place.
+		[800, 2000, 5000, 15500].forEach(function (ms) { setTimeout(markLang, ms); });
 	}
 
 	document.addEventListener('click', function (e) {
@@ -648,6 +562,33 @@
 		switchLang(sw, btn.getAttribute('data-dpk-lang'));
 	});
 
+	// Earlier kit versions drove Google's translator (googtrans cookie, dpk_lang, html lock): clean up.
+	function cleanLegacy() {
+		var host = window.location.hostname;
+		var base = host.replace(/^www\./, '');
+		var domains = ['', '; domain=' + host, '; domain=.' + host, '; domain=' + base, '; domain=.' + base];
+		var paths = ['/'];
+		var acc = '';
+		window.location.pathname.split('/').forEach(function (part) {
+			if (part) { acc += '/' + part; paths.push(acc, acc + '/'); }
+		});
+		var exp = '; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+		if (/(?:^|;)\s*googtrans=/.test(document.cookie)) {
+			paths.forEach(function (pth) { domains.forEach(function (d) { document.cookie = 'googtrans=; path=' + pth + d + exp; }); });
+		}
+		if (/(?:^|;)\s*dpk_lang=/.test(document.cookie)) { document.cookie = 'dpk_lang=; path=/' + exp; }
+	}
+
+	// Visitor chose another language on an earlier page and GTranslate's widget is not on this page:
+	// load GTranslate's library, which translates the page from its stored language (as its widget does).
+	function followStoredLang() {
+		var sw = document.querySelector('[data-dpk-lang-switch]');
+		if (!sw || paidMode() || gtWidgetOnPage()) { markLang(); return; }
+		var stored = storedLang();
+		if (stored && !sameLang(stored, sourceLang(sw))) { gtLib(); }
+		markLang();
+	}
+
 	// The brand name stays French in the tab title too (<title> cannot carry translate="no").
 	function keepBrandInTitle() {
 		var brand = (cfg.brand || []).filter(function (t) { return /^douce\s+paresse$/i.test(t); })[0];
@@ -660,23 +601,8 @@
 		}).observe(titleEl, { childList: true, characterData: true, subtree: true });
 	}
 
-	// Google translated / restored the page: update the switcher and remember the language for the next
-	// pages right away (Google itself does not always write a cookie the kit can read).
-	function langChanged() {
-		markLang();
-		var sw = document.querySelector('[data-dpk-lang-switch]');
-		var g = gtSettings();
-		if (!sw || (g.url_structure && g.url_structure !== 'none') || !translatedPage()) { return; }
-		var src = sourceLang(sw);
-		var cur = currentLang(sw);
-		var choice = choiceLang();
-		if (choice && sameLang(choice, src)) { return; }
-		if (!sameLang(cur, src) && !sameLang(langCookie() || src, cur)) { setLangCookie('/' + src + '/' + cur); }
-	}
-
-	if (window.MutationObserver) {
-		new MutationObserver(langChanged).observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'lang'] });
-	}
+	window.addEventListener('storage', function (e) { if (e.key === GT_STORE) { markLang(); } }); // Other tabs.
+	cleanLegacy();
 
 	/* WordPress admin bar (logged-in users): fixed above 600px, but it scrolls away on smaller screens.
 	   Publish the height it really covers so the fixed header (and the mobile menu) sit right under it. */
@@ -697,37 +623,7 @@
 	window.addEventListener('scroll', queueAdminBar, { passive: true });
 	window.addEventListener('resize', queueAdminBar);
 	window.addEventListener('load', adminBarOffset);
-	window.addEventListener('load', markLang); // GTranslate settings may be printed after the kit script
-	// Runs as soon as the kit script runs (before GTranslate's deferred script reads the cookie): the
-	// visitor's choice decides. Original language chosen → any leftover googtrans cookie is removed.
-	(function followChoice() {
-		var sw = document.querySelector('[data-dpk-lang-switch]');
-		var g = gtSettings();
-		if (!sw || (g.url_structure && g.url_structure !== 'none')) { return; }
-		var src = sourceLang(sw);
-		var choice = choiceLang();
-		if (!choice && langCookie()) { choice = langCookie(); setChoice(choice); } // Chosen with an older version.
-		if (choice && sameLang(choice, src)) {
-			lockOriginal(true);
-			if (langCookie()) { setLangCookie(''); }
-		}
-	})();
-
-	window.addEventListener('load', function () {
-		// Visitor chose another language on a previous page and GTranslate is not on the page: Google's
-		// translator applies the googtrans cookie by itself once loaded.
-		var sw = document.querySelector('[data-dpk-lang-switch]');
-		var g = gtSettings();
-		if (!sw || (g.url_structure && g.url_structure !== 'none')) { return; }
-		var src = sourceLang(sw);
-		var choice = choiceLang();
-		if (!choice || sameLang(choice, src)) {
-			if (langCookie()) { setLangCookie(''); }
-			return;
-		}
-		if (langCookie() !== choice) { setLangCookie('/' + src + '/' + choice); }
-		if (!gtOnPage()) { loadGoogle(src); }
-	});
+	window.addEventListener('load', followStoredLang); // After GTranslate's deferred widget script.
 
 	if (document.readyState === 'loading') {
 		document.addEventListener('DOMContentLoaded', function () { keepHeaderFixed(); adminBarOffset(); markActive(); markLang(); keepBrandInTitle(); initForms(); });

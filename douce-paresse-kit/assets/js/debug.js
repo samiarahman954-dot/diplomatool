@@ -413,15 +413,16 @@
 		var gtFloat = document.getElementById('gt_float_wrapper');
 		var kitLang = document.querySelector('.dpk-lang');
 		if (kitLang) {
-			var gtMode = typeof window.doGTranslate === 'function' ? 'GTranslate widget on the page (free plan)'
-				: (window.gtranslateSettings ? 'GTranslate settings found (' + (((Object.values ? Object.values(window.gtranslateSettings) : []).filter(function (v) { return v && v.url_structure; })[0] || window.gtranslateSettings).url_structure || 'none') + ')'
-				: 'GTranslate prints nothing on this page (floating selector off / no widget): the kit loads Google Translate itself');
-			var gtc = (document.cookie.match(/(?:^|;)\s*googtrans=[^;]*/g) || []).map(function (c) { return c.replace(/^[;\s]+/, ''); });
-			var choice = (document.cookie.match(/(?:^|;)\s*dpk_lang=([^;]*)/) || [])[1] || 'none';
+			var stored = null;
+			try { stored = window.localStorage.getItem('__GT_TRANSLATE_LANGS'); } catch (e) { stored = 'unreadable'; }
 			var pressed = (document.querySelector('.dpk-lang [aria-pressed="true"]') || {}).textContent || '?';
-			var shown = /translated-(ltr|rtl)/.test(document.documentElement.className) ? 'translated (html lang=' + document.documentElement.getAttribute('lang') + ')' : 'original';
-			add('info', G, 'Language state', 'switcher shows ' + pressed + ' · page ' + shown + ' · visitor choice ' + choice + ' · Google cookies on this page: ' + (gtc.length ? gtc.join(', ') : 'none'), 'URL path: ' + location.pathname + '\nGoogle Translate script: ' + (document.querySelector('script[src*="translate.google"]') ? 'loaded' : 'not loaded') + '\nGTranslate on page: ' + (window.gtranslateSettings ? 'yes' : 'no'));
-			add('ok', G, 'Language switcher', 'FR | EN switcher present · ' + gtMode + (window.google && window.google.translate ? ' · Google Translate loaded' : '') + (gtFloat ? (getComputedStyle(gtFloat).display === 'none' ? ' · floating button hidden.' : ' · floating button still visible.') : '.'));
+			var gtc = (window.DPK && window.DPK.gt) || {};
+			add('info', G, 'Language state', 'switcher shows ' + pressed + ' · GTranslate stored language: ' + (stored || 'none (original)') + ' · GTranslate library ' + (window.__GT && window.__GT.translator ? 'loaded' : 'not loaded'),
+				'GTranslate settings (server): original ' + (gtc.source || '?') + ', mode ' + (gtc.mode || '?') + ', floating selector ' + (gtc.floating || '?') + ', widget look ' + (gtc.look || '?') +
+				'\nGTranslate widget on this page: ' + (window.gtranslateSettings ? 'yes' : 'no') + ' · doGTranslate: ' + (typeof window.doGTranslate === 'function' ? 'yes' : 'no') +
+				'\nOld kit cookies left: ' + ((document.cookie.match(/googtrans|dpk_lang/g) || []).join(', ') || 'none'));
+			var gtMode = typeof window.doGTranslate === 'function' ? 'GTranslate widget on the page' : (window.gtranslateSettings ? 'GTranslate settings found' : 'GTranslate prints nothing on this page: the kit loads its library itself');
+			add('ok', G, 'Language switcher', 'FR | EN switcher present · ' + gtMode + (window.google && window.google.translate ? ' · Google Translate (old kit) loaded' : '') + (gtFloat ? (getComputedStyle(gtFloat).display === 'none' ? ' · floating button hidden.' : ' · floating button still visible.') : '.'));
 		}
 
 		// Duplicate ids

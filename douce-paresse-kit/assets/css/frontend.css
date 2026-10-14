@@ -198,7 +198,9 @@ html.dpk-lock, html.dpk-lock body { overflow: hidden; }
 .dpk .dpk-lang--overlay .dpk-lang__sep { font-size: 12px; color: rgba(245, 240, 230, .3); }
 /* The kit switcher replaces the GTranslate floating button (GTranslate itself keeps running). */
 body:has(.dpk-lang--hidegt) #gt_float_wrapper,
-body:has(.dpk-lang--hidegt) .gt_float_switcher { display: none !important; }
+body:has(.dpk-lang--hidegt) .gt_float_switcher,
+body:has(.dpk-lang--hidegt) .gtranslate_wrapper,
+body:has(.dpk-lang--hidegt) .gt_switcher_wrapper { display: none !important; }
 /* Google Translate: no top banner / page shift. */
 body:has(.dpk-lang) .goog-te-banner-frame,
 body:has(.dpk-lang) > .skiptranslate,

@@ -91,6 +91,7 @@ final class Plugin {
 			array(
 				'ajax'      => admin_url( 'admin-ajax.php' ),
 				'brand'     => class_exists( 'DPK\\I18n' ) ? I18n::terms() : array(),
+				'gt'        => class_exists( 'DPK\\I18n' ) ? I18n::gt_config() : array(),
 				'turnstile' => Spam::turnstile_enabled() ? array(
 					'sitekey'    => $spam['ts_site'],
 					'theme'      => $spam['ts_theme'],

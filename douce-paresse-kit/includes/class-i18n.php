@@ -69,6 +69,35 @@ final class I18n {
 		return false;
 	}
 
+	/**
+	 * GTranslate settings the switcher needs (read from GTranslate's own option, so it works even when
+	 * GTranslate prints no widget on the page).
+	 */
+	public static function gt_config() {
+		$d = get_option( 'GTranslate' );
+		$d = is_array( $d ) ? $d : array();
+		$mode = 'none';
+		if ( ! empty( $d['pro_version'] ) ) {
+			$mode = 'sub_directory';
+		} elseif ( ! empty( $d['enterprise_version'] ) ) {
+			$mode = 'sub_domain';
+		}
+		$langs = array();
+		foreach ( array( 'fincl_langs', 'incl_langs' ) as $k ) {
+			if ( ! empty( $d[ $k ] ) && is_array( $d[ $k ] ) ) {
+				$langs = array_merge( $langs, array_map( 'strval', $d[ $k ] ) );
+			}
+		}
+		return array(
+			'active'    => self::gtranslate_active(),
+			'source'    => ! empty( $d['default_language'] ) ? (string) $d['default_language'] : '',
+			'mode'      => $mode,
+			'languages' => array_values( array_unique( $langs ) ),
+			'floating'  => isset( $d['floating_language_selector'] ) ? (string) $d['floating_language_selector'] : '',
+			'look'      => isset( $d['widget_look'] ) ? (string) $d['widget_look'] : '',
+		);
+	}
+
 	/* ------------------------------------------------------------------
 	 * Brand protection
 	 * ------------------------------------------------------------------ */
