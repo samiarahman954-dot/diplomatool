@@ -451,6 +451,8 @@
 			var others = switchCodes().filter(function (x) { return !sameLang(x, src); });
 			if (others.length === 1) { return others[0]; }
 		}
+		var choice = choiceLang();
+		if (choice) { return choice; }
 		return c || src;
 	}
 
@@ -469,17 +471,53 @@
 		}
 	}
 
-	function setLangCookie(value) {
+	// Google writes googtrans without a path, so the browser binds it to the folder of the page where the
+	// language was chosen (/la-maison/ → path=/la-maison): it must be removed on every parent path and
+	// for every domain form, or it comes back after the reload.
+	function cookieVariants() {
 		var host = window.location.hostname;
-		var exp = value ? '' : '; expires=Thu, 01 Jan 1970 00:00:00 GMT';
 		var base = host.replace(/^www\./, '');
-		['', '; domain=' + host, '; domain=.' + host, '; domain=' + base, '; domain=.' + base].filter(function (d, i, all) { return all.indexOf(d) === i; }).forEach(function (d) {
-			document.cookie = 'googtrans=' + (value || '') + '; path=/' + d + exp;
+		var domains = ['', '; domain=' + host, '; domain=.' + host, '; domain=' + base, '; domain=.' + base];
+		var paths = ['/'];
+		var acc = '';
+		window.location.pathname.split('/').forEach(function (part) {
+			if (!part) { return; }
+			acc += '/' + part;
+			paths.push(acc, acc + '/');
 		});
+		var out = [];
+		paths.forEach(function (pth) {
+			domains.forEach(function (d) {
+				var v = '; path=' + pth + d;
+				if (out.indexOf(v) < 0) { out.push(v); }
+			});
+		});
+		return out;
+	}
+
+	function setLangCookie(value) {
+		var exp = '; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+		cookieVariants().forEach(function (v) { document.cookie = 'googtrans=' + v + exp; });
+		if (value) {
+			var host = window.location.hostname.replace(/^www\./, '');
+			document.cookie = 'googtrans=' + value + '; path=/';
+			document.cookie = 'googtrans=' + value + '; path=/; domain=.' + host;
+		}
+	}
+
+	// The visitor's own choice, kept by the kit (Google's cookie alone is not reliable).
+	function choiceLang() {
+		var m = document.cookie.match(/(?:^|;)\s*dpk_lang=([A-Za-z-]+)/);
+		return m ? m[1] : null;
+	}
+
+	function setChoice(code) {
+		document.cookie = 'dpk_lang=' + code + '; path=/; max-age=31536000; SameSite=Lax';
 	}
 
 	function reloadIn(code, src) {
-		setLangCookie(code === src ? '' : '/' + src + '/' + code);
+		setChoice(code);
+		setLangCookie(sameLang(code, src) ? '' : '/' + src + '/' + code);
 		window.location.reload();
 	}
 
@@ -548,6 +586,7 @@
 			if (url) { window.location.href = url; }
 			return;
 		}
+		setChoice(code);
 		var libLoaded = function () { return !!(window.google && window.google.translate); };
 		if (sameLang(code, src)) {
 			// Back to the original: clearing the cookie and reloading is the only reliable way (Google's own
@@ -615,6 +654,8 @@
 		if (!sw || (g.url_structure && g.url_structure !== 'none') || !translatedPage()) { return; }
 		var src = sourceLang(sw);
 		var cur = currentLang(sw);
+		var choice = choiceLang();
+		if (choice && sameLang(choice, src)) { return; }
 		if (!sameLang(cur, src) && !sameLang(langCookie() || src, cur)) { setLangCookie('/' + src + '/' + cur); }
 	}
 
@@ -642,14 +683,32 @@
 	window.addEventListener('resize', queueAdminBar);
 	window.addEventListener('load', adminBarOffset);
 	window.addEventListener('load', markLang); // GTranslate settings may be printed after the kit script
+	// Runs as soon as the kit script runs (before GTranslate's deferred script reads the cookie): the
+	// visitor's choice decides. Original language chosen → any leftover googtrans cookie is removed.
+	(function followChoice() {
+		var sw = document.querySelector('[data-dpk-lang-switch]');
+		var g = gtSettings();
+		if (!sw || (g.url_structure && g.url_structure !== 'none')) { return; }
+		var src = sourceLang(sw);
+		var choice = choiceLang();
+		if (!choice && langCookie()) { choice = langCookie(); setChoice(choice); } // Chosen with an older version.
+		if (choice && sameLang(choice, src) && langCookie()) { setLangCookie(''); }
+	})();
+
 	window.addEventListener('load', function () {
 		// Visitor chose another language on a previous page and GTranslate is not on the page: Google's
 		// translator applies the googtrans cookie by itself once loaded.
 		var sw = document.querySelector('[data-dpk-lang-switch]');
 		var g = gtSettings();
-		if (!sw || gtOnPage() || (g.url_structure && g.url_structure !== 'none')) { return; }
-		var c = langCookie();
-		if (c && c !== sourceLang(sw)) { loadGoogle(sourceLang(sw)); }
+		if (!sw || (g.url_structure && g.url_structure !== 'none')) { return; }
+		var src = sourceLang(sw);
+		var choice = choiceLang();
+		if (!choice || sameLang(choice, src)) {
+			if (langCookie()) { setLangCookie(''); }
+			return;
+		}
+		if (langCookie() !== choice) { setLangCookie('/' + src + '/' + choice); }
+		if (!gtOnPage()) { loadGoogle(src); }
 	});
 
 	if (document.readyState === 'loading') {

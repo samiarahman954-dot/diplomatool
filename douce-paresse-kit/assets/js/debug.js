@@ -416,6 +416,11 @@
 			var gtMode = typeof window.doGTranslate === 'function' ? 'GTranslate widget on the page (free plan)'
 				: (window.gtranslateSettings ? 'GTranslate settings found (' + (((Object.values ? Object.values(window.gtranslateSettings) : []).filter(function (v) { return v && v.url_structure; })[0] || window.gtranslateSettings).url_structure || 'none') + ')'
 				: 'GTranslate prints nothing on this page (floating selector off / no widget): the kit loads Google Translate itself');
+			var gtc = (document.cookie.match(/(?:^|;)\s*googtrans=[^;]*/g) || []).map(function (c) { return c.replace(/^[;\s]+/, ''); });
+			var choice = (document.cookie.match(/(?:^|;)\s*dpk_lang=([^;]*)/) || [])[1] || 'none';
+			var pressed = (document.querySelector('.dpk-lang [aria-pressed="true"]') || {}).textContent || '?';
+			var shown = /translated-(ltr|rtl)/.test(document.documentElement.className) ? 'translated (html lang=' + document.documentElement.getAttribute('lang') + ')' : 'original';
+			add('info', G, 'Language state', 'switcher shows ' + pressed + ' · page ' + shown + ' · visitor choice ' + choice + ' · Google cookies on this page: ' + (gtc.length ? gtc.join(', ') : 'none'), 'URL path: ' + location.pathname + '\nGoogle Translate script: ' + (document.querySelector('script[src*="translate.google"]') ? 'loaded' : 'not loaded') + '\nGTranslate on page: ' + (window.gtranslateSettings ? 'yes' : 'no'));
 			add('ok', G, 'Language switcher', 'FR | EN switcher present · ' + gtMode + (window.google && window.google.translate ? ' · Google Translate loaded' : '') + (gtFloat ? (getComputedStyle(gtFloat).display === 'none' ? ' · floating button hidden.' : ' · floating button still visible.') : '.'));
 		}
 
