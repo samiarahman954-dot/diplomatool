@@ -4,8 +4,10 @@
  *
  * - The API token is entered on the settings screen and stored in the database only;
  *   it is never printed back into a page.
- * - Rows are matched to the sheet's columns by column title, so the owner can reorder,
- *   hide or add columns freely. "Create a sheet for me" builds one with every column.
+ * - Rows are matched to the sheet's columns by title (with common alternatives such as
+ *   "Customer Name"), and the owner can pick any column per field, so an existing tracker
+ *   works as is. Columns that are not picked (Status, notes…) are never touched.
+ *   "Create a sheet for me" builds one with every column.
  * - Sending never slows down or breaks the visitor's form: it runs after the response
  *   is sent, and anything that fails is retried by WP-Cron (and can be retried by hand).
  */
@@ -60,6 +62,35 @@ final class JMK_Smartsheet {
 		'Lead link'         => 'TEXT_NUMBER',
 	);
 
+	/**
+	 * Other column titles each field is matched to automatically, so an existing tracker
+	 * ("Customer Name", "Phone Number", "Lead Date"…) works without renaming columns.
+	 * Matching ignores case, spaces and punctuation.
+	 */
+	const SYNONYMS = array(
+		'Name'              => array( 'Customer', 'Customer name', 'Client', 'Client name', 'Full name', 'Lead name', 'Lead', 'Contact name', 'Name of customer' ),
+		'Phone'             => array( 'Phone number', 'Phone #', 'Phone no', 'Mobile', 'Mobile number', 'Cell', 'Cell phone', 'Telephone', 'Contact number', 'Customer phone' ),
+		'Email'             => array( 'E-mail', 'Email address', 'E-mail address', 'Customer email' ),
+		'Received'          => array( 'Date', 'Lead date', 'Date received', 'Received date', 'Date added', 'Created', 'Date created', 'Submitted', 'Submitted on', 'Inquiry date', 'Request date' ),
+		'Lead source'       => array( 'Source', 'Lead channel', 'Channel', 'Referral source', 'Where did they find us', 'How did they hear about us' ),
+		'Estimate #'        => array( 'Estimate number', 'Estimate no', 'Quote #', 'Quote number', 'Quote no', 'Est #' ),
+		'Move type'         => array( 'Type of move', 'Service', 'Service type', 'Job type', 'Move category' ),
+		'Move size'         => array( 'Size', 'Home size', 'Size of move', 'Bedrooms', 'Job size' ),
+		'From'              => array( 'Origin', 'Origin address', 'Pickup', 'Pick up', 'Pickup address', 'Pick up address', 'From address', 'Moving from', 'Current address', 'Pickup location' ),
+		'To'                => array( 'Destination', 'Destination address', 'Drop off', 'Dropoff', 'Drop off address', 'Delivery address', 'To address', 'Moving to', 'New address', 'Drop off location' ),
+		'Move date'         => array( 'Moving date', 'Date of move', 'Job date', 'Service date', 'Requested date', 'Move day' ),
+		'Flexibility'       => array( 'Date flexibility', 'Flexible', 'Flexible dates' ),
+		'Crew'              => array( 'Crew size', 'Movers', 'Number of movers', '# of movers', 'Men' ),
+		'Packing service'   => array( 'Packing', 'Full packing', 'Packing needed' ),
+		'Packing materials' => array( 'Materials', 'Boxes', 'Supplies', 'Packing supplies' ),
+		'Specialty items'   => array( 'Special items', 'Specialty', 'Heavy items' ),
+		'Estimate'          => array( 'Quote', 'Quote amount', 'Estimate amount', 'Estimated price', 'Estimated cost', 'Price', 'Amount', 'Quoted price', 'Est value', 'Value' ),
+		'Photos'            => array( 'Pictures', 'Photos uploaded', 'Images' ),
+		'Page'              => array( 'Landing page', 'Page url', 'Website page', 'Url' ),
+		'Lead link'         => array( 'Link', 'WordPress link', 'Lead url', 'Details link' ),
+		'Details'           => array( 'Notes', 'Note', 'Comments', 'Comment', 'Description', 'Lead details', 'Job details', 'Move details', 'Summary', 'Info' ),
+	);
+
 	/** Leads queued in this request, sent once the response has gone out. */
 	private static $queue = array();
 
@@ -72,6 +103,7 @@ final class JMK_Smartsheet {
 		add_action( 'admin_post_jmk_ss_sheet', array( __CLASS__, 'handle_sheet' ) );
 		add_action( 'admin_post_jmk_ss_create', array( __CLASS__, 'handle_create' ) );
 		add_action( 'admin_post_jmk_ss_columns', array( __CLASS__, 'handle_columns' ) );
+		add_action( 'admin_post_jmk_ss_map', array( __CLASS__, 'handle_map' ) );
 		add_action( 'admin_post_jmk_ss_test', array( __CLASS__, 'handle_test' ) );
 		add_action( 'admin_post_jmk_ss_backfill', array( __CLASS__, 'handle_backfill' ) );
 		add_action( 'admin_post_jmk_ss_resend', array( __CLASS__, 'handle_resend' ) );
@@ -96,6 +128,7 @@ final class JMK_Smartsheet {
 				'sheet_name' => '',
 				'account'    => '',
 				'last_error' => '',
+				'map'        => array(), // field => column id, '-' (don't send) or missing (automatic)
 			),
 			is_array( $s ) ? $s : array()
 		);
@@ -175,7 +208,7 @@ final class JMK_Smartsheet {
 	 */
 	public static function columns( $fresh = false ) {
 		$s   = self::settings();
-		$key = 'jmk_ss_cols_' . md5( $s['sheet_id'] );
+		$key = 'jmk_ss_cols2_' . md5( $s['sheet_id'] );
 		if ( ! $fresh ) {
 			$cached = get_transient( $key );
 			if ( is_array( $cached ) ) {
@@ -200,8 +233,84 @@ final class JMK_Smartsheet {
 		return $out;
 	}
 
+	/**
+	 * Comparable form of a column title: case, spaces and punctuation (except #) ignored.
+	 */
 	private static function norm( $title ) {
-		return strtolower( trim( preg_replace( '/\s+/', ' ', (string) $title ) ) );
+		return trim( preg_replace( '/[^a-z0-9#]+/', ' ', strtolower( (string) $title ) ) );
+	}
+
+	/**
+	 * Every lead field that can be sent, in display order.
+	 */
+	public static function fields() {
+		return array_merge( array_keys( self::COLUMNS ), array( 'Details' ) );
+	}
+
+	/**
+	 * Which sheet column each field goes to: the owner's choice first, then an exact
+	 * title match, then a common alternative title. A column is never used twice.
+	 *
+	 * @param array $columns From columns().
+	 * @return array field => column array, or null when the field is not sent.
+	 */
+	public static function resolve( array $columns ) {
+		$map   = self::settings()['map'];
+		$by_id = array();
+		foreach ( $columns as $c ) {
+			$by_id[ (string) $c['id'] ] = $c;
+		}
+		$out   = array();
+		$taken = array();
+		foreach ( self::fields() as $f ) {
+			$choice = isset( $map[ $f ] ) ? (string) $map[ $f ] : '';
+			if ( '-' === $choice ) {
+				$out[ $f ] = null;
+			} elseif ( '' !== $choice && isset( $by_id[ $choice ] ) && ! isset( $taken[ $choice ] ) ) {
+				$out[ $f ]        = $by_id[ $choice ];
+				$taken[ $choice ] = true;
+			}
+		}
+		// Exact titles before alternatives, so "Date" never steals a column named after another field.
+		foreach ( array( 'exact', 'alt' ) as $pass ) {
+			foreach ( self::fields() as $f ) {
+				if ( array_key_exists( $f, $out ) ) {
+					continue;
+				}
+				$names = 'exact' === $pass ? array( $f ) : ( isset( self::SYNONYMS[ $f ] ) ? self::SYNONYMS[ $f ] : array() );
+				foreach ( $names as $name ) {
+					$k = self::norm( $name );
+					if ( isset( $columns[ $k ] ) && ! isset( $taken[ (string) $columns[ $k ]['id'] ] ) ) {
+						$out[ $f ]                                   = $columns[ $k ];
+						$taken[ (string) $columns[ $k ]['id'] ] = true;
+						break;
+					}
+				}
+			}
+		}
+		foreach ( self::fields() as $f ) {
+			if ( ! array_key_exists( $f, $out ) ) {
+				$out[ $f ] = null;
+			}
+		}
+		return $out;
+	}
+
+	/**
+	 * Lead fields of the "create a sheet" layout that have no column in this sheet
+	 * (and were not switched off by the owner).
+	 */
+	public static function missing( array $columns ) {
+		$map = self::settings()['map'];
+		$res = self::resolve( $columns );
+		return array_values(
+			array_filter(
+				array_keys( self::COLUMNS ),
+				static function ( $f ) use ( $res, $map ) {
+					return null === $res[ $f ] && ! ( isset( $map[ $f ] ) && '-' === $map[ $f ] );
+				}
+			)
+		);
 	}
 
 	/* ------------------------------------------------------------------
@@ -248,6 +357,21 @@ final class JMK_Smartsheet {
 			if ( '' === $v['Page'] && ! empty( $record['page_url'] ) ) {
 				$v['Page'] = $record['page_url'];
 			}
+			$v['Details'] = implode(
+				"\n",
+				array_filter(
+					array(
+						$v['Move type'] . ' · ' . $v['Move size'],
+						$v['From'] . ' → ' . $v['To'],
+						'Move date: ' . $v['Move date'] . ' (' . $v['Flexibility'] . ')',
+						$v['Crew'] . ' · Packing: ' . $v['Packing service'] . ' · Materials: ' . $v['Packing materials'],
+						'' !== $v['Specialty items'] ? 'Specialty: ' . $v['Specialty items'] : '',
+						'Estimate ' . $v['Estimate #'] . ': ' . $v['Estimate'],
+						'0' !== $v['Photos'] ? 'Photos: ' . $v['Photos'] . ' (see Lead link)' : '',
+					),
+					'strlen'
+				)
+			);
 		} else {
 			$from   = (string) get_post_meta( $post_id, '_jmk_from_zip', true );
 			$to     = (string) get_post_meta( $post_id, '_jmk_to_zip', true );
@@ -258,6 +382,16 @@ final class JMK_Smartsheet {
 				'Move size'   => (string) get_post_meta( $post_id, '_jmk_size', true ),
 				'From'        => '' !== $from ? 'ZIP ' . $from : '',
 				'To'          => '' !== $to ? 'ZIP ' . $to : '',
+			);
+			$v['Details'] = implode(
+				"\n",
+				array_filter(
+					array(
+						'Quick quote form' . ( '' !== $v['Move size'] ? ' · ' . $v['Move size'] : '' ),
+						'' !== $v['From'] . $v['To'] ? $v['From'] . ' → ' . $v['To'] : '',
+					),
+					'strlen'
+				)
 			);
 		}
 		return $v;
@@ -270,29 +404,49 @@ final class JMK_Smartsheet {
 	 */
 	public static function cells( array $values, array $columns ) {
 		$cells = array();
-		foreach ( $values as $title => $value ) {
-			$key = self::norm( $title );
-			if ( ! isset( $columns[ $key ] ) ) {
+		foreach ( self::resolve( $columns ) as $field => $col ) {
+			if ( ! $col || ! isset( $values[ $field ] ) ) {
 				continue;
 			}
-			$value = mb_substr( wp_strip_all_tags( (string) $value ), 0, 4000 );
-			if ( '' === $value ) {
+			$value = self::cell_value( mb_substr( wp_strip_all_tags( (string) $values[ $field ] ), 0, 4000 ), $col['type'] );
+			if ( '' === $value || null === $value ) {
 				continue;
 			}
 			$cell = array(
-				'columnId' => $columns[ $key ]['id'],
+				'columnId' => $col['id'],
 				'value'    => $value,
 				'strict'   => false,
 			);
-			if ( preg_match( '#^https?://#i', $value ) && 'TEXT_NUMBER' === $columns[ $key ]['type'] ) {
+			if ( is_string( $value ) && preg_match( '#^https?://#i', $value ) && 'TEXT_NUMBER' === $col['type'] ) {
 				$cell['hyperlink'] = array( 'url' => $value );
 			}
 			$cells[] = $cell;
 		}
 		if ( ! $cells ) {
-			return new WP_Error( 'jmk_ss_columns', __( 'None of the sheet\'s column titles match the lead fields (Name, Phone, Email…). Use "Add missing columns" or "Create a sheet for me".', 'jmk' ) );
+			return new WP_Error( 'jmk_ss_columns', __( 'None of the sheet\'s columns are linked to a lead field (Name, Phone, Email…). Choose the columns under "Which column gets what", or use "Add missing columns".', 'jmk' ) );
 		}
 		return $cells;
+	}
+
+	/**
+	 * Fit a value to the column's type (date, checkbox…); text columns take it as is.
+	 */
+	private static function cell_value( $value, $type ) {
+		if ( '' === $value ) {
+			return '';
+		}
+		switch ( $type ) {
+			case 'CHECKBOX':
+				return in_array( strtolower( $value ), array( 'yes', 'true', '1' ), true );
+			case 'DATE':
+				$t = strtotime( $value );
+				return false === $t ? $value : gmdate( 'Y-m-d', $t );
+			case 'DATETIME':
+			case 'ABSTRACT_DATETIME':
+				$t = strtotime( $value );
+				return false === $t ? $value : gmdate( 'Y-m-d\TH:i:s', $t );
+		}
+		return $value;
 	}
 
 	/**
@@ -587,18 +741,45 @@ final class JMK_Smartsheet {
 						<p style="color:#b32d2e"><?php echo esc_html( $cols->get_error_message() ); ?></p>
 						<?php
 					else :
-						$missing = array_values( array_filter( array_keys( self::COLUMNS ), static function ( $t ) use ( $cols ) {
-							return ! isset( $cols[ self::norm( $t ) ] );
-						} ) );
+						$res     = self::resolve( $cols );
+						$map     = $s['map'];
+						$missing = self::missing( $cols );
 						?>
-						<p><?php esc_html_e( 'Rows are matched to your columns by their titles. Columns with other titles are left empty, and you can move, hide or add columns in Smartsheet at any time.', 'jmk' ); ?></p>
+						<h3 style="margin-bottom:4px"><?php esc_html_e( 'Which column gets what', 'jmk' ); ?></h3>
+						<p class="description" style="margin-top:0"><?php esc_html_e( 'Matched automatically by column title (e.g. "Customer Name" or "Phone Number" work too). Change any of them here; columns you do not pick (like Status or your own notes) are never touched.', 'jmk' ); ?></p>
+						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+							<input type="hidden" name="action" value="jmk_ss_map">
+							<?php wp_nonce_field( 'jmk_ss_map' ); ?>
+							<table class="widefat striped" style="max-width:640px;margin:8px 0 10px">
+								<thead><tr><th><?php esc_html_e( 'Lead field', 'jmk' ); ?></th><th><?php esc_html_e( 'Your sheet column', 'jmk' ); ?></th></tr></thead>
+								<tbody>
+								<?php
+								foreach ( self::fields() as $f ) :
+									$choice = isset( $map[ $f ] ) ? (string) $map[ $f ] : '';
+									$auto   = $res[ $f ] && '' === $choice ? $res[ $f ]['title'] : '';
+									?>
+									<tr>
+										<td><?php echo esc_html( 'Details' === $f ? __( 'Details (everything in one note)', 'jmk' ) : $f ); ?></td>
+										<td><select name="map[<?php echo esc_attr( $f ); ?>]" style="max-width:340px">
+											<option value=""><?php echo esc_html( '' !== $auto ? sprintf( /* translators: %s: column */ __( 'Automatic → %s', 'jmk' ), $auto ) : __( 'Automatic (no matching column – not sent)', 'jmk' ) ); ?></option>
+											<?php foreach ( $cols as $c ) : ?>
+												<option value="<?php echo esc_attr( $c['id'] ); ?>" <?php selected( $choice, (string) $c['id'] ); ?>><?php echo esc_html( $c['title'] ); ?></option>
+											<?php endforeach; ?>
+											<option value="-" <?php selected( $choice, '-' ); ?>><?php esc_html_e( "Don't send", 'jmk' ); ?></option>
+										</select></td>
+									</tr>
+								<?php endforeach; ?>
+								</tbody>
+							</table>
+							<?php submit_button( __( 'Save column choices', 'jmk' ), 'secondary', 'submit', false ); ?>
+						</form>
 						<?php if ( $missing ) : ?>
-							<p><?php echo esc_html( sprintf( /* translators: %s: column list */ __( 'Not in this sheet yet: %s', 'jmk' ), implode( ', ', $missing ) ) ); ?></p>
+							<p><?php echo esc_html( sprintf( /* translators: %s: field list */ __( 'Not sent because the sheet has no column for them: %s. Pick a column above, choose "Don\'t send", or add them as new columns at the end of the sheet:', 'jmk' ), implode( ', ', $missing ) ) ); ?></p>
 							<?php self::form_open( 'jmk_ss_columns' ); ?>
 								<?php submit_button( __( 'Add missing columns', 'jmk' ), 'secondary', 'submit', false ); ?>
 							</form>
 						<?php else : ?>
-							<p>✅ <?php esc_html_e( 'All lead columns are in the sheet.', 'jmk' ); ?></p>
+							<p>✅ <?php esc_html_e( 'Every lead field has a column (or is switched off).', 'jmk' ); ?></p>
 						<?php endif; ?>
 					<?php endif; ?>
 					<div>
@@ -653,7 +834,7 @@ final class JMK_Smartsheet {
 				'region'     => $region,
 				'account'    => trim( $who . ( '' !== $email ? ' <' . $email . '>' : '' ) ),
 				'last_error' => '',
-			) + ( $changed && '' !== $s['token'] ? array( 'sheet_id' => '', 'sheet_name' => '' ) : array() )
+			) + ( $changed && '' !== $s['token'] ? array( 'sheet_id' => '', 'sheet_name' => '', 'map' => array() ) : array() )
 		);
 		self::back( __( 'Connected to Smartsheet. Now choose or create the sheet for your leads.', 'jmk' ) );
 	}
@@ -668,8 +849,30 @@ final class JMK_Smartsheet {
 		if ( '' === $id || ! isset( $sheets[ $id ] ) ) {
 			self::back( __( 'Please choose a sheet.', 'jmk' ), false );
 		}
-		self::save( array( 'sheet_id' => $id, 'sheet_name' => $sheets[ $id ] ) );
+		self::save( array( 'sheet_id' => $id, 'sheet_name' => $sheets[ $id ], 'map' => $id === self::settings()['sheet_id'] ? self::settings()['map'] : array() ) );
 		self::back( sprintf( /* translators: %s: sheet */ __( 'New leads will now go to "%s".', 'jmk' ), $sheets[ $id ] ) );
+	}
+
+	public static function handle_map() {
+		self::guard( 'jmk_ss_map' );
+		$cols = self::columns( true );
+		if ( is_wp_error( $cols ) ) {
+			self::back( $cols->get_error_message(), false );
+		}
+		$ids = array();
+		foreach ( $cols as $c ) {
+			$ids[ (string) $c['id'] ] = true;
+		}
+		$in  = isset( $_POST['map'] ) && is_array( $_POST['map'] ) ? wp_unslash( $_POST['map'] ) : array(); // phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput -- each value is checked below.
+		$map = array();
+		foreach ( self::fields() as $f ) {
+			$v = isset( $in[ $f ] ) ? (string) $in[ $f ] : '';
+			if ( '-' === $v || isset( $ids[ $v ] ) ) {
+				$map[ $f ] = $v;
+			}
+		}
+		self::save( array( 'map' => $map ) );
+		self::back( __( 'Column choices saved. New leads will use them.', 'jmk' ) );
 	}
 
 	public static function handle_create() {
@@ -692,7 +895,7 @@ final class JMK_Smartsheet {
 		if ( '' === $id ) {
 			self::back( __( 'Smartsheet did not return the new sheet. Please try again.', 'jmk' ), false );
 		}
-		self::save( array( 'sheet_id' => $id, 'sheet_name' => self::SHEET_NAME ) );
+		self::save( array( 'sheet_id' => $id, 'sheet_name' => self::SHEET_NAME, 'map' => array() ) );
 		self::back( sprintf( /* translators: %s: sheet */ __( 'Created "%s" in your Smartsheet (Sheets / Home). New leads will go there.', 'jmk' ), self::SHEET_NAME ) );
 	}
 
@@ -704,9 +907,9 @@ final class JMK_Smartsheet {
 		}
 		$add = array();
 		$at  = count( $have );
-		foreach ( self::COLUMNS as $title => $type ) {
-			if ( ! isset( $have[ self::norm( $title ) ] ) ) {
-				$add[] = array( 'title' => $title, 'type' => $type, 'index' => $at++ );
+		foreach ( self::missing( $have ) as $title ) {
+			if ( ! isset( $have[ self::norm( $title ) ] ) ) { // Smartsheet refuses duplicate titles.
+				$add[] = array( 'title' => $title, 'type' => self::COLUMNS[ $title ], 'index' => $at++ );
 			}
 		}
 		if ( $add ) {
