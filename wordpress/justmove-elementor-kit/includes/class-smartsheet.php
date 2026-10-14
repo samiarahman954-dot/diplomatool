@@ -225,7 +225,7 @@ final class JMK_Smartsheet {
 	 */
 	public static function columns( $fresh = false ) {
 		$s   = self::settings();
-		$key = 'jmk_ss_cols3_' . md5( $s['sheet_id'] );
+		$key = 'jmk_ss_cols4_' . md5( $s['sheet_id'] );
 		if ( ! $fresh ) {
 			$cached = get_transient( $key );
 			if ( is_array( $cached ) ) {
@@ -245,7 +245,11 @@ final class JMK_Smartsheet {
 					'type'  => isset( $c['type'] ) ? $c['type'] : 'TEXT_NUMBER',
 					// Column formulas and system columns (auto number, created date…) can't be
 					// written; one such cell would make Smartsheet reject the whole row.
-					'auto'  => ! empty( $c['formula'] ) || ! empty( $c['systemColumnType'] ),
+					'auto'    => ! empty( $c['formula'] ) || ! empty( $c['systemColumnType'] ),
+					// Dropdown columns: the choices, and whether only those are allowed
+					// ("Restrict to dropdown values only" – then strict:false does not help).
+					'options' => isset( $c['options'] ) && is_array( $c['options'] ) ? array_values( array_map( 'strval', $c['options'] ) ) : array(),
+					'limited' => ! empty( $c['validation'] ),
 				);
 			}
 		}
@@ -399,6 +403,7 @@ final class JMK_Smartsheet {
 						( '' !== $v['Crew'] ? $v['Crew'] . ' movers · ' : '' ) . 'Packing: ' . $v['Packing service'] . ' · Materials: ' . $v['Packing materials'],
 						'' !== $v['Specialty items'] ? 'Specialty: ' . $v['Specialty items'] : '',
 						'Estimate ' . $v['Estimate #'] . ': ' . $v['Estimate'],
+						'Source: ' . $v['Lead source'],
 						'0' !== $v['Photos'] ? 'Photos: ' . $v['Photos'] . ' (see Lead link)' : '',
 					),
 					'strlen'
@@ -451,11 +456,43 @@ final class JMK_Smartsheet {
 			if ( '' === $value || null === $value ) {
 				continue;
 			}
+			$picklist = in_array( $col['type'], array( 'PICKLIST', 'MULTI_PICKLIST' ), true );
+			$multi    = null;
+			if ( 'MULTI_PICKLIST' === $col['type'] && is_string( $value ) && ! empty( $col['options'] ) ) {
+				// Each item on its own: "Piano, Gun safe" → [Piano, Gun safe].
+				$multi = array();
+				foreach ( array_map( 'trim', explode( ',', $value ) ) as $item ) {
+					$option = self::pick_option( $item, $col['options'] );
+					if ( null !== $option ) {
+						$multi[] = $option;
+					}
+				}
+				$multi = array_values( array_unique( $multi ) );
+				if ( ! $multi && ! empty( $col['limited'] ) ) {
+					continue;
+				}
+			} elseif ( $picklist && is_string( $value ) && ! empty( $col['options'] ) ) {
+				$option = self::pick_option( $value, $col['options'] );
+				if ( null !== $option ) {
+					$value = $option;
+				} elseif ( ! empty( $col['limited'] ) ) {
+					continue; // Not one of the allowed choices: leave the cell for the team (it is in Details).
+				}
+			} elseif ( ! empty( $col['limited'] ) && ( $picklist || 'CONTACT_LIST' === $col['type'] ) ) {
+				continue; // Restricted column whose allowed values we don't know.
+			}
 			$cell = array(
 				'columnId' => $col['id'],
 				'value'    => $value,
 				'strict'   => false,
 			);
+			if ( $multi ) {
+				unset( $cell['value'], $cell['strict'] );
+				$cell['objectValue'] = array(
+					'objectType' => 'MULTI_PICKLIST',
+					'values'     => $multi,
+				);
+			}
 			if ( is_string( $value ) && preg_match( '#^https?://#i', $value ) && 'TEXT_NUMBER' === $col['type'] ) {
 				$cell['hyperlink'] = array( 'url' => $value );
 			}
@@ -465,6 +502,53 @@ final class JMK_Smartsheet {
 			return new WP_Error( 'jmk_ss_columns', __( 'None of the sheet\'s columns are linked to a lead field (Name, Phone, Email…). Choose the columns under "Which column gets what", or use "Add missing columns".', 'jmk' ) );
 		}
 		return $cells;
+	}
+
+	/**
+	 * The dropdown choice that means the same as $value, or null.
+	 * "Website – Quote builder" → "Website", "Long-distance move" → "Long Distance",
+	 * "2 Bedroom" → "2 Bedrooms", "Office / Commercial" → "Commercial".
+	 */
+	public static function pick_option( $value, array $options ) {
+		$v = self::norm( $value );
+		if ( '' === $v ) {
+			return null;
+		}
+		$longer    = null; // A choice that starts with the value ("2 Bedroom" → "2 Bedrooms").
+		$contained = null; // The longest choice found inside the value ("Website – Quote builder" → "Website").
+		$clen      = 0;
+		foreach ( $options as $opt ) {
+			$o = self::norm( $opt );
+			if ( '' === $o ) {
+				continue;
+			}
+			if ( $o === $v ) {
+				return $opt;
+			}
+			if ( null === $longer && 0 === strpos( $o, $v ) ) {
+				$longer = $opt;
+			}
+			// Very short choices ("1", "No") only count at the start, so "Studio / 1 room" is not "1".
+			$pos = strpos( $v, $o );
+			if ( false !== $pos && strlen( $o ) > $clen && ( strlen( $o ) >= 3 || 0 === $pos ) ) {
+				$contained = $opt;
+				$clen      = strlen( $o );
+			}
+		}
+		if ( null !== $longer || null !== $contained ) {
+			return null !== $longer ? $longer : $contained;
+		}
+		// Last try: a choice that starts with the value's first word ("Website – …" → "Website / Online").
+		$words = preg_split( '/[^a-z0-9]+/', strtolower( (string) $value ), -1, PREG_SPLIT_NO_EMPTY );
+		$first = $words ? $words[0] : '';
+		if ( strlen( $first ) >= 4 ) {
+			foreach ( $options as $opt ) {
+				if ( 0 === strpos( self::norm( $opt ), $first ) ) {
+					return $opt;
+				}
+			}
+		}
+		return null;
 	}
 
 	/**
@@ -555,19 +639,38 @@ final class JMK_Smartsheet {
 	}
 
 	/**
+	 * Add a row. If Smartsheet refuses one cell (a restricted dropdown, a locked column…),
+	 * that cell is left out and the row is sent again, so a lead is never lost over one value.
+	 *
 	 * @return array|WP_Error
 	 */
 	private static function add_row( array $cells ) {
-		return self::request(
-			'POST',
-			'/sheets/' . rawurlencode( self::settings()['sheet_id'] ) . '/rows',
-			array(
+		for ( $try = 0; $try < 6; $try++ ) {
+			$res = self::request(
+				'POST',
+				'/sheets/' . rawurlencode( self::settings()['sheet_id'] ) . '/rows',
 				array(
-					'toBottom' => true,
-					'cells'    => $cells,
-				),
-			)
-		);
+					array(
+						'toBottom' => true,
+						'cells'    => array_values( $cells ),
+					),
+				)
+			);
+			if ( ! is_wp_error( $res ) || ! preg_match( '/column (\d+)/i', $res->get_error_message(), $m ) ) {
+				return $res;
+			}
+			$left = array_filter(
+				$cells,
+				static function ( $c ) use ( $m ) {
+					return (string) $c['columnId'] !== $m[1];
+				}
+			);
+			if ( ! $left || count( $left ) === count( $cells ) ) {
+				return $res;
+			}
+			$cells = $left;
+		}
+		return $res;
 	}
 
 	/* ------------------------------------------------------------------
@@ -995,14 +1098,14 @@ final class JMK_Smartsheet {
 			'Phone'       => '(000) 000-0000',
 			'Email'       => 'test@example.com',
 			'Received'    => wp_date( 'Y-m-d H:i' ),
-			'Lead source' => 'Test from WordPress',
+			'Lead source' => 'Website',
 			'Estimate'    => '$0',
 		);
 		$cells = self::cells( $values, $cols );
 		if ( is_wp_error( $cells ) ) {
 			self::back( $cells->get_error_message(), false );
 		}
-		$res = self::request( 'POST', '/sheets/' . rawurlencode( self::settings()['sheet_id'] ) . '/rows', array( array( 'toBottom' => true, 'cells' => $cells ) ) );
+		$res = self::add_row( $cells );
 		if ( is_wp_error( $res ) ) {
 			self::back( $res->get_error_message(), false );
 		}
