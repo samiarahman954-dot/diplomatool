@@ -424,6 +424,13 @@
 			var gtMode = typeof window.doGTranslate === 'function' ? 'GTranslate widget on the page' : (window.gtranslateSettings ? 'GTranslate settings found' : 'GTranslate prints nothing on this page: the kit loads its library itself');
 			add('ok', G, 'Language switcher', 'FR | EN switcher present · ' + gtMode + (window.google && window.google.translate ? ' · Google Translate (old kit) loaded' : '') + (gtFloat ? (getComputedStyle(gtFloat).display === 'none' ? ' · floating button hidden.' : ' · floating button still visible.') : '.'));
 		}
+		var fixList = (window.DPK && window.DPK.fixes) || [];
+		if (fixList.length) {
+			var fx = (window.__dpkKit && window.__dpkKit.fixes) || { found: [] };
+			var missing = fixList.filter(function (f, i) { return fx.found.indexOf(i) < 0; }).map(function (f) { return '– ' + f.fr; });
+			add('info', G, 'English corrections', fx.found.length + ' of ' + fixList.length + ' found on this page (the others are on other pages, or their French text differs from the page).',
+				missing.length ? 'Not on this page:\n' + missing.slice(0, 40).join('\n') : '');
+		}
 
 		// Duplicate ids
 		var ids = {};

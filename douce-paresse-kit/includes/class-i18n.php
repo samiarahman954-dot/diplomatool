@@ -40,6 +40,77 @@ final class I18n {
 		return array(
 			'protect' => 'yes',
 			'terms'   => 'Douce Paresse',
+			'fixes'   => array(),
+		);
+	}
+
+	const MAX_FIXES = 400;
+
+	/** Tags allowed in a corrected English passage. */
+	public static function fix_tags() {
+		return array(
+			'a'      => array( 'href' => true, 'title' => true, 'target' => true, 'rel' => true ),
+			'strong' => array(),
+			'b'      => array(),
+			'em'     => array(),
+			'i'      => array(),
+			'br'     => array(),
+			'span'   => array( 'class' => true ),
+		);
+	}
+
+	/** English corrections for the front end: [ { fr, en } ], complete rows only. */
+	public static function fixes() {
+		$o = self::get();
+		return array_values(
+			array_filter(
+				(array) $o['fixes'],
+				function ( $f ) {
+					return is_array( $f ) && '' !== trim( (string) ( $f['fr'] ?? '' ) ) && '' !== trim( (string) ( $f['en'] ?? '' ) );
+				}
+			)
+		);
+	}
+
+	/**
+	 * "FR: … / EN: …" blocks pasted in the bulk box → rows. A block may span several lines;
+	 * a new "FR:" starts the next correction.
+	 */
+	public static function parse_bulk( $text ) {
+		$rows = array();
+		$cur  = null;
+		$key  = '';
+		foreach ( preg_split( '/\r\n|\r|\n/', (string) $text ) as $line ) {
+			if ( preg_match( '/^\s*(FR|EN)\s*[:：]\s*(.*)$/iu', $line, $m ) ) {
+				$key = strtolower( $m[1] );
+				if ( 'fr' === $key ) {
+					if ( $cur ) {
+						$rows[] = $cur;
+					}
+					$cur = array( 'fr' => $m[2], 'en' => '' );
+				} elseif ( $cur ) {
+					$cur['en'] = $m[2];
+				}
+			} elseif ( $cur && $key && '' !== trim( $line ) ) {
+				$cur[ $key ] .= ( '' === $cur[ $key ] ? '' : ' ' ) . trim( $line );
+			}
+		}
+		if ( $cur ) {
+			$rows[] = $cur;
+		}
+		return $rows;
+	}
+
+	/** One row, cleaned. Null when the French text is empty. */
+	public static function clean_fix( $row ) {
+		$fr = trim( preg_replace( '/\s+/u', ' ', wp_strip_all_tags( (string) ( $row['fr'] ?? '' ) ) ) );
+		$en = trim( wp_kses( (string) ( $row['en'] ?? '' ), self::fix_tags() ) );
+		if ( '' === $fr ) {
+			return null;
+		}
+		return array(
+			'fr' => mb_substr( $fr, 0, 5000 ),
+			'en' => mb_substr( $en, 0, 10000 ),
 		);
 	}
 
@@ -247,10 +318,27 @@ final class I18n {
 	}
 
 	public function sanitize( $in ) {
-		$in = (array) $in;
+		$in    = (array) $in;
+		$rows  = array_merge( array_values( (array) ( $in['fixes'] ?? array() ) ), self::parse_bulk( $in['fixes_bulk'] ?? '' ) );
+		$fixes = array();
+		$seen  = array();
+		foreach ( $rows as $row ) {
+			$row = is_array( $row ) && empty( $row['delete'] ) ? self::clean_fix( $row ) : null;
+			if ( ! $row ) {
+				continue;
+			}
+			$key = mb_strtolower( $row['fr'] );
+			if ( isset( $seen[ $key ] ) ) {
+				$fixes[ $seen[ $key ] ] = $row; // The same French text twice: the last English wins (bulk paste updates).
+				continue;
+			}
+			$seen[ $key ] = count( $fixes );
+			$fixes[]      = $row;
+		}
 		return array(
 			'protect' => empty( $in['protect'] ) ? '' : 'yes',
 			'terms'   => implode( "\n", array_slice( array_filter( array_map( 'sanitize_text_field', preg_split( '/\r\n|\r|\n/', (string) ( $in['terms'] ?? '' ) ) ) ), 0, 50 ) ),
+			'fixes'   => array_slice( $fixes, 0, self::MAX_FIXES ),
 		);
 	}
 
@@ -307,7 +395,59 @@ final class I18n {
 					<textarea name="<?php echo esc_attr( self::OPTION ); ?>[terms]" rows="4" class="large-text code"><?php echo esc_textarea( $o['terms'] ); ?></textarea></label></p>
 				<p class="description"><?php esc_html_e( 'Upper / lower case does not matter (“DOUCE PARESSE” is protected too). Works on every page, in the header, footer, page content and any Elementor widget. Clear your cache after a change.', 'douce-paresse-kit' ); ?></p>
 				<?php submit_button(); ?>
+
+				<h2 id="dpk-fixes"><?php esc_html_e( 'English corrections', 'douce-paresse-kit' ); ?></h2>
+				<p><?php esc_html_e( 'GTranslate translates the site automatically. For any passage whose English is not right, write the French text exactly as it is on the site and your own English: visitors reading in English see your English, GTranslate no longer translates that passage. Everything else is still translated by GTranslate.', 'douce-paresse-kit' ); ?></p>
+				<ul class="ul-disc">
+					<li><?php esc_html_e( 'French text: copy it from the page (a title, a paragraph, a button, or one sentence of a paragraph). Upper / lower case, spaces and the kind of apostrophe do not matter.', 'douce-paresse-kit' ); ?></li>
+					<li><?php esc_html_e( 'If you later change that French text on the page, change it here too (otherwise GTranslate translates the new text again).', 'douce-paresse-kit' ); ?></li>
+					<li><?php esc_html_e( 'English: plain text; <strong>, <em>, <br> and links are allowed. Clear your cache after a change.', 'douce-paresse-kit' ); ?></li>
+				</ul>
+				<?php $fixes = array_values( (array) $o['fixes'] ); ?>
+				<table class="widefat striped dpk-fixes">
+					<thead><tr><th style="width:45%"><?php esc_html_e( 'French text on the site', 'douce-paresse-kit' ); ?></th><th style="width:45%"><?php esc_html_e( 'Correct English', 'douce-paresse-kit' ); ?></th><th><?php esc_html_e( 'Delete', 'douce-paresse-kit' ); ?></th></tr></thead>
+					<tbody data-dpk-fix-rows data-next="<?php echo esc_attr( count( $fixes ) + 1 ); ?>">
+					<?php foreach ( array_merge( $fixes, array( array( 'fr' => '', 'en' => '' ) ) ) as $i => $f ) : ?>
+						<tr>
+							<td><textarea name="<?php echo esc_attr( self::OPTION . '[fixes][' . $i . '][fr]' ); ?>" rows="3" class="large-text"><?php echo esc_textarea( $f['fr'] ?? '' ); ?></textarea></td>
+							<td><textarea name="<?php echo esc_attr( self::OPTION . '[fixes][' . $i . '][en]' ); ?>" rows="3" class="large-text"><?php echo esc_textarea( $f['en'] ?? '' ); ?></textarea></td>
+							<td><label><input type="checkbox" name="<?php echo esc_attr( self::OPTION . '[fixes][' . $i . '][delete]' ); ?>" value="1"> <span class="screen-reader-text"><?php esc_html_e( 'Delete', 'douce-paresse-kit' ); ?></span></label></td>
+						</tr>
+					<?php endforeach; ?>
+					</tbody>
+				</table>
+				<p><button type="button" class="button" data-dpk-fix-add><?php esc_html_e( 'Add a row', 'douce-paresse-kit' ); ?></button>
+					<?php
+					/* translators: %d: number of corrections */
+					echo ' ' . esc_html( sprintf( _n( '%d correction saved.', '%d corrections saved.', count( $fixes ), 'douce-paresse-kit' ), count( $fixes ) ) );
+					?>
+				</p>
+				<details>
+					<summary><strong><?php esc_html_e( 'Add many at once (paste)', 'douce-paresse-kit' ); ?></strong></summary>
+					<p class="description"><?php esc_html_e( 'One block per correction: a line starting with “FR:” then a line starting with “EN:”. A French text already in the table gets the new English.', 'douce-paresse-kit' ); ?></p>
+					<textarea name="<?php echo esc_attr( self::OPTION ); ?>[fixes_bulk]" rows="8" class="large-text code" placeholder="FR: Et si un détail faisait toute la différence ?&#10;EN: What if one detail made all the difference?&#10;&#10;FR: …&#10;EN: …"></textarea>
+				</details>
+				<?php submit_button(); ?>
 			</form>
+			<script>
+			( function () {
+				var add = document.querySelector( '[data-dpk-fix-add]' );
+				var rows = document.querySelector( '[data-dpk-fix-rows]' );
+				if ( ! add || ! rows ) { return; }
+				add.addEventListener( 'click', function () {
+					var last = rows.lastElementChild;
+					var row = last.cloneNode( true );
+					var n = parseInt( rows.getAttribute( 'data-next' ), 10 );
+					rows.setAttribute( 'data-next', n + 1 );
+					row.querySelectorAll( 'textarea, input' ).forEach( function ( f ) {
+						f.name = f.name.replace( /\[fixes\]\[\d+\]/, '[fixes][' + n + ']' );
+						if ( 'checkbox' === f.type ) { f.checked = false; } else { f.value = ''; }
+					} );
+					rows.appendChild( row );
+					row.querySelector( 'textarea' ).focus();
+				} );
+			} )();
+			</script>
 		</div>
 		<?php
 	}

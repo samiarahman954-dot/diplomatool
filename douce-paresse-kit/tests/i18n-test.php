@@ -6,6 +6,9 @@
 define( 'ABSPATH', __DIR__ . '/' );
 function add_action() {}
 function add_filter() {}
+function wp_strip_all_tags( $s ) { return strip_tags( $s ); }
+function sanitize_text_field( $s ) { return trim( strip_tags( $s ) ); }
+function wp_kses( $s, $allowed ) { return strip_tags( $s, '<' . implode( '><', array_keys( $allowed ) ) . '>' ); }
 require dirname( __DIR__ ) . '/includes/class-i18n.php';
 
 $fails = 0;
@@ -77,6 +80,29 @@ $big = '<html><body>' . str_repeat( '<div class="a" data-s=\'{"x":1}\'><p>Texte 
 $t0  = microtime( true );
 $res = $p( $big );
 check( 'large page (' . round( strlen( $big ) / 1048576, 1 ) . ' MB) processed in ' . round( ( microtime( true ) - $t0 ) * 1000 ) . ' ms', 20000 === substr_count( $res, 'data-dpk-brand' ) );
+
+echo "English corrections\n";
+$rows = DPK\I18n::parse_bulk( "FR: Et si un détail faisait toute la différence ?\nEN: What if one detail\nmade all the difference?\n\nfr : La Maison\nEn: The House\nstray line\nEN:\nFR: Sans anglais" );
+check( 'bulk: blocks, multi-line, any case', array(
+	array( 'fr' => 'Et si un détail faisait toute la différence ?', 'en' => 'What if one detail made all the difference?' ),
+	array( 'fr' => 'La Maison', 'en' => '' ),
+	array( 'fr' => 'Sans anglais', 'en' => '' ),
+) === $rows, json_encode( $rows ) );
+$i18n = ( new ReflectionClass( 'DPK\I18n' ) )->newInstanceWithoutConstructor();
+$saved = $i18n->sanitize( array(
+	'fixes'      => array(
+		array( 'fr' => '  La   <b>Maison</b> ', 'en' => 'The <strong>House</strong><script>x()</script>' ),
+		array( 'fr' => 'Supprimer', 'en' => 'Delete me', 'delete' => '1' ),
+		array( 'fr' => '', 'en' => 'no French' ),
+	),
+	'fixes_bulk' => "FR: la maison\nEN: Our House\nFR: Accueil\nEN: Home",
+) );
+check( 'saved: cleaned, deleted / empty rows dropped, bulk updates an existing French text', array(
+	array( 'fr' => 'la maison', 'en' => 'Our House' ),
+	array( 'fr' => 'Accueil', 'en' => 'Home' ),
+) === $saved['fixes'], json_encode( $saved['fixes'] ) );
+$saved = $i18n->sanitize( array( 'fixes' => array( array( 'fr' => 'La Maison', 'en' => 'The <strong>House</strong><script>x()</script><img src=x>' ) ) ) );
+check( 'English keeps <strong>, drops script / img', 'The <strong>House</strong>x()' === $saved['fixes'][0]['en'], $saved['fixes'][0]['en'] );
 
 echo $fails ? "\n$fails FAILURE(S)\n" : "\nALL OK\n";
 exit( $fails ? 1 : 0 );

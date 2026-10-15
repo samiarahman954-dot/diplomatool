@@ -475,6 +475,126 @@
 				btns[j].setAttribute('aria-pressed', sameLang(cur, btns[j].getAttribute('data-dpk-lang')) ? 'true' : 'false');
 			}
 		}
+		syncFixes();
+	}
+
+	/* English corrections (Douce Paresse → Languages): the passages listed there are marked "notranslate"
+	   before GTranslate runs, so its machine translation never touches them, and while the visitor reads
+	   in English they show the corrected English instead of the French. Matched on the French text. */
+	var FIX_SKIP = /^(SCRIPT|STYLE|NOSCRIPT|TEXTAREA|TEMPLATE|SVG|IFRAME|SELECT|OPTION|TITLE)$/;
+	var fixState = { total: 0, found: [], spots: [] };
+
+	function fold(raw, withMap) {
+		var out = '';
+		var map = [];
+		var space = false;
+		for (var i = 0; i < raw.length; i++) {
+			var c = raw.charAt(i);
+			if (/[\s   ]/.test(c)) {
+				if (out && !space) { out += ' '; map.push(i); }
+				space = true;
+				continue;
+			}
+			space = false;
+			if (/[’‘ʼ`]/.test(c)) { c = "'"; } else if (/[“”«»]/.test(c)) { c = '"'; } else if (/[–—]/.test(c)) { c = '-'; } else if (c === '…') { c = '.'; }
+			var low = c.toLowerCase();
+			out += low.length === 1 ? low : c;
+			map.push(i);
+		}
+		if (out.charAt(out.length - 1) === ' ') { out = out.slice(0, -1); map.pop(); }
+		return withMap ? { text: out, map: map } : out;
+	}
+
+	function fixSkipped(el) {
+		for (; el && el !== document.body; el = el.parentElement) {
+			if (FIX_SKIP.test(el.tagName.toUpperCase()) || el.id === 'wpadminbar' || el.hasAttribute('data-dpk-fix') || el.hasAttribute('data-dpk-lang-switch') || el.hasAttribute('data-dpk-debug')) { return true; }
+		}
+		return false;
+	}
+
+	// Text of an element with line breaks and block edges as spaces ("Ligne 1<br>Ligne 2" → "Ligne 1 Ligne 2").
+	function plainText(el) {
+		var out = '';
+		var w = document.createTreeWalker(el, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+		for (var n = w.nextNode(); n; n = w.nextNode()) {
+			if (n.nodeType === 3) { out += n.nodeValue; } else if (/^(BR|P|DIV|LI|H[1-6])$/.test(n.tagName)) { out += ' '; }
+		}
+		return out;
+	}
+
+	function markFix(el, index) {
+		el.setAttribute('data-dpk-fix', index);
+		el.classList.add('notranslate');
+		el.setAttribute('translate', 'no');
+		fixState.spots.push({ el: el, index: index, original: null });
+		if (fixState.found.indexOf(index) < 0) { fixState.found.push(index); }
+	}
+
+	function prepareFixes() {
+		var list = cfg.fixes || [];
+		if (!list.length || !document.body || inEditor()) { return; }
+		fixState.total = list.length;
+		var keys = list.map(function (f) { return fold(f.fr || ''); });
+		var longest = Math.max.apply(null, keys.map(function (k) { return k.length; }));
+		// 1. Elements whose whole text is the passage (innermost one), so links / bold inside are replaced as a block.
+		var all = document.body.getElementsByTagName('*');
+		var hits = [];
+		for (var i = 0; i < all.length; i++) {
+			var el = all[i];
+			var raw = el.textContent;
+			if (!raw || raw.length > longest * 2 + 40) { continue; }
+			var k = keys.indexOf(fold(plainText(el)));
+			if (k > -1 && keys[k] && !fixSkipped(el)) { hits.push({ el: el, index: k }); }
+		}
+		hits.forEach(function (h) {
+			var inner = hits.some(function (o) { return o !== h && o.index === h.index && h.el.contains(o.el); });
+			if (!inner && !fixSkipped(h.el)) { markFix(h.el, h.index); }
+		});
+		// 2. A sentence inside a longer text: wrapped in its own span.
+		var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+		var nodes = [];
+		for (var n = walker.nextNode(); n; n = walker.nextNode()) { nodes.push(n); }
+		for (var x = 0; x < nodes.length; x++) { // Grows while splitting: the rest of a text node is searched too.
+			var node = nodes[x];
+			if (!node.parentElement || fixSkipped(node.parentElement)) { continue; }
+			var f = fold(node.nodeValue, true);
+			for (var j = 0; j < keys.length; j++) {
+				var at = keys[j] ? f.text.indexOf(keys[j]) : -1;
+				if (at < 0) { continue; }
+				var start = f.map[at];
+				var end = f.map[at + keys[j].length - 1] + 1;
+				var mid = start ? node.splitText(start) : node;
+				var rest = mid.splitText(end - start);
+				var span = document.createElement('span');
+				mid.parentNode.insertBefore(span, mid);
+				span.appendChild(mid);
+				markFix(span, j);
+				if (rest.nodeValue) { nodes.push(rest); }
+				if (start) { nodes.push(node); }
+				break;
+			}
+		}
+		window.__dpkKit = window.__dpkKit || {};
+		window.__dpkKit.fixes = fixState;
+		syncFixes();
+	}
+
+	function syncFixes() {
+		if (!fixState.spots.length) { return; }
+		var src = sourceLang();
+		var cur = currentLang();
+		var english = !sameLang(cur, src) && sameLang(cur, 'en');
+		fixState.spots.forEach(function (s) {
+			if (english && !s.original) {
+				s.original = document.createDocumentFragment();
+				while (s.el.firstChild) { s.original.appendChild(s.el.firstChild); }
+				s.el.innerHTML = cfg.fixes[s.index].en;
+			} else if (!english && s.original) {
+				s.el.innerHTML = '';
+				s.el.appendChild(s.original);
+				s.original = null;
+			}
+		});
 	}
 
 	function gtWidgetOnPage() {
@@ -603,6 +723,7 @@
 
 	window.addEventListener('storage', function (e) { if (e.key === GT_STORE) { markLang(); } }); // Other tabs.
 	cleanLegacy();
+	prepareFixes(); // Now, before GTranslate's library (loaded later, async) translates the page.
 
 	/* WordPress admin bar (logged-in users): fixed above 600px, but it scrolls away on smaller screens.
 	   Publish the height it really covers so the fixed header (and the mobile menu) sit right under it. */
@@ -626,7 +747,7 @@
 	window.addEventListener('load', followStoredLang); // After GTranslate's deferred widget script.
 
 	if (document.readyState === 'loading') {
-		document.addEventListener('DOMContentLoaded', function () { keepHeaderFixed(); adminBarOffset(); markActive(); markLang(); keepBrandInTitle(); initForms(); });
+		document.addEventListener('DOMContentLoaded', function () { prepareFixes(); keepHeaderFixed(); adminBarOffset(); markActive(); markLang(); keepBrandInTitle(); initForms(); });
 	} else {
 		keepHeaderFixed();
 		adminBarOffset();
