@@ -7,6 +7,8 @@ define( 'ABSPATH', __DIR__ . '/' );
 function add_action() {}
 function add_filter() {}
 function wp_strip_all_tags( $s ) { return strip_tags( $s ); }
+function get_option( $k, $d = false ) { return 'dpk_i18n' === $k ? ( $GLOBALS['OPT'] ?? $d ) : $d; }
+function wp_parse_args( $a, $d ) { return array_merge( $d, (array) $a ); }
 function sanitize_text_field( $s ) { return trim( strip_tags( $s ) ); }
 function wp_kses( $s, $allowed ) { return strip_tags( $s, '<' . implode( '><', array_keys( $allowed ) ) . '>' ); }
 require dirname( __DIR__ ) . '/includes/class-i18n.php';
@@ -103,6 +105,17 @@ check( 'saved: cleaned, deleted / empty rows dropped, bulk updates an existing F
 ) === $saved['fixes'], json_encode( $saved['fixes'] ) );
 $saved = $i18n->sanitize( array( 'fixes' => array( array( 'fr' => 'La Maison', 'en' => 'The <strong>House</strong><script>x()</script><img src=x>' ) ) ) );
 check( 'English keeps <strong>, drops script / img', 'The <strong>House</strong>x()' === $saved['fixes'][0]['en'], $saved['fixes'][0]['en'] );
+
+$kit = DPK\I18n::kit_fixes();
+check( 'kit corrections file: ' . count( $kit ) . ' complete rows, no duplicate French', count( $kit ) > 60 && count( $kit ) === count( array_unique( array_map( function ( $f ) { return mb_strtolower( $f['fr'] ); }, $kit ) ) ) && ! array_filter( $kit, function ( $f ) { return '' === $f['fr'] || '' === $f['en']; } ) );
+$GLOBALS['OPT'] = array();
+check( 'by default the kit corrections are used', count( $kit ) === count( DPK\I18n::fixes() ) );
+$GLOBALS['OPT'] = array( 'fixes' => array( array( 'fr' => 'la  maison', 'en' => 'Our House' ), array( 'fr' => 'Bonjour', 'en' => 'Hello' ) ) );
+$f = DPK\I18n::fixes();
+$maison = array_values( array_filter( $f, function ( $r ) { return 'la maison' === mb_strtolower( preg_replace( '/\s+/', ' ', $r['fr'] ) ); } ) );
+check( 'a site row overrides the kit row for the same French text, new rows added', count( $kit ) + 1 === count( $f ) && 1 === count( $maison ) && 'Our House' === $maison[0]['en'] );
+$GLOBALS['OPT'] = array( 'kit_fixes' => '', 'fixes' => array( array( 'fr' => 'Bonjour', 'en' => 'Hello' ) ) );
+check( 'kit corrections can be switched off', array( array( 'fr' => 'Bonjour', 'en' => 'Hello' ) ) === DPK\I18n::fixes() );
 
 echo $fails ? "\n$fails FAILURE(S)\n" : "\nALL OK\n";
 exit( $fails ? 1 : 0 );

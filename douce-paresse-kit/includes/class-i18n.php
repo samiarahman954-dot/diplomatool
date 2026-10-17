@@ -40,7 +40,8 @@ final class I18n {
 		return array(
 			'protect' => 'yes',
 			'terms'   => 'Douce Paresse',
-			'fixes'   => array(),
+			'fixes'     => array(),
+			'kit_fixes' => 'yes',
 		);
 	}
 
@@ -59,17 +60,31 @@ final class I18n {
 		);
 	}
 
-	/** English corrections for the front end: [ { fr, en } ], complete rows only. */
-	public static function fixes() {
-		$o = self::get();
-		return array_values(
-			array_filter(
-				(array) $o['fixes'],
-				function ( $f ) {
-					return is_array( $f ) && '' !== trim( (string) ( $f['fr'] ?? '' ) ) && '' !== trim( (string) ( $f['en'] ?? '' ) );
-				}
-			)
+	/** English corrections shipped with the kit (demo/en-corrections.php): [ { fr, en } ]. */
+	public static function kit_fixes() {
+		$file = defined( 'DPK_PATH' ) ? DPK_PATH . 'demo/en-corrections.php' : dirname( __DIR__ ) . '/demo/en-corrections.php';
+		$rows = is_readable( $file ) ? include $file : array();
+		return array_map(
+			function ( $r ) {
+				return array( 'fr' => $r[0], 'en' => $r[1] );
+			},
+			is_array( $rows ) ? $rows : array()
 		);
+	}
+
+	/**
+	 * English corrections for the front end: [ { fr, en } ], complete rows only.
+	 * The kit's list (unless switched off) + the site's own rows; a site row for the same French text wins.
+	 */
+	public static function fixes() {
+		$o    = self::get();
+		$rows = array();
+		foreach ( array_merge( 'yes' === $o['kit_fixes'] ? self::kit_fixes() : array(), (array) $o['fixes'] ) as $f ) {
+			if ( is_array( $f ) && '' !== trim( (string) ( $f['fr'] ?? '' ) ) && '' !== trim( (string) ( $f['en'] ?? '' ) ) ) {
+				$rows[ mb_strtolower( trim( preg_replace( '/\s+/u', ' ', $f['fr'] ) ) ) ] = array( 'fr' => $f['fr'], 'en' => $f['en'] );
+			}
+		}
+		return array_values( $rows );
 	}
 
 	/**
@@ -336,9 +351,10 @@ final class I18n {
 			$fixes[]      = $row;
 		}
 		return array(
-			'protect' => empty( $in['protect'] ) ? '' : 'yes',
-			'terms'   => implode( "\n", array_slice( array_filter( array_map( 'sanitize_text_field', preg_split( '/\r\n|\r|\n/', (string) ( $in['terms'] ?? '' ) ) ) ), 0, 50 ) ),
-			'fixes'   => array_slice( $fixes, 0, self::MAX_FIXES ),
+			'protect'   => empty( $in['protect'] ) ? '' : 'yes',
+			'terms'     => implode( "\n", array_slice( array_filter( array_map( 'sanitize_text_field', preg_split( '/\r\n|\r|\n/', (string) ( $in['terms'] ?? '' ) ) ) ), 0, 50 ) ),
+			'fixes'     => array_slice( $fixes, 0, self::MAX_FIXES ),
+			'kit_fixes' => empty( $in['kit_fixes'] ) ? '' : 'yes',
 		);
 	}
 
@@ -403,6 +419,28 @@ final class I18n {
 					<li><?php esc_html_e( 'If you later change that French text on the page, change it here too (otherwise GTranslate translates the new text again).', 'douce-paresse-kit' ); ?></li>
 					<li><?php esc_html_e( 'English: plain text; <strong>, <em>, <br> and links are allowed. Clear your cache after a change.', 'douce-paresse-kit' ); ?></li>
 				</ul>
+				<?php $kit = self::kit_fixes(); ?>
+				<p><label><input type="checkbox" name="<?php echo esc_attr( self::OPTION ); ?>[kit_fixes]" value="yes" <?php checked( 'yes', $o['kit_fixes'] ); ?>>
+					<?php
+					/* translators: %d: number of corrections */
+					echo esc_html( sprintf( __( 'Use the English corrections supplied with the kit (%d passages, from the Douce Paresse corrections document)', 'douce-paresse-kit' ), count( $kit ) ) );
+					?>
+				</label></p>
+				<?php if ( $kit ) : ?>
+				<details>
+					<summary><?php esc_html_e( 'See the kit corrections', 'douce-paresse-kit' ); ?></summary>
+					<p class="description"><?php esc_html_e( 'To change one, add a row below with the same French text and your English: your row wins.', 'douce-paresse-kit' ); ?></p>
+					<table class="widefat striped">
+						<thead><tr><th style="width:50%"><?php esc_html_e( 'French text on the site', 'douce-paresse-kit' ); ?></th><th><?php esc_html_e( 'Correct English', 'douce-paresse-kit' ); ?></th></tr></thead>
+						<tbody>
+						<?php foreach ( $kit as $f ) : ?>
+							<tr><td><?php echo esc_html( $f['fr'] ); ?></td><td><?php echo esc_html( $f['en'] ); ?></td></tr>
+						<?php endforeach; ?>
+						</tbody>
+					</table>
+				</details>
+				<?php endif; ?>
+				<h3><?php esc_html_e( 'Your own corrections', 'douce-paresse-kit' ); ?></h3>
 				<?php $fixes = array_values( (array) $o['fixes'] ); ?>
 				<table class="widefat striped dpk-fixes">
 					<thead><tr><th style="width:45%"><?php esc_html_e( 'French text on the site', 'douce-paresse-kit' ); ?></th><th style="width:45%"><?php esc_html_e( 'Correct English', 'douce-paresse-kit' ); ?></th><th><?php esc_html_e( 'Delete', 'douce-paresse-kit' ); ?></th></tr></thead>

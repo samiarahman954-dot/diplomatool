@@ -481,7 +481,7 @@
 	/* English corrections (Douce Paresse → Languages): the passages listed there are marked "notranslate"
 	   before GTranslate runs, so its machine translation never touches them, and while the visitor reads
 	   in English they show the corrected English instead of the French. Matched on the French text. */
-	var FIX_SKIP = /^(SCRIPT|STYLE|NOSCRIPT|TEXTAREA|TEMPLATE|SVG|IFRAME|SELECT|OPTION|TITLE)$/;
+	var FIX_SKIP = /^(SCRIPT|STYLE|NOSCRIPT|TEXTAREA|TEMPLATE|SVG|IFRAME|TITLE)$/;
 	var fixState = { total: 0, found: [], spots: [] };
 
 	function fold(raw, withMap) {
@@ -512,12 +512,21 @@
 		return false;
 	}
 
-	// Text of an element with line breaks and block edges as spaces ("Ligne 1<br>Ligne 2" → "Ligne 1 Ligne 2").
-	function plainText(el) {
+	// Text of an element, line breaks and block edges as spaces ("Ligne 1<br>Ligne 2" → "Ligne 1 Ligne 2").
+	// With nodes: the text nodes and where each starts (passages already corrected are left out).
+	function plainText(el, nodes) {
 		var out = '';
 		var w = document.createTreeWalker(el, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
 		for (var n = w.nextNode(); n; n = w.nextNode()) {
-			if (n.nodeType === 3) { out += n.nodeValue; } else if (/^(BR|P|DIV|LI|H[1-6])$/.test(n.tagName)) { out += ' '; }
+			if (n.nodeType === 3) {
+				if (nodes) {
+					if (fixSkipped(n.parentElement)) { out += ' '; continue; }
+					nodes.push({ node: n, at: out.length });
+				}
+				out += n.nodeValue;
+			} else if (/^(BR|P|DIV|LI|H[1-6]|OPTION)$/.test(n.tagName)) {
+				out += ' ';
+			}
 		}
 		return out;
 	}
@@ -530,50 +539,85 @@
 		if (fixState.found.indexOf(index) < 0) { fixState.found.push(index); }
 	}
 
+	// A passage inside a longer text, never in the middle of a word or phrase ("Nom" is not corrected inside
+	// "Nombre de chambres", nor "Le Premier Geste" inside "Le premier geste de Douce Paresse"). It may start
+	// after a sentence end or another element ("<strong>Les tasses</strong> ornées de …") and end before
+	// punctuation, a symbol or the next sentence. Short passages (1–2 words) only next to symbols ("Nom *").
+	function partEdges(t, at, key, tagBefore, tagAfter) {
+		var before = t.slice(0, at);
+		var after = t.slice(at + key.length);
+		var word = /[\p{L}\p{N}']/u;
+		if (word.test(before.slice(-1)) || word.test(after.charAt(0))) { return false; }
+		var prev = before.replace(/ $/, '').slice(-1);
+		var next = after.replace(/^ /, '').charAt(0);
+		if (key.split(' ').length >= 3) {
+			return (!prev || tagBefore || !word.test(prev)) && (!next || tagAfter || /[.!?:\u2026]$/.test(key) || !word.test(next));
+		}
+		return !/[\p{L}\p{N}]/u.test(before + after);
+	}
+
+	// The passage starts / ends right at an element edge (nothing but spaces between).
+	function atTag(node, off, end) {
+		var v = node.nodeValue;
+		if ((end ? v.slice(off) : v.slice(0, off)).trim()) { return false; }
+		var sib = end ? node.nextSibling : node.previousSibling;
+		return !!sib && sib.nodeType === 1 && !sib.hasAttribute('data-dpk-brand');
+	}
+
+	function wrapPart(el, key, index) {
+		var nodes = [];
+		var raw = plainText(el, nodes);
+		var f = fold(raw, true);
+		var at = f.text.indexOf(key);
+		if (at < 0) { return false; }
+		var locate = function (pos) {
+			for (var i = nodes.length - 1; i >= 0; i--) {
+				if (pos >= nodes[i].at) { return pos - nodes[i].at <= nodes[i].node.nodeValue.length ? { node: nodes[i].node, off: pos - nodes[i].at } : null; }
+			}
+			return null;
+		};
+		var a = locate(f.map[at]);
+		var b = locate(f.map[at + key.length - 1] + 1);
+		if (!a || !b || !partEdges(f.text, at, key, atTag(a.node, a.off, false), atTag(b.node, b.off, true))) { return false; }
+		var range = document.createRange();
+		range.setStart(a.node, a.off);
+		range.setEnd(b.node, b.off);
+		var span = document.createElement('span');
+		span.appendChild(range.extractContents());
+		range.insertNode(span);
+		markFix(span, index);
+		return true;
+	}
+
 	function prepareFixes() {
 		var list = cfg.fixes || [];
 		if (!list.length || !document.body || inEditor()) { return; }
 		fixState.total = list.length;
 		var keys = list.map(function (f) { return fold(f.fr || ''); });
 		var longest = Math.max.apply(null, keys.map(function (k) { return k.length; }));
-		// 1. Elements whose whole text is the passage (innermost one), so links / bold inside are replaced as a block.
+		var cands = [];
 		var all = document.body.getElementsByTagName('*');
-		var hits = [];
 		for (var i = 0; i < all.length; i++) {
-			var el = all[i];
-			var raw = el.textContent;
-			if (!raw || raw.length > longest * 2 + 40) { continue; }
-			var k = keys.indexOf(fold(plainText(el)));
-			if (k > -1 && keys[k] && !fixSkipped(el)) { hits.push({ el: el, index: k }); }
-		}
-		hits.forEach(function (h) {
-			var inner = hits.some(function (o) { return o !== h && o.index === h.index && h.el.contains(o.el); });
-			if (!inner && !fixSkipped(h.el)) { markFix(h.el, h.index); }
-		});
-		// 2. A sentence inside a longer text: wrapped in its own span.
-		var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-		var nodes = [];
-		for (var n = walker.nextNode(); n; n = walker.nextNode()) { nodes.push(n); }
-		for (var x = 0; x < nodes.length; x++) { // Grows while splitting: the rest of a text node is searched too.
-			var node = nodes[x];
-			if (!node.parentElement || fixSkipped(node.parentElement)) { continue; }
-			var f = fold(node.nodeValue, true);
-			for (var j = 0; j < keys.length; j++) {
-				var at = keys[j] ? f.text.indexOf(keys[j]) : -1;
-				if (at < 0) { continue; }
-				var start = f.map[at];
-				var end = f.map[at + keys[j].length - 1] + 1;
-				var mid = start ? node.splitText(start) : node;
-				var rest = mid.splitText(end - start);
-				var span = document.createElement('span');
-				mid.parentNode.insertBefore(span, mid);
-				span.appendChild(mid);
-				markFix(span, j);
-				if (rest.nodeValue) { nodes.push(rest); }
-				if (start) { nodes.push(node); }
-				break;
+			var raw = all[i].textContent;
+			if (raw && raw.length <= Math.max(longest * 2 + 40, 3000) && !/^(SELECT|HTML|BODY)$/.test(all[i].tagName) && !fixSkipped(all[i])) {
+				cands.push({ el: all[i], text: fold(plainText(all[i])) });
 			}
 		}
+		// Longest passages first: a paragraph listed as a whole wins over one of its sentences listed too.
+		var order = keys.map(function (k, j) { return j; }).sort(function (x, y) { return keys[y].length - keys[x].length; });
+		order.forEach(function (j) {
+			var key = keys[j];
+			if (!key) { return; }
+			var hits = cands.filter(function (c) { return c.text.indexOf(key) > -1 && !fixSkipped(c.el); });
+			hits.forEach(function (h) {
+				if (hits.some(function (o) { return o !== h && h.el.contains(o.el); })) { return; } // Innermost element only.
+				if (h.text === key && !h.el.querySelector('[data-dpk-fix]')) {
+					markFix(h.el, j); // The whole title / paragraph / button / option: replaced as a block.
+				} else if (h.el.tagName !== 'OPTION') {
+					while (wrapPart(h.el, key, j)) { /* every occurrence */ }
+				}
+			});
+		});
 		window.__dpkKit = window.__dpkKit || {};
 		window.__dpkKit.fixes = fixState;
 		syncFixes();
@@ -588,9 +632,15 @@
 			if (english && !s.original) {
 				s.original = document.createDocumentFragment();
 				while (s.el.firstChild) { s.original.appendChild(s.el.firstChild); }
-				s.el.innerHTML = cfg.fixes[s.index].en;
+				if (s.el.tagName === 'OPTION') {
+					var tmp = document.createElement('div');
+					tmp.innerHTML = cfg.fixes[s.index].en;
+					s.el.textContent = tmp.textContent;
+				} else {
+					s.el.innerHTML = cfg.fixes[s.index].en;
+				}
 			} else if (!english && s.original) {
-				s.el.innerHTML = '';
+				s.el.textContent = '';
 				s.el.appendChild(s.original);
 				s.original = null;
 			}
