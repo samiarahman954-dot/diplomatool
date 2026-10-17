@@ -481,35 +481,41 @@
 	/* English corrections (Douce Paresse → Languages): the passages listed there are marked "notranslate"
 	   before GTranslate runs, so its machine translation never touches them, and while the visitor reads
 	   in English they show the corrected English instead of the French. Matched on the French text. */
-	var FIX_SKIP = /^(SCRIPT|STYLE|NOSCRIPT|TEXTAREA|TEMPLATE|SVG|IFRAME|TITLE)$/;
-	var fixState = { total: 0, found: [], spots: [] };
+	var FIX_SKIP = 'script,style,noscript,textarea,template,svg,iframe,title,#wpadminbar,[data-dpk-fix],[data-dpk-lang-switch],[data-dpk-debug]';
+	var fixState = { total: 0, found: [], spots: [], last: null };
 
 	function fold(raw, withMap) {
+		if (!withMap) {
+			return raw.replace(/[\s\u00a0\u202f\u2009]+/g, ' ').replace(/^ | $/g, '').replace(/[\u2019\u2018\u02bc`]/g, "'").replace(/[\u201c\u201d\u00ab\u00bb]/g, '"').replace(/[\u2013\u2014]/g, '-').replace(/\u2026/g, '.').toLowerCase();
+		}
+		// Same text, plus where each character comes from in raw.
 		var out = '';
 		var map = [];
 		var space = false;
 		for (var i = 0; i < raw.length; i++) {
 			var c = raw.charAt(i);
-			if (/[\s   ]/.test(c)) {
+			if (/[\s\u00a0\u202f\u2009]/.test(c)) {
 				if (out && !space) { out += ' '; map.push(i); }
 				space = true;
 				continue;
 			}
 			space = false;
-			if (/[’‘ʼ`]/.test(c)) { c = "'"; } else if (/[“”«»]/.test(c)) { c = '"'; } else if (/[–—]/.test(c)) { c = '-'; } else if (c === '…') { c = '.'; }
-			var low = c.toLowerCase();
-			out += low.length === 1 ? low : c;
-			map.push(i);
+			if (/[\u2019\u2018\u02bc`]/.test(c)) { c = "'"; } else if (/[\u201c\u201d\u00ab\u00bb]/.test(c)) { c = '"'; } else if (/[\u2013\u2014]/.test(c)) { c = '-'; } else if (c === '\u2026') { c = '.'; }
+			c = c.toLowerCase();
+			out += c;
+			for (var k = 0; k < c.length; k++) { map.push(i); }
 		}
 		if (out.charAt(out.length - 1) === ' ') { out = out.slice(0, -1); map.pop(); }
-		return withMap ? { text: out, map: map } : out;
+		return { text: out, map: map };
 	}
 
 	function fixSkipped(el) {
-		for (; el && el !== document.body; el = el.parentElement) {
-			if (FIX_SKIP.test(el.tagName.toUpperCase()) || el.id === 'wpadminbar' || el.hasAttribute('data-dpk-fix') || el.hasAttribute('data-dpk-lang-switch') || el.hasAttribute('data-dpk-debug')) { return true; }
-		}
-		return false;
+		return !el || !el.closest || !!el.closest(FIX_SKIP);
+	}
+
+	// Quick comparison form (no spaces at all) to rule out most elements before the exact check.
+	function squash(raw) {
+		return raw.replace(/[\s\u00a0\u202f\u2009]+/g, '').replace(/[\u2019\u2018\u02bc`]/g, "'").replace(/[\u201c\u201d\u00ab\u00bb]/g, '"').replace(/[\u2013\u2014]/g, '-').replace(/\u2026/g, '.').toLowerCase();
 	}
 
 	// Text of an element, line breaks and block edges as spaces ("Ligne 1<br>Ligne 2" → "Ligne 1 Ligne 2").
@@ -589,28 +595,67 @@
 		return true;
 	}
 
+	// French visitors pay nothing: the passages are looked up only when the page is (or may soon be) in
+	// another language – stored choice, GTranslate's automatic browser-language switch, a click on EN – or in
+	// the debug panel. Paid plans serve /en/ pages already translated by GTranslate: not used there.
+	function fixesNeeded() {
+		if (paidMode()) { return false; }
+		var src = sourceLang();
+		var stored = storedLang();
+		// GTranslate's automatic switch (first visit, browser in another language) may translate any moment.
+		var auto = !!gtSettings().detect_browser_language && !sameLang(window.navigator.language || src, src);
+		return (!!stored && !sameLang(stored, src)) || auto || /[?&]dpk-debug=1/.test(window.location.search);
+	}
+
 	function prepareFixes() {
 		var list = cfg.fixes || [];
 		if (!list.length || !document.body || inEditor()) { return; }
 		fixState.total = list.length;
-		var keys = list.map(function (f) { return fold(f.fr || ''); });
-		var longest = Math.max.apply(null, keys.map(function (k) { return k.length; }));
-		var cands = [];
+		window.__dpkKit = window.__dpkKit || {};
+		window.__dpkKit.fixes = fixState;
 		var all = document.body.getElementsByTagName('*');
-		for (var i = 0; i < all.length; i++) {
-			var raw = all[i].textContent;
-			if (raw && raw.length <= Math.max(longest * 2 + 40, 3000) && !/^(SELECT|HTML|BODY)$/.test(all[i].tagName) && !fixSkipped(all[i])) {
-				cands.push({ el: all[i], text: fold(plainText(all[i])) });
-			}
+		// Second call (DOMContentLoaded): only what came after the first one, if anything with text did.
+		var from = fixState.last ? Array.prototype.indexOf.call(all, fixState.last) + 1 : 0;
+		fixState.last = all[all.length - 1];
+		if (from > 0) {
+			var added = false;
+			for (var m = from; m < all.length && !added; m++) { added = !/^(SCRIPT|STYLE|LINK|META|TEMPLATE|NOSCRIPT)$/.test(all[m].tagName) && !!all[m].textContent.trim(); }
+			if (!added) { return; }
 		}
+		var keys = list.map(function (f) { return fold(f.fr || ''); });
+		var quick = keys.map(squash);
+		// Only the passages present on this page (scripts left out: the list itself is in one).
+		var pageText = '';
+		for (var c = document.body.firstElementChild; c; c = c.nextElementSibling) {
+			if (!/^(SCRIPT|STYLE|TEMPLATE|NOSCRIPT)$/.test(c.tagName)) { pageText += c.textContent; }
+		}
+		pageText = squash(pageText);
 		// Longest passages first: a paragraph listed as a whole wins over one of its sentences listed too.
-		var order = keys.map(function (k, j) { return j; }).sort(function (x, y) { return keys[y].length - keys[x].length; });
-		order.forEach(function (j) {
+		var live = keys.map(function (k, j) { return j; })
+			.filter(function (j) { return keys[j] && pageText.indexOf(quick[j]) > -1; })
+			.sort(function (x, y) { return keys[y].length - keys[x].length; });
+		if (!live.length) { return; }
+		var longest = keys[live[0]].length;
+		var shortest = Math.min.apply(null, live.map(function (j) { return quick[j].length; }));
+		var cands = [];
+		var cap = Math.max(longest * 2 + 40, 3000);
+		for (var i = from; i < all.length; i++) {
+			var el = all[i];
+			var raw = el.textContent;
+			if (!raw || raw.length > cap || el.tagName === 'SELECT') { continue; }
+			// A wrapper around a single element with the same text (Elementor containers): its child is enough.
+			if (el.childElementCount === 1 && el.firstElementChild.textContent.length === raw.length) { continue; }
+			if (fixSkipped(el)) { continue; }
+			var q = squash(raw);
+			if (q.length >= shortest && live.some(function (j) { return q.indexOf(quick[j]) > -1; })) { cands.push({ el: el, quick: q, text: null }); }
+		}
+		live.forEach(function (j) {
 			var key = keys[j];
-			if (!key) { return; }
-			var hits = cands.filter(function (c) { return c.text.indexOf(key) > -1 && !fixSkipped(c.el); });
-			hits.forEach(function (h) {
-				if (hits.some(function (o) { return o !== h && h.el.contains(o.el); })) { return; } // Innermost element only.
+			var near = cands.filter(function (h) { return h.quick.indexOf(quick[j]) > -1 && !fixSkipped(h.el); });
+			// Innermost elements only (in document order, a descendant comes right after its ancestor).
+			near.filter(function (h, n) { return !(near[n + 1] && h.el.contains(near[n + 1].el)); }).forEach(function (h) {
+				if (h.text === null) { h.text = fold(plainText(h.el)); }
+				if (h.text.indexOf(key) < 0) { return; }
 				if (h.text === key && !h.el.querySelector('[data-dpk-fix]')) {
 					markFix(h.el, j); // The whole title / paragraph / button / option: replaced as a block.
 				} else if (h.el.tagName !== 'OPTION') {
@@ -618,8 +663,6 @@
 				}
 			});
 		});
-		window.__dpkKit = window.__dpkKit || {};
-		window.__dpkKit.fixes = fixState;
 		syncFixes();
 	}
 
@@ -638,6 +681,8 @@
 					s.el.textContent = tmp.textContent;
 				} else {
 					s.el.innerHTML = cfg.fixes[s.index].en;
+					// <em>, <strong>, links inside: marked too, whatever way the translator checks.
+					Array.prototype.forEach.call(s.el.querySelectorAll('*'), function (d) { d.classList.add('notranslate'); d.setAttribute('translate', 'no'); });
 				}
 			} else if (!english && s.original) {
 				s.el.textContent = '';
@@ -716,6 +761,7 @@
 			return;
 		}
 		pendingLang = { code: code, at: Date.now() };
+		if (!sameLang(code, src)) { prepareFixes(); } // Before GTranslate's library touches the page.
 		markLang();
 		gtTranslate(src, code); // Also for the original language: GTranslate restores it in place.
 		[800, 2000, 5000, 15500].forEach(function (ms) { setTimeout(markLang, ms); });
@@ -773,7 +819,7 @@
 
 	window.addEventListener('storage', function (e) { if (e.key === GT_STORE) { markLang(); } }); // Other tabs.
 	cleanLegacy();
-	prepareFixes(); // Now, before GTranslate's library (loaded later, async) translates the page.
+	if (fixesNeeded()) { prepareFixes(); } // Now, before GTranslate's library (loaded later, async) translates the page.
 
 	/* WordPress admin bar (logged-in users): fixed above 600px, but it scrolls away on smaller screens.
 	   Publish the height it really covers so the fixed header (and the mobile menu) sit right under it. */
@@ -797,7 +843,7 @@
 	window.addEventListener('load', followStoredLang); // After GTranslate's deferred widget script.
 
 	if (document.readyState === 'loading') {
-		document.addEventListener('DOMContentLoaded', function () { prepareFixes(); keepHeaderFixed(); adminBarOffset(); markActive(); markLang(); keepBrandInTitle(); initForms(); });
+		document.addEventListener('DOMContentLoaded', function () { if (fixesNeeded()) { prepareFixes(); } keepHeaderFixed(); adminBarOffset(); markActive(); markLang(); keepBrandInTitle(); initForms(); });
 	} else {
 		keepHeaderFixed();
 		adminBarOffset();

@@ -81,7 +81,7 @@ final class I18n {
 		$rows = array();
 		foreach ( array_merge( 'yes' === $o['kit_fixes'] ? self::kit_fixes() : array(), (array) $o['fixes'] ) as $f ) {
 			if ( is_array( $f ) && '' !== trim( (string) ( $f['fr'] ?? '' ) ) && '' !== trim( (string) ( $f['en'] ?? '' ) ) ) {
-				$rows[ mb_strtolower( trim( preg_replace( '/\s+/u', ' ', $f['fr'] ) ) ) ] = array( 'fr' => $f['fr'], 'en' => $f['en'] );
+				$rows[ self::lower( trim( preg_replace( '/\s+/u', ' ', $f['fr'] ) ) ) ] = array( 'fr' => $f['fr'], 'en' => $f['en'] );
 			}
 		}
 		return array_values( $rows );
@@ -114,6 +114,11 @@ final class I18n {
 			$rows[] = $cur;
 		}
 		return $rows;
+	}
+
+	/** Lower case without requiring the mbstring extension. */
+	private static function lower( $s ) {
+		return function_exists( 'mb_strtolower' ) ? mb_strtolower( $s, 'UTF-8' ) : strtolower( $s );
 	}
 
 	/** One row, cleaned. Null when the French text is empty. */
@@ -342,7 +347,7 @@ final class I18n {
 			if ( ! $row ) {
 				continue;
 			}
-			$key = mb_strtolower( $row['fr'] );
+			$key = self::lower( $row['fr'] );
 			if ( isset( $seen[ $key ] ) ) {
 				$fixes[ $seen[ $key ] ] = $row; // The same French text twice: the last English wins (bulk paste updates).
 				continue;
