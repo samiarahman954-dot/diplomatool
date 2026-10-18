@@ -8,6 +8,9 @@
 defined( 'ABSPATH' ) || exit;
 
 return array(
+	// Menu (header, mobile menu, footer) – also the title of the Coffret page.
+	array( 'Le Coffret Luxury', 'The Luxury Box' ),
+
 	// Accueil.
 	array( 'Le Premier Geste', 'The First Gesture' ),
 	array( 'Et si un détail faisait toute la différence ?', 'What if one detail made all the difference?' ),
