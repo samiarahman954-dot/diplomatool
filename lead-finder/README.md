@@ -1,0 +1,123 @@
+# Lead Finder
+
+Client khojar tool. Kono shohor ar business type dile (jemon "Austin er dentist") tool ta:
+
+1. Map (OpenStreetMap) theke oi business gulo khuje ber kore
+2. Protiti business er website check kore: site down, SSL nai, mobile-friendly na, slow,
+   purono WordPress, purono copyright year, SEO meta nai, analytics nai
+3. Jar website e beshi problem, take beshi score dey (0-100). **Beshi score = bhalo client.**
+4. Website theke ba contact page theke email ber kore
+5. Protiti business er jonno oder nijer problem diye **personalized email** likhe dey
+6. Shob kichu **HTML report** (browser e khulben) ar **CSV** (Excel / Google Sheets) e save kore
+
+Website nai kintu phone number ache, emon business o list e ashe. Era "website banano" kaj er client.
+Boro chain brand (McDonald's, Starbucks) baad dey, karon ora freelancer hire kore na.
+
+## Ki lagbe
+
+Shudhu **Python 3.8 ba notun**. Kono `pip install` lagbe na.
+
+- Windows: https://www.python.org/downloads/ theke install korun, install er somoy
+  "Add Python to PATH" tick diben.
+- Check: `python --version`
+
+## Kivabe chalaben
+
+`lead-finder` folder e terminal (Windows e Command Prompt) khulun.
+
+### 1. Shohor + business type diye khojen
+
+```
+python lead_finder.py search --city "Austin, Texas, USA" --category dentist --your-name "Rahim Uddin" --your-site "https://rahim.dev"
+```
+
+Kaj shesh hole `leads/dentist_austin-texas-usa.html` file ta browser e khulun.
+Protiti lead e **Email draft** e click korle email ta dekhben. **Copy email** ba
+**Open in mail app** button ache.
+
+Shob category dekhte:
+
+```
+python lead_finder.py categories
+```
+
+`dentist, lawyer, plumber, electrician, hvac, roofer, real_estate, restaurant, salon, gym,
+car_repair, accountant, veterinary, hotel` ityadi ache. List e na thakle OpenStreetMap tag
+diye khujte paren: `--tag shop=bicycle`
+
+### 2. Nijer jogar kora website list check korun
+
+Google Maps theke website gulo copy kore ekta `sites.txt` file e rakhun, protiti line e ekta:
+
+```
+Smile Dental | https://smiledental.com
+Bob's Plumbing | bobsplumbing.co.uk
+anotherbusiness.com
+```
+
+Tarpor:
+
+```
+python lead_finder.py audit --input sites.txt --city "Austin" --category-label "dentists" --your-name "Rahim Uddin"
+```
+
+`name, website, phone, email` column wala CSV file o dite paren.
+
+## Kaje lage emon option
+
+| Option | Ki kore |
+|---|---|
+| `--min-score 40` | 40 er kom score er lead lukiye rakhe |
+| `--skip-no-website` | Jader website nai tader baad dey |
+| `--limit 300` | Koto gulo business khujbe (default 150) |
+| `--include-chains` | Boro brand o rakhe |
+| `--psi-key KEY` | Google PageSpeed er mobile speed score o yog kore (free key: https://developers.google.com/speed/docs/insights/v5/get-started). Proti site e 20-40 second beshi lagbe. |
+| `--contact-email you@mail.com` | OpenStreetMap er niyom onujayi nijer email din |
+| `--out folder/name` | Output kothay save hobe |
+
+Protibar naam likhte na chaile environment variable set korte paren:
+`LEAD_YOUR_NAME`, `LEAD_YOUR_SITE`, `LEAD_CONTACT_EMAIL`, `PSI_API_KEY`.
+
+## Score kivabe hoy
+
+| Problem | Point |
+|---|---|
+| Website down / khule na | 80 |
+| Website e nai (phone ache) | 70 |
+| SSL certificate nosto | 35 |
+| HTTPS nai ("Not Secure") | 30 |
+| Mobile-friendly na | 30 |
+| PageSpeed mobile score 50 er niche | 25 |
+| 3 second er beshi load time | 20 |
+| WordPress 6.0 er ager version | 20 |
+| Copyright 2 bochor ba ar beshi purono | 15 |
+| Purono jQuery | 10 |
+| Page title nai | 10 |
+| Meta description nai | 8 |
+| Analytics nai | 5 |
+
+**60+ = hot**, 30-59 = warm. Hot lead gulo age contact korun.
+
+## Bhalo result er tips
+
+- **Email pathanor age nije site ta ekbar khule dekhen.** Tool bhul korte pare (jemon kono site
+  JavaScript diye copyright year dekhay).
+- Draft ta hubohu pathaben na. 1 line nijer moto kore yog korun, jemon oder kono service er naam.
+- Hot lead e 2 minute er Loom video record kore link ta email e din. Reply onek beshi ase.
+- Din e 20-30 tar beshi email pathaben na, noile spam e chole jabe. Nijer domain er email
+  (jemon `rahim@rahim.dev`) use korun, Gmail na.
+- Keu "no" bolle ar pathaben na. Email er niche nijer naam, website thakbe. US, UK, EU er
+  anti-spam niyom (CAN-SPAM, GDPR) mene cholun.
+- Email na pele: phone korun, website er contact form use korun, ba LinkedIn e owner ke khujen.
+
+## Data source
+
+Business er list ase [OpenStreetMap](https://www.openstreetmap.org) theke (free, kono API key lage na).
+Boro shohore (US, UK, Europe, Australia) data bhalo. Kono jaygay kom business pele Google Maps theke
+website gulo copy kore `audit` mode use korun.
+
+## Test
+
+```
+python -m unittest test_lead_finder
+```
