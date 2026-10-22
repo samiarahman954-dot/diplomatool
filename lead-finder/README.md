@@ -17,55 +17,48 @@ Boro chain brand (McDonald's, Starbucks) baad dey, karon ora freelancer hire kor
 
 https://raw.githack.com/samiarahman954-dot/diplomatool/ccr-3bce4458-ck8crm/lead-finder/index.html
 
-Link ta khulun, list theke city (160+ shohor) ar business type (100+ dhoron) select korun. Select korlei
-search shuru hoy. List e na thakle "Other city" select kore nam likhun. Kono install lagbe na, phone eo chole.
-Website check hoy Google PageSpeed diye. Key chara Google alpo kichu check korte dey, tai ekta free
-[PageSpeed API key](https://developers.google.com/speed/docs/insights/v5/get-started#APIKey) niye
-"Your details & PageSpeed key" e ekbar boshiye din. Browser key ta mone rakhe, protibar dite hoy na.
-Key ta code e rakha hoy na, karon repo public: code e thakle je keu niye use korte parto.
+List theke city (160+ shohor) ar business type (100+ dhoron) select korun, search nijei shuru hoy.
+Kono install lagbe na, phone eo chole. **Settings** e shudhu duita jinish:
 
-### Client ke convince korar feature
+- **Google PageSpeed API key:** website speed test er jonno
+  ([free key](https://developers.google.com/speed/docs/insights/v5/get-started#APIKey)). Browser mone rakhe.
+- **Email signature (optional):** shob email ar report er shesh e boshe.
 
-- **Client report / Proposal:** protiti lead er card e button ache. Report e thake: A-F grade, 4 ta Google
-  score, phone e site er screenshot, second-by-second load howar chobi, problem gulo (ki khoti kore ar
-  kivabe thik korben), ek-i shohorer competitor der sathe tulona, speed details, apnar 3 ta package
-  (recommended ta highlight kora), guarantee ar contact. **Save as PDF** ba **Download HTML** kore pathan.
-  Website chara business er jonno "Proposal" ase: kon competitor der website ache, ar website e ki thakbe.
-- **Email sequence:** First email (free report offer, kono link/attachment chara), Follow-up (3 din pore),
-  Last follow-up (7 din pore), Send report (reply dile, PDF attach kore).
-- **Your details, prices:** naam, title, email, WhatsApp, portfolio, call booking link, package er dam ar
-  guarantee. Report ar email e eguloi boshe, browser mone rakhe.
+Dam, package ba guarantee tool e nai. Protiti client er dam alada, tai oigulo email e nijer moto likhben.
 
-### Redesign bikrir feature
+### Jader website ache: report pathan
 
-- **"Keno customer ashche na" checklist:** customer ana website e je 8 ta jinish thake (mobile, 3 second e
-  load, HTTPS, Call/Book button, tap-to-call, contact form, review, Google setup), tar kon gulo client er
-  site e nai, ✓/✗ diye dekhay. Report er prothom page ei ta: "Your website isn't turning visitors into
-  customers".
-- **Site er content pora:** website check er por tool client er site theke heading, description, about
-  text, logo, chobi, email, brand color ar copyright year pore. Browser shorasori onno site porte dey na,
-  tai public proxy (allorigins, corsproxy, r.jina.ai) diye pore. Kaj na korle industry er default lekha
-  use hoy.
-- **Claude redesign:** card er **Redesign with Claude** button e Claude (Claude Opus 5.5) client er jonno
-  notun homepage design kore. Template na: Claude dekhe client er current site er pura screenshot, site er
-  lekha, chobi, logo, brand color, map er tottho (phone, address, opening hours) ar test e pawa problem,
-  tarpor oder nijer content diye ekdom notun page likhe. Nokol review, award, dam ityadi banay na; ja nai
-  ta [bracket] e placeholder hishebe rakhe. "Extra instructions" e nijer kotha likhte paren (jemon "premium
-  feel"). **Download homepage** e alada HTML file paben.
-  - Ekta **Claude API key** lage (https://console.anthropic.com/settings/keys). Key ta "Your details" ba
-    design screen e ekbar din, browser mone rakhe, shorasori Anthropic e jay.
-  - Protiti design apnar Anthropic account theke ~$0.20-0.50 khoroch hoy, 1-3 minute lage.
-  - Design ta browser e save thake (protiti business er jonno), page bondho korleo hariye jay na.
-  - Anthropic er official SDK (`vendor/anthropic-sdk-0.132.0.js`, MIT) repo te bundle kora, alada kichu
-    install lagbe na.
-- Report e **Now bonam After the redesign** (phone ar desktop) thake. PDF e eta nijer page e ase.
-- Prothom email e free report + free homepage design offer kora hoy.
+1. Tool site ta check kore: speed, mobile, security, Google, ar design er problem (chobi stretch/blurry,
+   lekha porte koshto, page laaphay, purono copyright), sathe customer ana jinish gulo (Call/Book button,
+   tap-to-call, form, review).
+2. **Email** > "First email": 3 ta ashol problem + free report er offer (link/attachment chara).
+3. Reply dile **Report** > **Save as PDF**, "Send report" email er sathe pathan. Report e thake:
+   - "Why your website isn't bringing in more customers" (8 ta jinish er ✓/✗)
+   - phone e site er screenshot ar load howar chobi, 4 ta Google score
+   - problem gulo bhag kore: Design, Customer ana, Speed, Security, Google; protitar khoti ar shomadhan
+   - **"Why we recommend a redesign"**: keno chhoto chhoto fix na kore redesign dorkar
+   - competitor er sathe tulona, speed details
+   - shesh e: "interested hole ami free sample redesign dekhate pari"
+4. Client "yes" bolle **Redesign prompt**: screenshot download korun, prompt copy kore
+   [Claude](https://claude.ai/new) e paste korun, screenshot attach korun. Prompt e oder site er pura lekha,
+   chobi, logo, brand color, map er tottho ar shob problem thake. Claude shesh e "main changes" er list dey,
+   seta "Send sample redesign" email e boshan.
+
+### Jader website nai: design pathan
+
+1. **Website prompt** copy kore Claude e paste korun. Prompt e business er naam, dhoron, shohor, address,
+   phone, opening hours thake. Claude nokol review/award banay na, [bracket] e placeholder rakhe.
+2. **Email** > "First email": free website design er offer.
+3. Reply dile design er screenshot ba link "Send design" email e pathan.
+
+### Follow-up mone rakha
+
+Protiti card e **Status** ache: Not contacted, Emailed, Followed up, Replied, Sample sent, Client,
+Not interested. "Emailed" er 3 din por card upore chole ashe ar "follow-up due" dekhay. **Follow-up due**
+filter e shob ek sathe paben. Status ei browser e save thake, CSV te o ase.
 
 Screenshot gulo browser e save hoy na (onek boro). Page bondho kore abar khulle report e
-**Re-check for screenshots** chapun.
-
-Web version copyright year, WordPress version ar website theke email khujte pare na (browser er
-security niyom er karone). Eguloo lagle niche Python version chalan.
+**Re-check for screenshots**, ba prompt e **Take screenshot** chapun.
 
 ## Python version: ki lagbe
 
