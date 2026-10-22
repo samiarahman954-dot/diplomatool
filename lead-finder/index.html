@@ -127,7 +127,9 @@ footer { margin-top: 24px; color: var(--muted); font-size: 12px; }
     <form class="rail" id="form" autocomplete="on">
       <div class="field">
         <label for="city">City</label>
-        <input type="text" id="city" placeholder="Austin, Texas, USA" required>
+        <select id="city"></select>
+        <input type="text" id="cityOther" placeholder="Type a city, e.g. Boise, Idaho, USA" aria-label="Other city" hidden>
+        <p class="hint">Pick a city or business type and the search starts by itself.</p>
       </div>
       <div class="field">
         <label for="category">Business type</label>
@@ -159,9 +161,9 @@ footer { margin-top: 24px; color: var(--muted); font-size: 12px; }
           </div>
           <div class="field">
             <label for="psiKey">Google PageSpeed API key</label>
-            <input type="password" id="psiKey" placeholder="Optional, but strongly recommended">
-            <p class="hint">Without a key Google allows only a few checks. A free key takes 2 minutes:
-              <a href="https://developers.google.com/speed/docs/insights/v5/get-started#APIKey" target="_blank" rel="noopener">get one here</a>. It stays in this browser only.</p>
+            <input type="password" id="psiKey" placeholder="Paste your key once">
+            <p class="hint">Paste it once and this browser remembers it. Without a key Google allows only a few checks:
+              <a href="https://developers.google.com/speed/docs/insights/v5/get-started#APIKey" target="_blank" rel="noopener">get a free key</a>. The key never leaves your browser except to Google.</p>
           </div>
         </div>
       </details>
@@ -170,7 +172,7 @@ footer { margin-top: 24px; color: var(--muted); font-size: 12px; }
     <div style="min-width:0">
       <div class="status">
         <div class="status-line">
-          <p class="status-msg" id="statusMsg" aria-live="polite">Enter a city and a business type, then press Find leads.</p>
+          <p class="status-msg" id="statusMsg" aria-live="polite">Pick a city and a business type to start.</p>
           <button type="button" class="ghost small" id="stopBtn" hidden>Stop checking</button>
         </div>
         <div class="bar" id="bar" hidden><i></i></div>
@@ -199,7 +201,7 @@ footer { margin-top: 24px; color: var(--muted); font-size: 12px; }
     <section>
       <h2>Kivabe use korben</h2>
       <ol>
-        <li>City ar business type din, <b>Find leads</b> chapun.</li>
+        <li>List theke city ar business type select korun. Select korlei search shuru hoy. List e na thakle "Other city" diye likhe <b>Find leads</b> chapun.</li>
         <li>Tool ta map theke business ber kore, tarpor protiti website Google PageSpeed diye check kore.</li>
         <li>Beshi score = beshi problem = bhalo client. Hot lead gulo age contact korun.</li>
         <li><b>Email draft</b> khule copy korun, 1 line nijer moto kore pathan.</li>
@@ -229,42 +231,181 @@ const NOMINATIM = "https://nominatim.openstreetmap.org/search";
 const OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter", "https://overpass.private.coffee/api/interpreter"];
 const PSI = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed";
 
-const CATEGORIES = {
-  dentist: ["Dentists", [["amenity","dentist"],["healthcare","dentist"]]],
-  doctor: ["Doctors & clinics", [["amenity","doctors"],["amenity","clinic"]]],
-  veterinary: ["Vets", [["amenity","veterinary"]]],
-  pharmacy: ["Pharmacies", [["amenity","pharmacy"]]],
-  lawyer: ["Lawyers", [["office","lawyer"]]],
-  accountant: ["Accountants", [["office","accountant"],["office","tax_advisor"]]],
-  insurance: ["Insurance agencies", [["office","insurance"]]],
-  real_estate: ["Real estate agencies", [["office","estate_agent"],["shop","estate_agent"]]],
-  architect: ["Architects", [["office","architect"]]],
-  plumber: ["Plumbers", [["craft","plumber"]]],
-  electrician: ["Electricians", [["craft","electrician"]]],
-  hvac: ["HVAC companies", [["craft","hvac"]]],
-  roofer: ["Roofers", [["craft","roofer"]]],
-  carpenter: ["Carpenters", [["craft","carpenter"]]],
-  painter: ["Painters", [["craft","painter"]]],
-  car_repair: ["Car repair shops", [["shop","car_repair"]]],
-  car_dealer: ["Car dealers", [["shop","car"]]],
-  restaurant: ["Restaurants", [["amenity","restaurant"]]],
-  cafe: ["Cafes", [["amenity","cafe"]]],
-  bakery: ["Bakeries", [["shop","bakery"]]],
-  hotel: ["Hotels & guest houses", [["tourism","hotel"],["tourism","guest_house"]]],
-  salon: ["Hair & beauty salons", [["shop","hairdresser"],["shop","beauty"]]],
-  spa: ["Spas & massage", [["leisure","sauna"],["shop","massage"],["amenity","spa"]]],
-  gym: ["Gyms", [["leisure","fitness_centre"]]],
-  florist: ["Florists", [["shop","florist"]]],
-  furniture: ["Furniture stores", [["shop","furniture"]]],
-  clothes: ["Clothing stores", [["shop","clothes"],["shop","boutique"]]],
-  jewelry: ["Jewelry stores", [["shop","jewelry"]]],
-  optician: ["Opticians", [["shop","optician"]]],
-  driving_school: ["Driving schools", [["amenity","driving_school"]]],
-  school: ["Schools & colleges", [["amenity","school"],["amenity","college"]]],
-  kindergarten: ["Kindergartens", [["amenity","kindergarten"]]],
-  travel_agency: ["Travel agencies", [["shop","travel_agency"],["office","travel_agent"]]],
-  photographer: ["Photographers", [["craft","photographer"],["shop","photo"]]],
-};
+// [key, label, OpenStreetMap tags], grouped for the dropdown.
+const CATEGORY_GROUPS = [
+  ["Health & medical", [
+    ["dentist", "Dentists", [["amenity","dentist"],["healthcare","dentist"]]],
+    ["doctor", "Doctors & clinics", [["amenity","doctors"],["amenity","clinic"]]],
+    ["hospital", "Hospitals", [["amenity","hospital"]]],
+    ["physiotherapist", "Physiotherapists", [["healthcare","physiotherapist"]]],
+    ["chiropractor", "Chiropractors", [["healthcare","chiropractor"],["healthcare:speciality","chiropractic"]]],
+    ["psychotherapist", "Therapists & counsellors", [["healthcare","psychotherapist"],["healthcare","counselling"]]],
+    ["optician", "Opticians", [["shop","optician"]]],
+    ["hearing", "Hearing aid clinics", [["shop","hearing_aids"],["healthcare","audiologist"]]],
+    ["pharmacy", "Pharmacies", [["amenity","pharmacy"]]],
+    ["veterinary", "Vets", [["amenity","veterinary"]]],
+    ["nursing_home", "Care & nursing homes", [["amenity","nursing_home"],["social_facility","nursing_home"]]],
+  ]],
+  ["Professional services", [
+    ["lawyer", "Lawyers", [["office","lawyer"]]],
+    ["notary", "Notaries", [["office","notary"]]],
+    ["accountant", "Accountants", [["office","accountant"],["office","tax_advisor"]]],
+    ["financial", "Financial advisors", [["office","financial_advisor"],["office","financial"]]],
+    ["insurance", "Insurance agencies", [["office","insurance"]]],
+    ["real_estate", "Real estate agencies", [["office","estate_agent"],["shop","estate_agent"]]],
+    ["architect", "Architects", [["office","architect"]]],
+    ["consulting", "Consultants", [["office","consulting"]]],
+    ["marketing", "Marketing & ad agencies", [["office","advertising_agency"],["office","marketing"]]],
+    ["it_company", "IT companies", [["office","it"],["office","telecommunication"]]],
+    ["employment", "Recruitment agencies", [["office","employment_agency"]]],
+    ["coworking", "Coworking spaces", [["amenity","coworking_space"],["office","coworking"]]],
+    ["ngo", "Non-profits & associations", [["office","ngo"],["office","association"],["office","charity"]]],
+  ]],
+  ["Home services & trades", [
+    ["plumber", "Plumbers", [["craft","plumber"]]],
+    ["electrician", "Electricians", [["craft","electrician"]]],
+    ["hvac", "HVAC companies", [["craft","hvac"]]],
+    ["roofer", "Roofers", [["craft","roofer"]]],
+    ["builder", "Builders & contractors", [["craft","builder"],["office","construction_company"]]],
+    ["carpenter", "Carpenters", [["craft","carpenter"],["craft","joiner"]]],
+    ["painter", "Painters & decorators", [["craft","painter"]]],
+    ["locksmith", "Locksmiths", [["craft","locksmith"],["shop","locksmith"]]],
+    ["gardener", "Gardeners & landscapers", [["craft","gardener"],["craft","landscaper"]]],
+    ["cleaning", "Cleaning services", [["craft","cleaning"],["office","cleaning"]]],
+    ["laundry", "Laundry & dry cleaning", [["shop","laundry"],["shop","dry_cleaning"]]],
+    ["moving", "Moving companies", [["office","moving_company"]]],
+    ["glazier", "Glaziers & window fitters", [["craft","glaziery"],["craft","window_construction"]]],
+    ["tiler", "Tilers & flooring", [["craft","tiler"],["craft","floorer"],["shop","flooring"]]],
+    ["kitchen", "Kitchen & bathroom showrooms", [["shop","kitchen"],["shop","bathroom_furnishing"]]],
+    ["solar", "Solar installers", [["craft","photovoltaic"],["craft","solar"]]],
+    ["storage", "Self storage", [["shop","storage_rental"]]],
+  ]],
+  ["Automotive", [
+    ["car_repair", "Car repair shops", [["shop","car_repair"]]],
+    ["car_dealer", "Car dealers", [["shop","car"]]],
+    ["car_parts", "Car parts shops", [["shop","car_parts"]]],
+    ["tyres", "Tyre shops", [["shop","tyres"]]],
+    ["car_wash", "Car washes", [["amenity","car_wash"]]],
+    ["car_rental", "Car rentals", [["amenity","car_rental"]]],
+    ["motorcycle", "Motorcycle shops", [["shop","motorcycle"],["shop","motorcycle_repair"]]],
+    ["driving_school", "Driving schools", [["amenity","driving_school"]]],
+  ]],
+  ["Food & drink", [
+    ["restaurant", "Restaurants", [["amenity","restaurant"]]],
+    ["cafe", "Cafes", [["amenity","cafe"]]],
+    ["fast_food", "Takeaways & fast food", [["amenity","fast_food"]]],
+    ["bar", "Bars & pubs", [["amenity","bar"],["amenity","pub"]]],
+    ["bakery", "Bakeries", [["shop","bakery"]]],
+    ["cake", "Cake & pastry shops", [["shop","pastry"],["shop","confectionery"]]],
+    ["ice_cream", "Ice cream shops", [["amenity","ice_cream"]]],
+    ["butcher", "Butchers", [["shop","butcher"]]],
+    ["deli", "Delis & grocers", [["shop","deli"],["shop","greengrocer"]]],
+    ["caterer", "Caterers", [["craft","caterer"]]],
+    ["brewery", "Breweries & wineries", [["craft","brewery"],["craft","winery"],["craft","distillery"]]],
+    ["wine", "Wine & liquor stores", [["shop","wine"],["shop","alcohol"]]],
+  ]],
+  ["Beauty, fitness & wellness", [
+    ["salon", "Hair & beauty salons", [["shop","hairdresser"],["shop","beauty"]]],
+    ["spa", "Spas & massage", [["leisure","sauna"],["shop","massage"],["amenity","spa"]]],
+    ["tattoo", "Tattoo studios", [["shop","tattoo"]]],
+    ["cosmetics", "Cosmetics shops", [["shop","cosmetics"],["shop","perfumery"]]],
+    ["gym", "Gyms", [["leisure","fitness_centre"]]],
+    ["yoga", "Yoga & pilates studios", [["sport","yoga"],["sport","pilates"]]],
+    ["martial_arts", "Martial arts schools", [["sport","martial_arts"],["sport","karate"],["sport","taekwondo"]]],
+    ["dance", "Dance schools", [["leisure","dance"],["amenity","dancing_school"]]],
+  ]],
+  ["Shops & retail", [
+    ["florist", "Florists", [["shop","florist"]]],
+    ["furniture", "Furniture stores", [["shop","furniture"]]],
+    ["interior", "Interior decor shops", [["shop","interior_decoration"],["shop","curtain"]]],
+    ["clothes", "Clothing stores", [["shop","clothes"],["shop","boutique"]]],
+    ["shoes", "Shoe stores", [["shop","shoes"]]],
+    ["bridal", "Bridal shops", [["shop","wedding"]]],
+    ["jewelry", "Jewelry stores", [["shop","jewelry"]]],
+    ["electronics", "Electronics & phone shops", [["shop","electronics"],["shop","mobile_phone"]]],
+    ["computer", "Computer shops", [["shop","computer"]]],
+    ["hardware", "Hardware & DIY stores", [["shop","hardware"],["shop","doityourself"]]],
+    ["garden_centre", "Garden centres", [["shop","garden_centre"]]],
+    ["pet", "Pet shops & groomers", [["shop","pet"],["shop","pet_grooming"]]],
+    ["bicycle", "Bike shops", [["shop","bicycle"]]],
+    ["sports", "Sports shops", [["shop","sports"],["shop","outdoor"]]],
+    ["toys", "Toy shops", [["shop","toys"]]],
+    ["books", "Bookshops", [["shop","books"]]],
+    ["gift", "Gift shops", [["shop","gift"]]],
+    ["art", "Art galleries & framers", [["shop","art"],["shop","frame"],["tourism","gallery"]]],
+    ["music", "Music shops", [["shop","musical_instrument"],["shop","music"]]],
+  ]],
+  ["Hotels, travel & events", [
+    ["hotel", "Hotels & guest houses", [["tourism","hotel"],["tourism","guest_house"]]],
+    ["motel", "Motels & hostels", [["tourism","motel"],["tourism","hostel"]]],
+    ["camp_site", "Campsites & holiday parks", [["tourism","camp_site"],["tourism","caravan_site"]]],
+    ["travel_agency", "Travel agencies", [["shop","travel_agency"],["office","travel_agent"]]],
+    ["events_venue", "Event venues", [["amenity","events_venue"],["amenity","conference_centre"]]],
+    ["attraction", "Tourist attractions", [["tourism","attraction"],["tourism","museum"]]],
+  ]],
+  ["Education & childcare", [
+    ["school", "Schools & colleges", [["amenity","school"],["amenity","college"]]],
+    ["kindergarten", "Kindergartens", [["amenity","kindergarten"]]],
+    ["childcare", "Childcare & daycare", [["amenity","childcare"]]],
+    ["language_school", "Language schools", [["amenity","language_school"]]],
+    ["music_school", "Music schools", [["amenity","music_school"]]],
+    ["tutoring", "Tutoring & training centres", [["amenity","prep_school"],["amenity","training"]]],
+  ]],
+  ["Other local services", [
+    ["photographer", "Photographers", [["craft","photographer"],["shop","photo"]]],
+    ["printing", "Print shops", [["shop","copyshop"],["craft","printer"]]],
+    ["sign_maker", "Sign makers", [["craft","sign_maker"]]],
+    ["tailor", "Tailors & alterations", [["craft","tailor"],["shop","tailor"]]],
+    ["repair", "Phone & computer repair", [["craft","electronics_repair"],["shop","electronics_repair"]]],
+    ["funeral", "Funeral homes", [["shop","funeral_directors"]]],
+    ["place_of_worship", "Churches, mosques & temples", [["amenity","place_of_worship"]]],
+  ]],
+];
+const CATEGORIES = Object.fromEntries(CATEGORY_GROUPS.flatMap(([, items]) => items.map(([k, label, tags]) => [k, [label, tags]])));
+
+// Map search text for each city; the dropdown shows it without the country.
+const CITY_GROUPS = [
+  ["United States", ["New York City, New York, USA", "Los Angeles, California, USA", "Chicago, Illinois, USA", "Houston, Texas, USA",
+    "Phoenix, Arizona, USA", "Philadelphia, Pennsylvania, USA", "San Antonio, Texas, USA", "San Diego, California, USA", "Dallas, Texas, USA",
+    "Austin, Texas, USA", "Fort Worth, Texas, USA", "Jacksonville, Florida, USA", "Columbus, Ohio, USA", "Charlotte, North Carolina, USA",
+    "Indianapolis, Indiana, USA", "San Francisco, California, USA", "San Jose, California, USA", "Seattle, Washington, USA", "Denver, Colorado, USA",
+    "Washington, District of Columbia, USA", "Boston, Massachusetts, USA", "Nashville, Tennessee, USA", "Detroit, Michigan, USA",
+    "Portland, Oregon, USA", "Las Vegas, Nevada, USA", "Memphis, Tennessee, USA", "Louisville, Kentucky, USA", "Baltimore, Maryland, USA",
+    "Milwaukee, Wisconsin, USA", "Albuquerque, New Mexico, USA", "Tucson, Arizona, USA", "Fresno, California, USA", "Sacramento, California, USA",
+    "Kansas City, Missouri, USA", "Atlanta, Georgia, USA", "Miami, Florida, USA", "Tampa, Florida, USA", "Orlando, Florida, USA",
+    "Raleigh, North Carolina, USA", "Minneapolis, Minnesota, USA", "Cleveland, Ohio, USA", "Pittsburgh, Pennsylvania, USA",
+    "St. Louis, Missouri, USA", "Cincinnati, Ohio, USA", "Salt Lake City, Utah, USA", "New Orleans, Louisiana, USA", "Boise, Idaho, USA",
+    "Omaha, Nebraska, USA", "Richmond, Virginia, USA", "Buffalo, New York, USA", "Birmingham, Alabama, USA", "Spokane, Washington, USA",
+    "Des Moines, Iowa, USA", "Madison, Wisconsin, USA", "Charleston, South Carolina, USA", "Savannah, Georgia, USA", "Scottsdale, Arizona, USA",
+    "Plano, Texas, USA", "Irvine, California, USA", "Honolulu, Hawaii, USA", "Anchorage, Alaska, USA"]],
+  ["United Kingdom", ["London, England, UK", "Manchester, England, UK", "Birmingham, England, UK", "Leeds, England, UK", "Liverpool, England, UK",
+    "Sheffield, England, UK", "Bristol, England, UK", "Newcastle upon Tyne, England, UK", "Nottingham, England, UK", "Leicester, England, UK",
+    "Southampton, England, UK", "Brighton and Hove, England, UK", "Coventry, England, UK", "Reading, England, UK", "Oxford, England, UK",
+    "Cambridge, England, UK", "York, England, UK", "Bath, England, UK", "Cardiff, Wales, UK", "Edinburgh, Scotland, UK", "Glasgow, Scotland, UK",
+    "Aberdeen, Scotland, UK", "Belfast, Northern Ireland, UK"]],
+  ["Ireland", ["Dublin, Ireland", "Cork, Ireland", "Galway, Ireland", "Limerick, Ireland"]],
+  ["Canada", ["Toronto, Ontario, Canada", "Montreal, Quebec, Canada", "Vancouver, British Columbia, Canada", "Calgary, Alberta, Canada",
+    "Edmonton, Alberta, Canada", "Ottawa, Ontario, Canada", "Winnipeg, Manitoba, Canada", "Quebec City, Quebec, Canada",
+    "Hamilton, Ontario, Canada", "Halifax, Nova Scotia, Canada", "Victoria, British Columbia, Canada", "Saskatoon, Saskatchewan, Canada"]],
+  ["Australia", ["Sydney, New South Wales, Australia", "Melbourne, Victoria, Australia", "Brisbane, Queensland, Australia",
+    "Perth, Western Australia, Australia", "Adelaide, South Australia, Australia", "Gold Coast, Queensland, Australia",
+    "Canberra, Australian Capital Territory, Australia", "Newcastle, New South Wales, Australia", "Hobart, Tasmania, Australia",
+    "Darwin, Northern Territory, Australia"]],
+  ["New Zealand", ["Auckland, New Zealand", "Wellington, New Zealand", "Christchurch, New Zealand", "Hamilton, Waikato, New Zealand"]],
+  ["Europe", ["Amsterdam, Netherlands", "Rotterdam, Netherlands", "Berlin, Germany", "Munich, Germany", "Hamburg, Germany", "Frankfurt, Germany",
+    "Vienna, Austria", "Zurich, Switzerland", "Brussels, Belgium", "Paris, France", "Lyon, France", "Madrid, Spain", "Barcelona, Spain",
+    "Lisbon, Portugal", "Milan, Italy", "Rome, Italy", "Copenhagen, Denmark", "Stockholm, Sweden", "Oslo, Norway", "Helsinki, Finland",
+    "Prague, Czechia", "Warsaw, Poland", "Malta"]],
+  ["Middle East", ["Dubai, United Arab Emirates", "Abu Dhabi, United Arab Emirates", "Sharjah, United Arab Emirates", "Doha, Qatar",
+    "Riyadh, Saudi Arabia", "Jeddah, Saudi Arabia", "Kuwait City, Kuwait", "Muscat, Oman", "Manama, Bahrain"]],
+  ["Asia & Africa", ["Singapore", "Kuala Lumpur, Malaysia", "Hong Kong", "Johannesburg, South Africa", "Cape Town, South Africa",
+    "Durban, South Africa", "Nairobi, Kenya", "Lagos, Nigeria"]],
+  ["Bangladesh", ["Dhaka, Bangladesh", "Chattogram, Bangladesh", "Sylhet, Bangladesh", "Khulna, Bangladesh", "Rajshahi, Bangladesh",
+    "Barishal, Bangladesh", "Rangpur, Bangladesh", "Mymensingh, Bangladesh", "Cumilla, Bangladesh", "Narayanganj, Bangladesh",
+    "Gazipur, Bangladesh", "Bogura, Bangladesh", "Cox's Bazar, Bangladesh"]],
+];
+const OTHER_CITY = "__other";
+function cityLabel(q) { const p = q.split(", "); return p.length > 1 ? p.slice(0, -1).join(", ") : q; }
 const ANALYTICS = ["googletagmanager.com","google-analytics.com","connect.facebook.net","plausible.io","matomo","clarity.ms","hotjar","segment.com","umami"];
 const STACKS = { wordpress: "WordPress", wix: "Wix", drupal: "Drupal", joomla: "Joomla", magento: "Magento", gatsby: "Gatsby", next: "Next.js", nuxt: "Nuxt", react: "React", angular: "Angular", amp: "AMP" };
 const PLATFORM_URLS = [["WordPress", /\/wp-(content|includes)\//], ["Wix", /wixstatic|parastorage/], ["Squarespace", /squarespace/], ["Shopify", /cdn\.shopify/], ["Webflow", /webflow/], ["GoDaddy Builder", /wsimg\.com/], ["Weebly", /weebly/], ["Duda", /multiscreensite|dudaone/]];
@@ -274,7 +415,7 @@ const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch {} },
 };
-const state = { leads: [], filter: "all", city: "", category: "", example: true, checking: false, stop: false, open: new Set() };
+const state = { leads: [], filter: "all", city: "", category: "", example: true, checking: false, stop: false, running: null, searchSeq: 0, open: new Set() };
 
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 function normUrl(u) { u = (u || "").trim(); if (!u) return ""; return /^https?:\/\//i.test(u) ? u : "http://" + u; }
@@ -283,6 +424,14 @@ function safeHref(u) { const n = normUrl(u); return /^https?:\/\//i.test(n) ? n 
 
 // ---------------- Finding businesses ----------------
 async function geocode(city) {
+  const cacheKey = `lf:geo:${city.toLowerCase()}`;
+  try { const hit = JSON.parse(store.get(cacheKey) || "null"); if (hit) return hit; } catch {}
+  const place = await geocodeFresh(city);
+  store.set(cacheKey, JSON.stringify({ osm_type: place.osm_type, osm_id: place.osm_id, boundingbox: place.boundingbox, display_name: place.display_name }));
+  return place;
+}
+
+async function geocodeFresh(city) {
   const r = await fetch(`${NOMINATIM}?${new URLSearchParams({ q: city, format: "jsonv2", limit: "1" })}`);
   if (!r.ok) throw new Error(`The map search failed (HTTP ${r.status}). Try again in a minute.`);
   const j = await r.json();
@@ -555,20 +704,28 @@ function setProgress(done, total) {
 }
 
 // ---------------- Actions ----------------
+function selectedCity() {
+  return $("city").value === OTHER_CITY ? $("cityOther").value.trim() : $("city").value;
+}
+
 async function search(ev) {
-  ev.preventDefault();
-  if (state.checking) return;
-  const city = $("city").value.trim();
+  ev?.preventDefault();
+  const city = selectedCity();
   const category = $("category").value;
   const limit = Math.max(10, Math.min(500, parseInt($("limit").value, 10) || 60));
-  if (!city) return;
+  if (!city) { setStatus("Type a city name first, then press Find leads.", true); $("cityOther").focus(); return; }
+  const seq = ++state.searchSeq;
+  if (state.checking) { state.stop = true; setStatus("Stopping the current website checks…"); await state.running; }
+  if (seq !== state.searchSeq) return;  // a newer search started while we waited
   $("searchBtn").disabled = true;
   store.set("lf:city", city); store.set("lf:category", category);
   try {
-    setStatus(`Finding ${city} on the map…`);
+    setStatus(`Finding ${cityLabel(city)} on the map…`);
     const place = await geocode(city);
+    if (seq !== state.searchSeq) return;
     setStatus(`Searching ${CATEGORIES[category][0].toLowerCase()} in ${place.display_name}…`);
     const els = await runOverpass(overpassQuery(place, CATEGORIES[category][1], limit));
+    if (seq !== state.searchSeq) return;
     const seen = new Set();
     const leads = [];
     for (const el of els) {
@@ -584,14 +741,19 @@ async function search(ev) {
     const withSite = leads.filter(l => l.website).length;
     setStatus(leads.length
       ? `Found ${leads.length} businesses, ${withSite} with a website.`
-      : `No ${CATEGORIES[category][0].toLowerCase()} found in ${city} on OpenStreetMap. Try a bigger city or another business type.`);
+      : `No ${CATEGORIES[category][0].toLowerCase()} found in ${cityLabel(city)} on OpenStreetMap. Try a bigger city or another business type.`);
     render();
     if (withSite && $("autoCheck").checked) checkAll();
   } catch (e) {
-    setStatus(e.message, true);
+    if (seq === state.searchSeq) setStatus(e.message, true);
   } finally {
-    $("searchBtn").disabled = false;
+    if (seq === state.searchSeq) $("searchBtn").disabled = false;
   }
+}
+
+function startChecks(targets) {
+  state.running = checkLeads(targets);
+  return state.running;
 }
 
 async function checkLeads(targets) {
@@ -629,7 +791,7 @@ async function checkLeads(targets) {
   setProgress(0, 0);
   render();
   if (keyErr) { setStatus(`Google rejected the PageSpeed key: ${keyErr}`, true); $("settings").open = true; }
-  else if (quota) { setStatus(`Google's free limit without a key is used up after ${done} checks. Add a free PageSpeed API key under "Your details", then press Check websites.`, true); $("settings").open = true; }
+  else if (quota) { setStatus(`Google's PageSpeed limit is used up for now (after ${done} checks). Paste your PageSpeed API key under "Your details" (or wait a few minutes), then press Check websites.`, true); $("settings").open = true; }
   else if (state.stop) setStatus(`Stopped after ${done} checks. Press Check websites to continue.`);
   else {
     const hot = state.leads.filter(l => l.score !== null && l.score >= 60).length;
@@ -640,7 +802,7 @@ async function checkLeads(targets) {
 function checkAll() {
   if (state.checking) return;
   const targets = state.leads.filter(l => l.website && (!l.audit || l.audit.state === "error"));
-  if (targets.length) checkLeads(targets);
+  if (targets.length) startChecks(targets);
 }
 
 async function copyDraft(l, btn) {
@@ -684,9 +846,26 @@ const EXAMPLES = [
 
 function boot() {
   const sel = $("category");
-  sel.innerHTML = Object.entries(CATEGORIES).map(([k, [label]]) => `<option value="${k}">${esc(label)}</option>`).join("");
-  $("city").value = store.get("lf:city") || "";
-  sel.value = store.get("lf:category") || "dentist";
+  sel.innerHTML = CATEGORY_GROUPS.map(([group, items]) =>
+    `<optgroup label="${esc(group)}">${items.map(([k, label]) => `<option value="${k}">${esc(label)}</option>`).join("")}</optgroup>`).join("");
+  const citySel = $("city");
+  citySel.innerHTML = `<option value="" disabled>Choose a city</option>` + CITY_GROUPS.map(([group, cities]) =>
+    `<optgroup label="${esc(group)}">${cities.map(q => `<option value="${esc(q)}">${esc(cityLabel(q))}</option>`).join("")}</optgroup>`).join("") +
+    `<option value="${OTHER_CITY}">Other city (type it)…</option>`;
+  const savedCity = store.get("lf:city") || "";
+  if (savedCity && [...citySel.options].some(o => o.value === savedCity)) citySel.value = savedCity;
+  else if (savedCity) { citySel.value = OTHER_CITY; $("cityOther").value = savedCity; }
+  else citySel.value = "";
+  $("cityOther").hidden = citySel.value !== OTHER_CITY;
+  const savedCat = store.get("lf:category");
+  sel.value = savedCat && CATEGORIES[savedCat] ? savedCat : "dentist";
+  citySel.addEventListener("change", () => {
+    const other = citySel.value === OTHER_CITY;
+    $("cityOther").hidden = !other;
+    if (other) $("cityOther").focus();
+    else search();
+  });
+  sel.addEventListener("change", () => { if (selectedCity()) search(); });
   for (const id of ["yourName", "yourSite", "psiKey"]) {
     $(id).value = store.get(`lf:${id}`) || "";
     $(id).addEventListener("input", () => { store.set(`lf:${id}`, $(id).value); if (id !== "psiKey") render(); });
@@ -697,7 +876,7 @@ function boot() {
     Object.assign(state, { leads: last.leads, city: last.city, category: last.category, example: false });
     setStatus(`Showing your last search: ${CATEGORIES[last.category]?.[0] || "businesses"} in ${last.city}.`);
   } else {
-    Object.assign(state, { leads: EXAMPLES.map(e => ({ ...e })), city: "Austin, Texas", category: "dentist", example: true });
+    Object.assign(state, { leads: EXAMPLES.map(e => ({ ...e })), city: "Austin, Texas, USA", category: "dentist", example: true });
   }
   $("form").addEventListener("submit", search);
   $("checkAllBtn").addEventListener("click", checkAll);
@@ -714,7 +893,7 @@ function boot() {
     const l = state.leads.find(x => x.id === btn.dataset.id);
     if (!l) return;
     if (btn.dataset.act === "draft") { state.open.has(l.id) ? state.open.delete(l.id) : state.open.add(l.id); render(); }
-    else if (btn.dataset.act === "check") checkLeads([l]);
+    else if (btn.dataset.act === "check") startChecks([l]);
     else if (btn.dataset.act === "copy") copyDraft(l, btn);
   });
   if (state.example) state.open.add("ex1");

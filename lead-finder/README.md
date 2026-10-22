@@ -17,10 +17,12 @@ Boro chain brand (McDonald's, Starbucks) baad dey, karon ora freelancer hire kor
 
 https://raw.githack.com/samiarahman954-dot/diplomatool/ccr-3bce4458-ck8crm/lead-finder/index.html
 
-Link ta khulun, city ar business type din, **Find leads** chapun. Kono install lagbe na, phone eo chole.
+Link ta khulun, list theke city (160+ shohor) ar business type (100+ dhoron) select korun. Select korlei
+search shuru hoy. List e na thakle "Other city" select kore nam likhun. Kono install lagbe na, phone eo chole.
 Website check hoy Google PageSpeed diye. Key chara Google alpo kichu check korte dey, tai ekta free
 [PageSpeed API key](https://developers.google.com/speed/docs/insights/v5/get-started#APIKey) niye
-"Your details & PageSpeed key" e boshiye din. Key shudhu apnar browser e thake.
+"Your details & PageSpeed key" e ekbar boshiye din. Browser key ta mone rakhe, protibar dite hoy na.
+Key ta code e rakha hoy na, karon repo public: code e thakle je keu niye use korte parto.
 
 Web version copyright year, WordPress version ar website theke email khujte pare na (browser er
 security niyom er karone). Eguloo lagle niche Python version chalan.
