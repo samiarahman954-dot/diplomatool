@@ -1,0 +1,726 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lead Finder</title>
+<meta name="description" content="Find local businesses with weak websites and draft outreach emails.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: search form in a left rail, ranked lead cards on the right; one column on phones. */
+:root {
+  --bg: #f2f5f3; --surface: #ffffff; --ink: #16201c; --muted: #5a6762;
+  --line: #d9e1dd; --accent: #0e6b58; --accent-ink: #ffffff; --accent-soft: #dcefe9;
+  --hot: #b93a2b; --warm: #a86a12; --cold: #6a7a73; --focus: #1d8f75; --score-ink: #ffffff;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "Figtree", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1412; --surface: #151d1a; --ink: #e3ebe7; --muted: #94a39c;
+    --line: #26312d; --accent: #3dbb9b; --accent-ink: #06231c; --accent-soft: #173a31;
+    --hot: #f07462; --warm: #e2a63f; --cold: #82938b; --focus: #5fd3b5; --score-ink: #1b0f0b; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1412; --surface: #151d1a; --ink: #e3ebe7; --muted: #94a39c;
+  --line: #26312d; --accent: #3dbb9b; --accent-ink: #06231c; --accent-soft: #173a31;
+  --hot: #f07462; --warm: #e2a63f; --cold: #82938b; --focus: #5fd3b5; --score-ink: #1b0f0b; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 var(--body); }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 28px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; margin-bottom: 22px; }
+h1 { font: 700 30px/1.1 var(--display); letter-spacing: -0.01em; margin: 0; text-wrap: balance; }
+.tagline { color: var(--muted); margin: 4px 0 0; max-width: 60ch; }
+.grid { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 860px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* Form rail */
+.rail { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: grid; gap: 14px; position: sticky; top: max(16px, env(safe-area-inset-top, 0px)); }
+@media (max-width: 860px) { .rail { position: static; } }
+.field { display: grid; gap: 5px; min-width: 0; }
+label, .label { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+input[type=text], input[type=url], input[type=password], input[type=number], select {
+  width: 100%; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 8px; padding: 9px 11px; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.check { display: flex; gap: 8px; align-items: center; font-size: 14px; text-transform: none; letter-spacing: 0; color: var(--ink); font-weight: 500; }
+.check input { width: 16px; height: 16px; accent-color: var(--accent); }
+details.more { border-top: 1px solid var(--line); padding-top: 12px; }
+details.more > summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+details.more[open] > summary { margin-bottom: 12px; }
+details.more .inner { display: grid; gap: 12px; }
+.hint { color: var(--muted); font-size: 13px; margin: 0; }
+button, .btn { font: 600 14px/1 var(--body); border-radius: 8px; padding: 11px 14px; cursor: pointer; border: 1px solid transparent; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.primary { background: var(--accent); color: var(--accent-ink); }
+.primary:disabled { opacity: 0.55; cursor: progress; }
+.ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+.ghost:hover { border-color: var(--accent); color: var(--accent); }
+.small { padding: 7px 10px; font-size: 13px; }
+
+/* Results */
+.status { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 10px; margin-bottom: 14px; }
+.status-line { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
+.status-msg { margin: 0; font-weight: 500; min-width: 0; overflow-wrap: anywhere; }
+.status-msg.error { color: var(--hot); }
+.stats { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--muted); }
+.stats b { font: 700 15px var(--mono); color: var(--ink); font-variant-numeric: tabular-nums; }
+.bar { height: 4px; background: var(--line); border-radius: 4px; overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.3s; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: 500 13px/1 var(--body); padding: 7px 11px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+.chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.example-note { font-size: 13px; color: var(--muted); background: var(--surface); border: 1px dashed var(--line); border-radius: 10px; padding: 10px 12px; margin: 0 0 12px; }
+
+.list { display: grid; gap: 10px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 4px 14px; }
+.score { grid-row: span 3; width: 52px; height: 52px; border-radius: 10px; display: grid; place-items: center; font: 700 18px var(--mono); font-variant-numeric: tabular-nums; color: var(--score-ink); background: var(--cold); }
+.card.hot .score { background: var(--hot); } .card.warm .score { background: var(--warm); }
+.card.unchecked .score, .card.running .score { background: transparent; color: var(--muted); border: 1px dashed var(--line); font-size: 12px; }
+.card.running .score { border-color: var(--accent); color: var(--accent); }
+.name { font: 600 17px/1.3 var(--display); margin: 0; overflow-wrap: anywhere; }
+.meta { color: var(--muted); font-size: 13px; margin: 0; overflow-wrap: anywhere; }
+.meta span + span::before { content: "·"; margin: 0 6px; color: var(--line); }
+.findings { margin: 6px 0 0; padding-left: 18px; font-size: 14px; }
+.findings li + li { margin-top: 2px; }
+.card-body { grid-column: 2; min-width: 0; }
+.card-foot { grid-column: 2; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; align-items: center; }
+@media (max-width: 480px) { .card { grid-template-columns: minmax(0, 1fr); } .score { grid-row: auto; } .card-foot, .card-body { grid-column: 1; } }
+.draft { grid-column: 1 / -1; margin-top: 8px; border-top: 1px solid var(--line); padding-top: 10px; display: grid; gap: 8px; min-width: 0; }
+.draft .subj { margin: 0; font-size: 14px; overflow-wrap: anywhere; }
+.draft pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 12px; font: 13px/1.55 var(--mono); }
+.empty { text-align: center; color: var(--muted); padding: 32px 12px; background: var(--surface); border: 1px dashed var(--line); border-radius: 12px; }
+.help { margin-top: 28px; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.help section { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+.help h2 { font: 600 16px var(--display); margin: 0 0 6px; }
+.help p, .help ol { margin: 0; color: var(--muted); font-size: 14px; }
+.help ol { padding-left: 18px; }
+.legend { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size: 13px; color: var(--muted); }
+.legend b { font: 700 13px var(--mono); }
+footer { margin-top: 24px; color: var(--muted); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { .bar > i { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>Lead Finder</h1>
+      <p class="tagline">Find local businesses whose websites are broken, slow or missing, and get a ready email that names their exact problems.</p>
+    </div>
+  </div>
+
+  <div class="grid">
+    <form class="rail" id="form" autocomplete="on">
+      <div class="field">
+        <label for="city">City</label>
+        <input type="text" id="city" placeholder="Austin, Texas, USA" required>
+      </div>
+      <div class="field">
+        <label for="category">Business type</label>
+        <select id="category"></select>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label for="limit">Max results</label>
+          <input type="number" id="limit" min="10" max="500" step="10" value="60">
+        </div>
+        <div class="field">
+          <span class="label">Options</span>
+          <label class="check"><input type="checkbox" id="skipChains" checked> Skip chains</label>
+        </div>
+      </div>
+      <label class="check"><input type="checkbox" id="autoCheck" checked> Check websites after search</label>
+      <button class="primary" id="searchBtn" type="submit">Find leads</button>
+
+      <details class="more" id="settings">
+        <summary>Your details &amp; PageSpeed key</summary>
+        <div class="inner">
+          <div class="field">
+            <label for="yourName">Your name (signs the emails)</label>
+            <input type="text" id="yourName" placeholder="Rahim Uddin">
+          </div>
+          <div class="field">
+            <label for="yourSite">Your portfolio link</label>
+            <input type="url" id="yourSite" placeholder="https://yourname.dev">
+          </div>
+          <div class="field">
+            <label for="psiKey">Google PageSpeed API key</label>
+            <input type="password" id="psiKey" placeholder="Optional, but strongly recommended">
+            <p class="hint">Without a key Google allows only a few checks. A free key takes 2 minutes:
+              <a href="https://developers.google.com/speed/docs/insights/v5/get-started#APIKey" target="_blank" rel="noopener">get one here</a>. It stays in this browser only.</p>
+          </div>
+        </div>
+      </details>
+    </form>
+
+    <div style="min-width:0">
+      <div class="status">
+        <div class="status-line">
+          <p class="status-msg" id="statusMsg" aria-live="polite">Enter a city and a business type, then press Find leads.</p>
+          <button type="button" class="ghost small" id="stopBtn" hidden>Stop checking</button>
+        </div>
+        <div class="bar" id="bar" hidden><i></i></div>
+        <div class="stats" id="stats"></div>
+      </div>
+
+      <div class="toolbar">
+        <div class="chips" role="group" aria-label="Filter leads">
+          <button type="button" class="chip" data-filter="all" aria-pressed="true">All</button>
+          <button type="button" class="chip" data-filter="hot" aria-pressed="false">Hot 60+</button>
+          <button type="button" class="chip" data-filter="warm" aria-pressed="false">Warm 30–59</button>
+          <button type="button" class="chip" data-filter="nosite" aria-pressed="false">No website</button>
+          <button type="button" class="chip" data-filter="contact" aria-pressed="false">Has email or phone</button>
+        </div>
+        <div class="actions">
+          <button type="button" class="ghost small" id="checkAllBtn" hidden>Check websites</button>
+          <button type="button" class="ghost small" id="csvBtn">Download CSV</button>
+        </div>
+      </div>
+      <p class="example-note" id="exampleNote">These three cards are example data so you can see what results look like. Run a search to replace them with real businesses.</p>
+      <div class="list" id="list"></div>
+    </div>
+  </div>
+
+  <div class="help">
+    <section>
+      <h2>Kivabe use korben</h2>
+      <ol>
+        <li>City ar business type din, <b>Find leads</b> chapun.</li>
+        <li>Tool ta map theke business ber kore, tarpor protiti website Google PageSpeed diye check kore.</li>
+        <li>Beshi score = beshi problem = bhalo client. Hot lead gulo age contact korun.</li>
+        <li><b>Email draft</b> khule copy korun, 1 line nijer moto kore pathan.</li>
+      </ol>
+    </section>
+    <section>
+      <h2>Score</h2>
+      <div class="legend">
+        <b>80</b><span>Website down or not loading</span>
+        <b>70</b><span>No website (but has phone or address)</span>
+        <b>30</b><span>No HTTPS, or not mobile-friendly</span>
+        <b>25</b><span>PageSpeed mobile score under 50</span>
+        <b>5–10</b><span>Old jQuery, missing title or description, small text, no analytics</span>
+      </div>
+    </section>
+    <section>
+      <h2>Bhalo result er tips</h2>
+      <p>Email pathanor age site ta nije ekbar khule dekhen. Din e 20–30 tar beshi email pathaben na. Email na thakle phone korun ba website er contact form use korun. Deeper check (copyright year, WordPress version, email khoja) er jonno repo te Python version ache.</p>
+    </section>
+  </div>
+  <footer>Business data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>. Website checks by Google PageSpeed Insights.</footer>
+</div>
+
+<script>
+"use strict";
+const NOMINATIM = "https://nominatim.openstreetmap.org/search";
+const OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter", "https://overpass.private.coffee/api/interpreter"];
+const PSI = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed";
+
+const CATEGORIES = {
+  dentist: ["Dentists", [["amenity","dentist"],["healthcare","dentist"]]],
+  doctor: ["Doctors & clinics", [["amenity","doctors"],["amenity","clinic"]]],
+  veterinary: ["Vets", [["amenity","veterinary"]]],
+  pharmacy: ["Pharmacies", [["amenity","pharmacy"]]],
+  lawyer: ["Lawyers", [["office","lawyer"]]],
+  accountant: ["Accountants", [["office","accountant"],["office","tax_advisor"]]],
+  insurance: ["Insurance agencies", [["office","insurance"]]],
+  real_estate: ["Real estate agencies", [["office","estate_agent"],["shop","estate_agent"]]],
+  architect: ["Architects", [["office","architect"]]],
+  plumber: ["Plumbers", [["craft","plumber"]]],
+  electrician: ["Electricians", [["craft","electrician"]]],
+  hvac: ["HVAC companies", [["craft","hvac"]]],
+  roofer: ["Roofers", [["craft","roofer"]]],
+  carpenter: ["Carpenters", [["craft","carpenter"]]],
+  painter: ["Painters", [["craft","painter"]]],
+  car_repair: ["Car repair shops", [["shop","car_repair"]]],
+  car_dealer: ["Car dealers", [["shop","car"]]],
+  restaurant: ["Restaurants", [["amenity","restaurant"]]],
+  cafe: ["Cafes", [["amenity","cafe"]]],
+  bakery: ["Bakeries", [["shop","bakery"]]],
+  hotel: ["Hotels & guest houses", [["tourism","hotel"],["tourism","guest_house"]]],
+  salon: ["Hair & beauty salons", [["shop","hairdresser"],["shop","beauty"]]],
+  spa: ["Spas & massage", [["leisure","sauna"],["shop","massage"],["amenity","spa"]]],
+  gym: ["Gyms", [["leisure","fitness_centre"]]],
+  florist: ["Florists", [["shop","florist"]]],
+  furniture: ["Furniture stores", [["shop","furniture"]]],
+  clothes: ["Clothing stores", [["shop","clothes"],["shop","boutique"]]],
+  jewelry: ["Jewelry stores", [["shop","jewelry"]]],
+  optician: ["Opticians", [["shop","optician"]]],
+  driving_school: ["Driving schools", [["amenity","driving_school"]]],
+  school: ["Schools & colleges", [["amenity","school"],["amenity","college"]]],
+  kindergarten: ["Kindergartens", [["amenity","kindergarten"]]],
+  travel_agency: ["Travel agencies", [["shop","travel_agency"],["office","travel_agent"]]],
+  photographer: ["Photographers", [["craft","photographer"],["shop","photo"]]],
+};
+const ANALYTICS = ["googletagmanager.com","google-analytics.com","connect.facebook.net","plausible.io","matomo","clarity.ms","hotjar","segment.com","umami"];
+const STACKS = { wordpress: "WordPress", wix: "Wix", drupal: "Drupal", joomla: "Joomla", magento: "Magento", gatsby: "Gatsby", next: "Next.js", nuxt: "Nuxt", react: "React", angular: "Angular", amp: "AMP" };
+const PLATFORM_URLS = [["WordPress", /\/wp-(content|includes)\//], ["Wix", /wixstatic|parastorage/], ["Squarespace", /squarespace/], ["Shopify", /cdn\.shopify/], ["Webflow", /webflow/], ["GoDaddy Builder", /wsimg\.com/], ["Weebly", /weebly/], ["Duda", /multiscreensite|dudaone/]];
+
+const $ = (id) => document.getElementById(id);
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+};
+const state = { leads: [], filter: "all", city: "", category: "", example: true, checking: false, stop: false, open: new Set() };
+
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function normUrl(u) { u = (u || "").trim(); if (!u) return ""; return /^https?:\/\//i.test(u) ? u : "http://" + u; }
+function domainOf(u) { try { return new URL(normUrl(u)).hostname.replace(/^www\./, ""); } catch { return u; } }
+function safeHref(u) { const n = normUrl(u); return /^https?:\/\//i.test(n) ? n : ""; }
+
+// ---------------- Finding businesses ----------------
+async function geocode(city) {
+  const r = await fetch(`${NOMINATIM}?${new URLSearchParams({ q: city, format: "jsonv2", limit: "1" })}`);
+  if (!r.ok) throw new Error(`The map search failed (HTTP ${r.status}). Try again in a minute.`);
+  const j = await r.json();
+  if (!j.length) throw new Error(`Couldn't find "${city}". Add the country, for example "Austin, Texas, USA".`);
+  return j[0];
+}
+
+function overpassQuery(place, tags, limit) {
+  let area = "", scope;
+  if (place.osm_type === "relation") { area = `area(id:${3600000000 + Number(place.osm_id)})->.a;`; scope = "(area.a)"; }
+  else { const [s, n, w, e] = place.boundingbox; scope = `(${s},${w},${n},${e})`; }
+  const sel = tags.map(([k, v]) => `  nwr["${k}"="${v}"]["name"]${scope};`).join("\n");
+  return `[out:json][timeout:120];\n${area}\n(\n${sel}\n);\nout tags center ${limit};`;
+}
+
+async function runOverpass(query) {
+  let last;
+  for (const url of OVERPASS) {
+    try {
+      const r = await fetch(url, { method: "POST", body: new URLSearchParams({ data: query }) });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return (await r.json()).elements || [];
+    } catch (e) { last = e; }
+  }
+  throw new Error(`The map servers are busy (${last?.message}). Wait a minute and try again.`);
+}
+
+function toLead(el) {
+  const t = el.tags || {};
+  if (!t.name) return null;
+  const street = [t["addr:housenumber"], t["addr:street"]].filter(Boolean).join(" ");
+  return {
+    id: `${el.type}/${el.id}`,
+    name: t.name,
+    website: t.website || t["contact:website"] || t.url || "",
+    phone: t.phone || t["contact:phone"] || t["contact:mobile"] || "",
+    email: t.email || t["contact:email"] || "",
+    address: [street, t["addr:city"], t["addr:postcode"]].filter(Boolean).join(", "),
+    facebook: t["contact:facebook"] || t.facebook || "",
+    map: `https://www.openstreetmap.org/${el.type}/${el.id}`,
+    chain: Boolean(t.brand || t["brand:wikidata"]),
+    audit: null,
+  };
+}
+
+// ---------------- Website check (Google PageSpeed) ----------------
+class QuotaError extends Error {}
+class KeyError extends Error {}
+
+function downReason(msg) {
+  if (/DNS_FAILURE/i.test(msg)) return { code: "down", why: "the domain doesn't resolve" };
+  if (/INSECURE_DOCUMENT_REQUEST|CERT|SSL/i.test(msg)) return { code: "ssl_broken" };
+  const status = msg.match(/Status code:\s*(\d{3})/i);
+  if (status) return { code: "down", why: `it returned error ${status[1]}` };
+  if (/NO_FCP|NO_LCP/i.test(msg)) return { code: "down", why: "the page stayed blank" };
+  return { code: "down", why: "" };
+}
+
+async function checkSite(url, key) {
+  const p = new URLSearchParams({ url: normUrl(url), strategy: "mobile" });
+  for (const c of ["performance", "seo", "best-practices"]) p.append("category", c);
+  if (key) p.set("key", key);
+  const r = await fetch(`${PSI}?${p}`);
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 429) throw new QuotaError();
+  const msg = j.error?.message || "";
+  if (!r.ok) {
+    if (/API key/i.test(msg)) throw new KeyError(msg);
+    if (/Lighthouse returned error|FAILED_DOCUMENT|ERRORED_DOCUMENT|DNS_FAILURE|NO_FCP|INSECURE/i.test(msg)) {
+      const d = downReason(msg);
+      return { issues: [d.code], why: d.why };
+    }
+    throw new Error(msg || `HTTP ${r.status}`);
+  }
+  const lr = j.lighthouseResult || {};
+  if (lr.runtimeError && lr.runtimeError.code && lr.runtimeError.code !== "NO_ERROR") {
+    const d = downReason(`${lr.runtimeError.code} ${lr.runtimeError.message || ""}`);
+    return { issues: [d.code], why: d.why };
+  }
+  const A = lr.audits || {};
+  const sc = (id) => (A[id] ? A[id].score : null);
+  const a = { issues: [], perf: null, lcp: null, platform: "", jquery: "" };
+  const perf = lr.categories?.performance?.score;
+  if (typeof perf === "number") a.perf = Math.round(perf * 100);
+  const lcp = A["largest-contentful-paint"]?.numericValue;
+  if (typeof lcp === "number") a.lcp = lcp / 1000;
+  const urls = (A["network-requests"]?.details?.items || []).map(i => String(i.url || "").toLowerCase());
+
+  const stack = (lr.stackPacks || []).map(s => STACKS[s.id] || s.title).find(Boolean);
+  a.platform = stack || (PLATFORM_URLS.find(([, re]) => urls.some(u => re.test(u))) || [""])[0];
+  const lib = (A["js-libraries"]?.details?.items || []).find(i => /^jquery$/i.test(i.name || ""));
+  a.jquery = lib?.version || "";
+  if (!a.jquery) { for (const u of urls) { const m = u.match(/jquery[.-]?(\d+\.\d+(?:\.\d+)?)|jquery[^?]*\.js\?ver=(\d+\.\d+(?:\.\d+)?)/); if (m) { a.jquery = m[1] || m[2]; break; } } }
+
+  if (sc("http-status-code") === 0) return { issues: ["down"], why: "it returns an error page" };
+  if (sc("is-on-https") === 0) a.issues.push("no_https");
+  if (sc("viewport") === 0) a.issues.push("no_viewport");
+  if (a.perf !== null && a.perf < 50) a.issues.push("psi_low");
+  if (a.jquery && parseInt(a.jquery, 10) < 3) a.issues.push("old_jquery");
+  if (sc("document-title") === 0) a.issues.push("no_title");
+  if (sc("meta-description") === 0) a.issues.push("no_meta_desc");
+  if (sc("font-size") === 0) a.issues.push("small_fonts");
+  if (urls.length && !urls.some(u => ANALYTICS.some(m => u.includes(m)))) a.issues.push("no_analytics");
+  return a;
+}
+
+// ---------------- Scoring & email ----------------
+function issueText(code, a) {
+  switch (code) {
+    case "down": return [80, `your website didn't load when I tried to open it${a.why ? ` (${a.why})` : ""}, so customers who search for you hit a dead end`];
+    case "ssl_broken": return [35, "browsers show a security warning on your site because its SSL certificate is broken"];
+    case "no_https": return [30, "the site isn't on HTTPS, so Chrome labels it \"Not Secure\" next to your address"];
+    case "no_viewport": return [30, "the site isn't mobile-friendly, so it's hard to read and use on a phone"];
+    case "psi_low": return [25, `Google PageSpeed scores the mobile version ${a.perf}/100${a.lcp ? `, and the main content takes ${a.lcp.toFixed(1)} seconds to appear on a phone` : ""}`];
+    case "old_jquery": return [10, `it loads an outdated JavaScript library (jQuery ${a.jquery}) with known security issues`];
+    case "no_title": return [10, "the homepage has no proper page title, which hurts how you show up on Google"];
+    case "small_fonts": return [8, "the text is too small to read comfortably on a phone"];
+    case "no_meta_desc": return [8, "the homepage has no meta description, so Google picks random text for your search listing"];
+    case "no_analytics": return [5, "there's no visitor tracking set up, so you can't see how many people visit or where they come from"];
+  }
+  return [0, ""];
+}
+
+function scoreLead(l) {
+  if (!l.website) { l.score = 70; l.findings = ["No website found"]; return; }
+  if (!l.audit || l.audit.state !== "done") { l.score = null; l.findings = []; return; }
+  const items = l.audit.issues.map(c => issueText(c, l.audit)).sort((x, y) => y[0] - x[0]);
+  l.score = Math.min(100, items.reduce((s, [p]) => s + p, 0));
+  l.findings = items.map(([, t]) => t);
+}
+
+function cap(s) { return s ? s[0].toUpperCase() + s.slice(1) : s; }
+
+function draft(l) {
+  const name = $("yourName").value.trim() || "[Your Name]";
+  const site = $("yourSite").value.trim();
+  const sign = [name, site].filter(Boolean).join("\n");
+  const what = (CATEGORIES[state.category]?.[0] || "local businesses").toLowerCase();
+  const where = state.city ? ` in ${state.city.split(",")[0].trim()}` : "";
+  if (!l.website) {
+    return { subject: `A website for ${l.name}?`, body:
+`Hi ${l.name} team,
+
+I came across ${l.name} while looking at ${what}${where}, and noticed you don't seem to have a website.
+
+Most people search Google before they call or visit, and without a site they usually end up with a competitor who has one.
+
+I build fast, mobile-friendly websites for small businesses, with your services, opening hours, reviews and a simple contact or booking form. I'd be happy to put together a free homepage mock-up so you can see what it would look like, with no obligation.
+
+Would that be useful?
+
+Best regards,
+${sign}` };
+  }
+  const bullets = l.findings.slice(0, 3).map(f => `- ${cap(f)}`).join("\n");
+  return { subject: `Quick note about ${l.name}'s website`, body:
+`Hi ${l.name} team,
+
+I came across ${l.name} while looking at ${what}${where} and had a quick look at your website (${domainOf(l.website)}). A few things stood out that are probably costing you customers:
+
+${bullets}
+
+All of these are fixable, usually within a few days. I'm a web developer who works with WordPress and small business websites, and I'd be happy to record a short video showing exactly how I'd fix them, free of charge.
+
+Would that be helpful?
+
+Best regards,
+${sign}` };
+}
+
+// ---------------- Rendering ----------------
+function level(l) { return l.score === null ? (l.audit?.state === "running" ? "running" : "unchecked") : l.score >= 60 ? "hot" : l.score >= 30 ? "warm" : "cold"; }
+
+function visible() {
+  const f = state.filter;
+  return state.leads.filter(l =>
+    f === "all" ? true :
+    f === "hot" ? l.score !== null && l.score >= 60 :
+    f === "warm" ? l.score !== null && l.score >= 30 && l.score < 60 :
+    f === "nosite" ? !l.website :
+    f === "contact" ? Boolean(l.email || l.phone) : true);
+}
+
+function sorted(list) {
+  return [...list].sort((a, b) => (b.score ?? -1) - (a.score ?? -1) || a.name.localeCompare(b.name));
+}
+
+function cardHtml(l) {
+  const lv = level(l);
+  const badge = l.score !== null ? l.score : lv === "running" ? "…" : "—";
+  const meta = [
+    l.address && `<span>${esc(l.address)}</span>`,
+    l.audit?.platform && `<span>${esc(l.audit.platform)}</span>`,
+    l.audit?.perf != null && `<span>PageSpeed ${l.audit.perf}</span>`,
+  ].filter(Boolean).join("");
+  const href = safeHref(l.website);
+  const contact = [
+    href && `<span><a href="${esc(href)}" target="_blank" rel="noopener">${esc(domainOf(l.website))}</a></span>`,
+    l.email && `<span>${esc(l.email)}</span>`,
+    l.phone && `<span>${esc(l.phone)}</span>`,
+    safeHref(l.facebook) && l.facebook.includes("facebook") && `<span><a href="${esc(safeHref(l.facebook))}" target="_blank" rel="noopener">Facebook</a></span>`,
+  ].filter(Boolean).join("");
+  let body = "";
+  if (l.audit?.state === "error") body = `<p class="meta">Couldn't check this site: ${esc(l.audit.error)}</p>`;
+  else if (l.findings.length) body = `<ul class="findings">${l.findings.map(f => `<li>${esc(cap(f))}</li>`).join("")}</ul>`;
+  else if (lv === "running") body = `<p class="meta">Checking the website with Google PageSpeed…</p>`;
+  else if (lv === "unchecked") body = `<p class="meta">Website not checked yet.</p>`;
+  else body = `<p class="meta">No problems found. Probably not a good lead.</p>`;
+
+  const open = state.open.has(l.id);
+  const d = l.score !== null ? draft(l) : null;
+  const search = `https://www.google.com/search?q=${encodeURIComponent(`"${l.name}" ${state.city.split(",")[0] || ""} owner email`)}`;
+  const foot = [
+    d && `<button type="button" class="ghost small" data-act="draft" data-id="${esc(l.id)}" aria-expanded="${open}">${open ? "Hide email" : "Email draft"}</button>`,
+    href && (lv === "unchecked" || l.audit?.state === "error") && !state.checking && `<button type="button" class="ghost small" data-act="check" data-id="${esc(l.id)}">Check website</button>`,
+    !l.email && `<a class="btn ghost small" href="${esc(search)}" target="_blank" rel="noopener">Find email</a>`,
+    l.map && `<a class="btn ghost small" href="${esc(l.map)}" target="_blank" rel="noopener">Map</a>`,
+  ].filter(Boolean).join("");
+  const draftHtml = d && open ? `
+    <div class="draft">
+      <p class="subj"><b>Subject:</b> ${esc(d.subject)}</p>
+      <pre>${esc(d.body)}</pre>
+      <div class="actions">
+        <button type="button" class="primary small" data-act="copy" data-id="${esc(l.id)}">Copy email</button>
+        ${l.email ? `<a class="btn ghost small" href="mailto:${esc(l.email)}?subject=${encodeURIComponent(d.subject)}&amp;body=${encodeURIComponent(d.body)}">Open in mail app</a>` : ""}
+      </div>
+    </div>` : "";
+  return `<article class="card ${lv}">
+    <div class="score" title="Opportunity score (higher = better lead)">${badge}</div>
+    <h3 class="name">${esc(l.name)}</h3>
+    ${meta ? `<p class="meta">${meta}</p>` : ""}
+    ${contact ? `<p class="meta">${contact}</p>` : `<p class="meta">No contact details on the map</p>`}
+    <div class="card-body">${body}</div>
+    <div class="card-foot">${foot}</div>
+    ${draftHtml}
+  </article>`;
+}
+
+function render() {
+  state.leads.forEach(scoreLead);
+  const list = sorted(visible());
+  $("list").innerHTML = list.length ? list.map(cardHtml).join("") :
+    `<div class="empty">${state.leads.length ? "No leads match this filter." : "No businesses yet. Run a search to see leads here."}</div>`;
+  $("exampleNote").hidden = !state.example;
+  const L = state.leads;
+  const withSite = L.filter(l => l.website).length;
+  const checked = L.filter(l => l.website && l.audit && (l.audit.state === "done" || l.audit.state === "error")).length;
+  const hot = L.filter(l => l.score !== null && l.score >= 60).length;
+  $("stats").innerHTML = L.length ? [
+    `<span><b>${L.length}</b> businesses</span>`,
+    `<span><b>${withSite}</b> with a website</span>`,
+    `<span><b>${L.length - withSite}</b> without</span>`,
+    `<span><b>${checked}</b> checked</span>`,
+    `<span><b>${hot}</b> hot leads</span>`,
+  ].join("") : "";
+  const unchecked = L.some(l => l.website && (!l.audit || l.audit.state === "error"));
+  $("checkAllBtn").hidden = state.checking || !unchecked || state.example;
+  if (!state.example) {
+    try { store.set("lf:last", JSON.stringify({ leads: L.map(l => ({ ...l, audit: l.audit?.state === "running" ? null : l.audit })), city: state.city, category: state.category })); } catch {}
+  }
+}
+
+function setStatus(msg, isError) {
+  $("statusMsg").textContent = msg;
+  $("statusMsg").classList.toggle("error", Boolean(isError));
+}
+function setProgress(done, total) {
+  $("bar").hidden = total === 0;
+  $("bar").firstElementChild.style.width = total ? `${Math.round((done / total) * 100)}%` : "0";
+}
+
+// ---------------- Actions ----------------
+async function search(ev) {
+  ev.preventDefault();
+  if (state.checking) return;
+  const city = $("city").value.trim();
+  const category = $("category").value;
+  const limit = Math.max(10, Math.min(500, parseInt($("limit").value, 10) || 60));
+  if (!city) return;
+  $("searchBtn").disabled = true;
+  store.set("lf:city", city); store.set("lf:category", category);
+  try {
+    setStatus(`Finding ${city} on the map…`);
+    const place = await geocode(city);
+    setStatus(`Searching ${CATEGORIES[category][0].toLowerCase()} in ${place.display_name}…`);
+    const els = await runOverpass(overpassQuery(place, CATEGORIES[category][1], limit));
+    const seen = new Set();
+    const leads = [];
+    for (const el of els) {
+      const l = toLead(el);
+      if (!l || (l.chain && $("skipChains").checked)) continue;
+      const key = `${l.name.toLowerCase()}|${domainOf(l.website)}`;
+      if (seen.has(key) || (!l.website && !l.phone && !l.address)) continue;
+      seen.add(key); leads.push(l);
+    }
+    Object.assign(state, { leads, city, category, example: false, filter: "all" });
+    state.open.clear();
+    document.querySelectorAll(".chip").forEach(c => c.setAttribute("aria-pressed", String(c.dataset.filter === "all")));
+    const withSite = leads.filter(l => l.website).length;
+    setStatus(leads.length
+      ? `Found ${leads.length} businesses, ${withSite} with a website.`
+      : `No ${CATEGORIES[category][0].toLowerCase()} found in ${city} on OpenStreetMap. Try a bigger city or another business type.`);
+    render();
+    if (withSite && $("autoCheck").checked) checkAll();
+  } catch (e) {
+    setStatus(e.message, true);
+  } finally {
+    $("searchBtn").disabled = false;
+  }
+}
+
+async function checkLeads(targets) {
+  const key = $("psiKey").value.trim();
+  state.checking = true; state.stop = false;
+  $("stopBtn").hidden = false;
+  let done = 0, quota = false, keyErr = "";
+  const total = targets.length;
+  setProgress(0, total);
+  const queue = [...targets];
+  const worker = async () => {
+    while (queue.length && !state.stop && !quota && !keyErr) {
+      const l = queue.shift();
+      l.audit = { state: "running", issues: [] };
+      render();
+      setStatus(`Checking websites with Google PageSpeed: ${done} of ${total} done. Each check takes 10–40 seconds.`);
+      try {
+        const res = await checkSite(l.website, key);
+        l.audit = { ...res, state: "done" };
+      } catch (e) {
+        l.audit = null;
+        if (e instanceof QuotaError) quota = true;
+        else if (e instanceof KeyError) keyErr = e.message;
+        else l.audit = { state: "error", issues: [], error: e.message || "network error" };
+      }
+      done++;
+      setProgress(done, total);
+      render();
+    }
+  };
+  await Promise.all(Array.from({ length: key ? 3 : 1 }, worker));
+  targets.forEach(l => { if (l.audit?.state === "running") l.audit = null; });
+  state.checking = false;
+  $("stopBtn").hidden = true;
+  setProgress(0, 0);
+  render();
+  if (keyErr) { setStatus(`Google rejected the PageSpeed key: ${keyErr}`, true); $("settings").open = true; }
+  else if (quota) { setStatus(`Google's free limit without a key is used up after ${done} checks. Add a free PageSpeed API key under "Your details", then press Check websites.`, true); $("settings").open = true; }
+  else if (state.stop) setStatus(`Stopped after ${done} checks. Press Check websites to continue.`);
+  else {
+    const hot = state.leads.filter(l => l.score !== null && l.score >= 60).length;
+    setStatus(`Done. ${hot} hot leads. Open a card's email draft to contact them.`);
+  }
+}
+
+function checkAll() {
+  if (state.checking) return;
+  const targets = state.leads.filter(l => l.website && (!l.audit || l.audit.state === "error"));
+  if (targets.length) checkLeads(targets);
+}
+
+async function copyDraft(l, btn) {
+  const d = draft(l);
+  const text = `Subject: ${d.subject}\n\n${d.body}`;
+  try {
+    await navigator.clipboard.writeText(text);
+    btn.textContent = "Copied";
+  } catch {
+    const pre = btn.closest(".draft").querySelector("pre");
+    const range = document.createRange(); range.selectNodeContents(pre);
+    const sel = getSelection(); sel.removeAllRanges(); sel.addRange(range);
+    btn.textContent = "Selected: press Ctrl+C";
+  }
+  setTimeout(() => { btn.textContent = "Copy email"; }, 2000);
+}
+
+function csvCell(v) { v = String(v ?? ""); return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v; }
+function downloadCsv() {
+  const rows = [["score","name","website","email","phone","address","facebook","platform","pagespeed","problems","email_subject","email_body","map"]];
+  for (const l of sorted(state.leads)) {
+    const d = l.score !== null ? draft(l) : { subject: "", body: "" };
+    rows.push([l.score ?? "", l.name, l.website, l.email, l.phone, l.address, l.facebook, l.audit?.platform || "", l.audit?.perf ?? "", l.findings.join(" | "), d.subject, d.body, l.map]);
+  }
+  const blob = new Blob(["﻿" + rows.map(r => r.map(csvCell).join(",")).join("\r\n")], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `leads-${(state.category || "example")}-${(state.city || "sample").split(",")[0].toLowerCase().replace(/[^a-z0-9]+/g, "-")}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// ---------------- Boot ----------------
+const EXAMPLES = [
+  { id: "ex1", name: "Example: Hillside Family Dental", website: "hillside-dental.example", phone: "+1 512 555 0101", email: "", address: "1200 Congress Ave, Austin", facebook: "", map: "",
+    audit: { state: "done", issues: ["no_https", "no_viewport", "psi_low", "old_jquery", "no_meta_desc"], perf: 23, lcp: 9.4, platform: "WordPress", jquery: "1.12.4" } },
+  { id: "ex2", name: "Example: Lakeway Smiles", website: "", phone: "+1 512 555 0142", email: "", address: "Lakeway, Austin", facebook: "", map: "", audit: null },
+  { id: "ex3", name: "Example: Barton Creek Dentistry", website: "bartoncreekdental.example", phone: "", email: "hello@bartoncreekdental.example", address: "Austin", facebook: "", map: "",
+    audit: { state: "done", issues: ["psi_low", "no_analytics"], perf: 41, lcp: 5.2, platform: "Wix" } },
+];
+
+function boot() {
+  const sel = $("category");
+  sel.innerHTML = Object.entries(CATEGORIES).map(([k, [label]]) => `<option value="${k}">${esc(label)}</option>`).join("");
+  $("city").value = store.get("lf:city") || "";
+  sel.value = store.get("lf:category") || "dentist";
+  for (const id of ["yourName", "yourSite", "psiKey"]) {
+    $(id).value = store.get(`lf:${id}`) || "";
+    $(id).addEventListener("input", () => { store.set(`lf:${id}`, $(id).value); if (id !== "psiKey") render(); });
+  }
+  let last = null;
+  try { last = JSON.parse(store.get("lf:last") || "null"); } catch {}
+  if (last && last.leads && last.leads.length) {
+    Object.assign(state, { leads: last.leads, city: last.city, category: last.category, example: false });
+    setStatus(`Showing your last search: ${CATEGORIES[last.category]?.[0] || "businesses"} in ${last.city}.`);
+  } else {
+    Object.assign(state, { leads: EXAMPLES.map(e => ({ ...e })), city: "Austin, Texas", category: "dentist", example: true });
+  }
+  $("form").addEventListener("submit", search);
+  $("checkAllBtn").addEventListener("click", checkAll);
+  $("stopBtn").addEventListener("click", () => { state.stop = true; setStatus("Stopping after the current checks finish…"); });
+  $("csvBtn").addEventListener("click", downloadCsv);
+  document.querySelectorAll(".chip").forEach(c => c.addEventListener("click", () => {
+    state.filter = c.dataset.filter;
+    document.querySelectorAll(".chip").forEach(o => o.setAttribute("aria-pressed", String(o === c)));
+    render();
+  }));
+  $("list").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-act]");
+    if (!btn) return;
+    const l = state.leads.find(x => x.id === btn.dataset.id);
+    if (!l) return;
+    if (btn.dataset.act === "draft") { state.open.has(l.id) ? state.open.delete(l.id) : state.open.add(l.id); render(); }
+    else if (btn.dataset.act === "check") checkLeads([l]);
+    else if (btn.dataset.act === "copy") copyDraft(l, btn);
+  });
+  if (state.example) state.open.add("ex1");
+  render();
+}
+boot();
+</script>
+</body>
+</html>

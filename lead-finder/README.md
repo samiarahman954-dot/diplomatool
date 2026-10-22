@@ -13,7 +13,19 @@ Client khojar tool. Kono shohor ar business type dile (jemon "Austin er dentist"
 Website nai kintu phone number ache, emon business o list e ashe. Era "website banano" kaj er client.
 Boro chain brand (McDonald's, Starbucks) baad dey, karon ora freelancer hire kore na.
 
-## Ki lagbe
+## Web version (install chara, browser e)
+
+https://raw.githack.com/samiarahman954-dot/diplomatool/ccr-3bce4458-ck8crm/lead-finder/index.html
+
+Link ta khulun, city ar business type din, **Find leads** chapun. Kono install lagbe na, phone eo chole.
+Website check hoy Google PageSpeed diye. Key chara Google alpo kichu check korte dey, tai ekta free
+[PageSpeed API key](https://developers.google.com/speed/docs/insights/v5/get-started#APIKey) niye
+"Your details & PageSpeed key" e boshiye din. Key shudhu apnar browser e thake.
+
+Web version copyright year, WordPress version ar website theke email khujte pare na (browser er
+security niyom er karone). Eguloo lagle niche Python version chalan.
+
+## Python version: ki lagbe
 
 Shudhu **Python 3.8 ba notun**. Kono `pip install` lagbe na.
 
