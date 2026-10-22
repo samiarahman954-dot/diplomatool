@@ -46,10 +46,18 @@ Key ta code e rakha hoy na, karon repo public: code e thakle je keu niye use kor
   text, logo, chobi, email, brand color ar copyright year pore. Browser shorasori onno site porte dey na,
   tai public proxy (allorigins, corsproxy, r.jina.ai) diye pore. Kaj na korle industry er default lekha
   use hoy.
-- **Redesign concept:** card er **Redesign concept** button e oi content, business er naam, phone,
-  address, opening hours ar brand color diye notun homepage design toiri hoy. Style (Clean, Warm, Bold,
-  Elegant), color, headline, service, about, shob edit kora jay. **Download homepage** e alada HTML file
-  hishebe pathano jay.
+- **Claude redesign:** card er **Redesign with Claude** button e Claude (Claude Opus 5.5) client er jonno
+  notun homepage design kore. Template na: Claude dekhe client er current site er pura screenshot, site er
+  lekha, chobi, logo, brand color, map er tottho (phone, address, opening hours) ar test e pawa problem,
+  tarpor oder nijer content diye ekdom notun page likhe. Nokol review, award, dam ityadi banay na; ja nai
+  ta [bracket] e placeholder hishebe rakhe. "Extra instructions" e nijer kotha likhte paren (jemon "premium
+  feel"). **Download homepage** e alada HTML file paben.
+  - Ekta **Claude API key** lage (https://console.anthropic.com/settings/keys). Key ta "Your details" ba
+    design screen e ekbar din, browser mone rakhe, shorasori Anthropic e jay.
+  - Protiti design apnar Anthropic account theke ~$0.20-0.50 khoroch hoy, 1-3 minute lage.
+  - Design ta browser e save thake (protiti business er jonno), page bondho korleo hariye jay na.
+  - Anthropic er official SDK (`vendor/anthropic-sdk-0.132.0.js`, MIT) repo te bundle kora, alada kichu
+    install lagbe na.
 - Report e **Now bonam After the redesign** (phone ar desktop) thake. PDF e eta nijer page e ase.
 - Prothom email e free report + free homepage design offer kora hoy.
 
