@@ -51,10 +51,32 @@ Dam, package ba guarantee tool e nai. Protiti client er dam alada, tai oigulo em
 2. **Email** > "First email": free website design er offer.
 3. Reply dile design er screenshot ba link "Send design" email e pathan.
 
+### Contact: email, WhatsApp, SMS, Messenger
+
+Protiti card er **Contact** row:
+
+- **Gmail:** Gmail e notun email khule, to/subject/lekha boshano. **Mail app:** computer/phone er email app e.
+  **Copy address:** email address copy.
+- **WhatsApp:** number e WhatsApp chat khule, chhoto message likha thake. Number antorjatik format e nijei
+  hoy (jemon Dhaka er `01711...` > `8801711...`). Map listing e WhatsApp number dewa thakle
+  "WhatsApp (listed)" dekhay. Number dekhte landline hole "WhatsApp (landline?)" dekhay.
+- **SMS** (message likha thake) ar **Call**.
+- **Messenger** (Facebook page thakle), **Instagram DM** (Instagram thakle), **Contact form** (site e contact
+  page pele): message copy hoy, page khule, apni paste koren.
+- **Copy message:** chhoto message ta copy.
+
+Kono number e WhatsApp ache kina **age theke check korar public upay nai** (WhatsApp eta shudhu paid Business
+API te dey). WhatsApp chaple number e WhatsApp na thakle WhatsApp nijei bole dey; tokhon SMS ba Call use korun.
+Unknown number theke beshi WhatsApp message pathale WhatsApp number ban korte pare, tai din e alpo kichu,
+personalized message pathan.
+
+Contact button e pathale status nijei agay (First email > Contacted, Follow-up > Followed up, Send report >
+Replied, Send sample > Sample sent). Kon message jabe, seta **Messages** e tab diye bodlan.
+
 ### Follow-up mone rakha
 
 Protiti card e **Status** ache: Not contacted, Emailed, Followed up, Replied, Sample sent, Client,
-Not interested. "Emailed" er 3 din por card upore chole ashe ar "follow-up due" dekhay. **Follow-up due**
+Not interested. "Contacted" er 3 din por card upore chole ashe ar "follow-up due" dekhay. **Follow-up due**
 filter e shob ek sathe paben. Status ei browser e save thake, CSV te o ase.
 
 Screenshot gulo browser e save hoy na (onek boro). Page bondho kore abar khulle report e

@@ -145,6 +145,14 @@ body.report-open { overflow: hidden; }
 .chip[aria-pressed="true"] i { color: var(--accent); }
 @media (max-width: 480px) { .card-status { grid-column: 1; } }
 
+/* Contact row and toast */
+.card-contact { grid-column: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); min-width: 0; }
+.card-contact .label { font-size: 11px; }
+.contact-note { flex-basis: 100%; font-size: 12px; color: var(--muted); }
+#toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: max(20px, env(safe-area-inset-bottom, 0px)); z-index: 80; max-width: min(520px, calc(100% - 32px));
+  background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 14px; box-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.4); }
+@media (max-width: 480px) { .card-contact { grid-column: 1; } }
+
 /* Prompt window */
 #pvView { position: fixed; inset: 0; z-index: 60; background: color-mix(in srgb, var(--ink) 45%, transparent); overflow: auto;
   padding-block: max(24px, env(safe-area-inset-top, 0px)) 24px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
@@ -265,7 +273,7 @@ body.report-open { overflow: hidden; }
     </section>
     <section>
       <h2>Follow-up mone rakha</h2>
-      <p>Email pathanor por card er <b>Status</b> "Emailed" korun. 3 din por card ta upore chole ashe ar "follow-up due" dekhay. <b>Follow-up due</b> filter e shob ek sathe paben. Status shudhu ei browser e save thake.</p>
+      <p>Card er <b>Contact</b> row theke Gmail, WhatsApp, SMS ba Messenger e pathale status nijei "Contacted" hoye jay (ba nije bodlan). 3 din por card ta upore chole ashe ar "follow-up due" dekhay. <b>Follow-up due</b> filter e shob ek sathe paben. Status shudhu ei browser e save thake.</p>
     </section>
     <section>
       <h2>Score</h2>
@@ -295,6 +303,8 @@ body.report-open { overflow: hidden; }
   </div>
   <div class="rv-page" id="reportDoc"></div>
 </div>
+
+<div id="toast" role="status" aria-live="polite" hidden></div>
 
 <div id="pvView" role="dialog" aria-modal="true" aria-labelledby="pvTitle" hidden>
   <div class="pv-box">
@@ -558,6 +568,8 @@ function toLead(el) {
     email: t.email || t["contact:email"] || "",
     address: [street, t["addr:city"], t["addr:postcode"]].filter(Boolean).join(", "),
     facebook: t["contact:facebook"] || t.facebook || "",
+    instagram: t["contact:instagram"] || t.instagram || "",
+    whatsapp: t["contact:whatsapp"] || "",
     hours: t.opening_hours || "",
     map: `https://www.openstreetmap.org/${el.type}/${el.id}`,
     chain: Boolean(t.brand || t["brand:wikidata"]),
@@ -1258,6 +1270,11 @@ function parseHtmlContent(html, base) {
     headings: [...doc.querySelectorAll("h2, h3")].map(txt).filter(t => t.length > 2 && t.length < 70 && !GENERIC_HEADING.test(t)).slice(0, 12),
     paragraphs: [...doc.querySelectorAll("p")].map(txt).filter(t => t.length > 80 && t.length < 600 && !/cookie|copyright|©|all rights reserved/i.test(t)).slice(0, 4),
     hasTel: Boolean(doc.querySelector('a[href^="tel:"]')),
+    contactUrl: (() => {
+      const a = [...doc.querySelectorAll("a[href]")].find(x => /contact|get-in-touch|enquir|kontakt/i.test(`${x.getAttribute("href")} ${txt(x)}`) && !/^(mailto|tel):/i.test(x.getAttribute("href")));
+      const u = a ? abs(a.getAttribute("href")) : "";
+      return u && domainOf(u) === domainOf(base) ? u : "";
+    })(),
     hasForm: [...doc.querySelectorAll("form")].some(f => f.querySelector("textarea, input[type=email], input[type=tel]")) || FORM_RE.test(html),
     hasCta: [...doc.querySelectorAll("a, button")].some(e => CTA_RE.test(txt(e))),
     hasReviews: REVIEW_RE.test(bodyText) || /trustindex|elfsight|birdeye|reviews-widget/i.test(html),
@@ -1292,6 +1309,7 @@ function parseTextContent(md, base) {
     headings: heads.slice(1).filter(t => t.length > 2 && t.length < 70 && !GENERIC_HEADING.test(t)).slice(0, 12),
     paragraphs: lines.filter(s => s.length > 80 && s.length < 600 && !/^[#!\[|>*-]|cookie|copyright|©/i.test(s)).map(s => s.replace(/[*_]/g, "")).slice(0, 4),
     hasTel: /\(tel:/i.test(md),
+    contactUrl: ([...md.matchAll(/\[([^\]]*)\]\((https?:[^)\s]+)\)/g)].find(m => /contact|get-in-touch|enquir/i.test(m[1] + m[2]) && domainOf(m[2]) === domainOf(base)) || [])[2] || "",
     hasForm: FORM_RE.test(md) ? true : null,
     hasCta: CTA_RE.test(plain),
     hasReviews: REVIEW_RE.test(plain),
@@ -1511,7 +1529,7 @@ async function copyText(text, btn) {
 
 // ---------------- Outreach status ----------------
 // Where each business is in the sequence, kept in this browser so follow-ups don't slip.
-const STATUSES = [["new", "Not contacted"], ["emailed", "Emailed"], ["followed", "Followed up"], ["replied", "Replied"], ["sample", "Sample sent"], ["won", "Client"], ["lost", "Not interested"]];
+const STATUSES = [["new", "Not contacted"], ["emailed", "Contacted"], ["followed", "Followed up"], ["replied", "Replied"], ["sample", "Sample sent"], ["won", "Client"], ["lost", "Not interested"]];
 const STATUS_LABEL = Object.fromEntries(STATUSES);
 function loadStatuses() { try { return JSON.parse(store.get("lf:status") || "{}") || {}; } catch { return {}; } }
 function statusOf(l) { return state.statuses[l.id] || { s: "new" }; }
@@ -1531,6 +1549,170 @@ function statusNote(l) {
   const when = d === 0 ? "today" : d === 1 ? "yesterday" : `${d} days ago`;
   const due = followUpDue(l) ? (st.s === "emailed" ? " · follow-up due" : " · send the last follow-up") : "";
   return `${STATUS_LABEL[st.s]} ${when}${due}`;
+}
+
+// ---------------- Reaching the business ----------------
+// Country calling codes for the cities in the list, used to turn local numbers into the
+// international format WhatsApp and SMS links need.
+const CALLING_CODES = {
+  "USA": "1", "Canada": "1", "UK": "44", "Ireland": "353", "Australia": "61", "New Zealand": "64",
+  "Netherlands": "31", "Germany": "49", "Austria": "43", "Switzerland": "41", "Belgium": "32", "France": "33",
+  "Spain": "34", "Portugal": "351", "Italy": "39", "Denmark": "45", "Sweden": "46", "Norway": "47", "Finland": "358",
+  "Czechia": "420", "Poland": "48", "Malta": "356", "United Arab Emirates": "971", "Qatar": "974", "Saudi Arabia": "966",
+  "Kuwait": "965", "Oman": "968", "Bahrain": "973", "Singapore": "65", "Malaysia": "60", "Hong Kong": "852",
+  "South Africa": "27", "Kenya": "254", "Nigeria": "234", "Bangladesh": "880",
+};
+// Where a country's mobile numbers are recognisable, the digits that follow the calling code.
+// WhatsApp lives on mobiles, so a landline is a weak WhatsApp bet. US and Canada can't be told apart.
+const MOBILE_PREFIXES = {
+  "44": ["7"], "353": ["8"], "61": ["4"], "64": ["2"], "31": ["6"], "49": ["15", "16", "17"], "43": ["6"], "41": ["7"],
+  "32": ["4"], "33": ["6", "7"], "34": ["6", "7"], "351": ["9"], "39": ["3"], "45": [], "46": ["7"], "47": ["4", "9"],
+  "358": ["4", "5"], "420": ["6", "7"], "48": ["5", "6", "7", "8"], "356": ["7", "9"], "971": ["5"], "974": ["3", "5", "6", "7"],
+  "966": ["5"], "965": ["5", "6", "9"], "968": ["7", "9"], "973": ["3"], "65": ["8", "9"], "60": ["1"], "852": ["5", "6", "9"],
+  "27": ["6", "7", "8"], "254": ["7", "1"], "234": ["7", "8", "9"], "880": ["1"],
+};
+
+function countryCode() {
+  return CALLING_CODES[(state.city || "").split(",").pop().trim()] || "";
+}
+
+// Digits only, with the country code and without "+", or "" when the number can't be made international.
+function intlPhone(raw) {
+  if (!raw) return "";
+  let d = String(raw).split(/[;,/]| or /i)[0].replace(/[^\d+]/g, "");
+  if (d.startsWith("+")) return d.slice(1);
+  if (d.startsWith("00")) return d.slice(2);
+  const cc = countryCode();
+  if (!cc) return d.length >= 11 ? d : "";
+  if (d.startsWith(cc) && d.length >= cc.length + 9) return d;
+  if (d.startsWith("0")) d = d.slice(1);
+  return d.length >= 6 ? cc + d : "";
+}
+
+// "mobile", "landline" or "" when the country doesn't make it visible.
+function phoneKind(intl) {
+  const cc = Object.keys(MOBILE_PREFIXES).filter(c => intl.startsWith(c)).sort((x, y) => y.length - x.length)[0];
+  if (!cc || !MOBILE_PREFIXES[cc].length) return "";
+  const rest = intl.slice(cc.length);
+  return MOBILE_PREFIXES[cc].some(p => rest.startsWith(p)) ? "mobile" : "landline";
+}
+
+function senderName() { return settings().sign.split("\n")[0].trim() || "[Your name]"; }
+
+// Short versions of each email, for WhatsApp, SMS and social messages.
+function shortMessage(l, kind = "first") {
+  const me = senderName();
+  if (!l.website) {
+    return {
+      first: `Hi ${l.name}, I'm ${me}, a web designer. I noticed you don't have a website yet, so I made a free design of what a website for ${l.name} could look like. No cost and no obligation. Can I send it to you here?`,
+      followup: `Hi ${l.name}, just following up on my message. The free website design I made for you is ready. Shall I send it here?`,
+      last: `Hi ${l.name}, last message from me. If you'd ever like to see the free website design I made for you, just reply here. Thanks!`,
+      sample: `Thanks for replying! Here's the website design I made for ${l.name}: [attach screenshots or add the link]. Anything in [brackets] is a placeholder for your own details. Happy to answer any questions.`,
+    }[kind] || "";
+  }
+  const top = l.findings.slice(0, 2).map(f => f.replace(/\.$/, "")).join("; and ");
+  return {
+    first: `Hi ${l.name}, I'm ${me}, a web designer. I looked at your website ${domainOf(l.website)} and noticed ${l.findings[0] || "a few problems that may be costing you customers"}. I've put together a short free report on what's holding it back. Can I send it to you here?`,
+    followup: `Hi ${l.name}, just following up on my message about your website. The free report is ready. Shall I send it here?`,
+    last: `Hi ${l.name}, last message from me. If you'd ever like the free report on ${domainOf(l.website)}, just reply here. Thanks!`,
+    report: `Thanks for replying! Here's your website report [attach the PDF]. In short: ${top || "a few fixable problems"}. If you're interested, I can make a free sample redesign of your homepage so you can see the difference.`,
+    sample: `As promised, here's the sample redesign of your homepage: [attach screenshots or add the link]. It uses your own content and fixes the problems from the report. Happy to answer any questions.`,
+  }[kind] || "";
+}
+
+function messengerLink(fb) {
+  if (!fb) return "";
+  if (/^[\w.]+$/.test(fb)) return `https://m.me/${fb}`;
+  try {
+    const u = new URL(safeHref(fb));
+    if (!/(^|\.)facebook\.com$/i.test(u.hostname)) return "";
+    if (u.pathname.startsWith("/profile.php")) { const id = u.searchParams.get("id"); return id ? `https://m.me/${id}` : ""; }
+    const seg = u.pathname.split("/").filter(Boolean);
+    const slug = seg[0] === "pages" ? seg[seg.length - 1] : seg[0];
+    return slug && /^[\w.-]+$/.test(slug) ? `https://m.me/${slug}` : "";
+  } catch { return ""; }
+}
+
+function instagramLink(ig) {
+  if (!ig) return "";
+  const m = String(ig).match(/instagram\.com\/([\w.]+)/i) || String(ig).match(/^@?([\w.]+)$/);
+  return m ? `https://ig.me/m/${m[1]}` : "";
+}
+
+function gmailLink(to, subject, body) {
+  return `https://mail.google.com/mail/?${new URLSearchParams({ view: "cm", fs: "1", to, su: subject, body })}`;
+}
+
+// Which step of the outreach a send moves the lead to. Never moves a lead backwards.
+const KIND_STATUS = { first: "emailed", followup: "followed", last: "followed", report: "replied", sample: "sample" };
+function advanceStatus(l, kind) {
+  const next = KIND_STATUS[kind];
+  const order = STATUSES.map(([k]) => k);
+  if (!next || order.indexOf(statusOf(l).s) >= order.indexOf(next)) return false;
+  setStatusFor(l, next);
+  return true;
+}
+
+function contactRowHtml(l, kind) {
+  const id = esc(l.id);
+  const d = draft(l, kind);
+  const msg = shortMessage(l, kind);
+  const btn = (attrs, label, title = "") => `<a class="btn ghost small" ${attrs} data-id="${id}"${title ? ` title="${esc(title)}"` : ""}>${label}</a>`;
+  const out = [];
+  if (l.email) {
+    out.push(btn(`href="${esc(gmailLink(l.email, d.subject, d.body))}" target="_blank" rel="noopener" data-act="send" data-copy=""`, "Gmail", "Open a Gmail draft with this email filled in"));
+    out.push(btn(`href="mailto:${esc(l.email)}?subject=${encodeURIComponent(d.subject)}&amp;body=${encodeURIComponent(d.body)}" data-act="send" data-copy=""`, "Mail app", "Open your email app with this email filled in"));
+    out.push(`<button type="button" class="ghost small" data-act="copyaddr" data-id="${id}">Copy address</button>`);
+  }
+  const wa = intlPhone(l.whatsapp || l.phone);
+  if (wa) {
+    const kindOf = l.whatsapp ? "listed" : phoneKind(wa);
+    const label = kindOf === "listed" ? "WhatsApp (listed)" : kindOf === "landline" ? "WhatsApp (landline?)" : "WhatsApp";
+    const title = kindOf === "listed" ? "The map listing says this number is on WhatsApp"
+      : kindOf === "landline" ? "This looks like a landline, which usually isn't on WhatsApp. If it isn't, WhatsApp will say so: use SMS or a call instead."
+      : kindOf === "mobile" ? "Mobile number. If it isn't on WhatsApp, WhatsApp will say so."
+      : "If this number isn't on WhatsApp, WhatsApp will say so.";
+    out.push(btn(`href="https://wa.me/${wa}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener" data-act="send" data-copy=""`, label, title));
+  }
+  const tel = intlPhone(l.phone);
+  if (tel) {
+    out.push(btn(`href="sms:+${tel}?&amp;body=${encodeURIComponent(msg)}" data-act="send" data-copy=""`, "SMS", "Opens your phone's messages app with the text filled in"));
+    out.push(btn(`href="tel:+${tel}" data-act="send" data-copy=""`, "Call"));
+  } else if (l.phone) {
+    out.push(btn(`href="tel:${esc(l.phone.replace(/[^\d+]/g, ""))}" data-act="send" data-copy=""`, "Call"));
+  }
+  const fb = messengerLink(l.facebook);
+  if (fb) out.push(btn(`href="${esc(fb)}" target="_blank" rel="noopener" data-act="send" data-copy="msg"`, "Messenger", "Copies the message, then opens their Facebook page chat. Paste it in."));
+  const ig = instagramLink(l.instagram);
+  if (ig) out.push(btn(`href="${esc(ig)}" target="_blank" rel="noopener" data-act="send" data-copy="msg"`, "Instagram DM", "Copies the message, then opens an Instagram chat. Paste it in."));
+  const form = l.content?.contactUrl;
+  if (form) out.push(btn(`href="${esc(form)}" target="_blank" rel="noopener" data-act="send" data-copy="msg"`, "Contact form", "Copies the message, then opens their contact page. Paste it into the form."));
+  if (msg && (wa || tel || fb || ig || form)) out.push(`<button type="button" class="ghost small" data-act="copymsg" data-id="${id}">Copy message</button>`);
+  const label = KINDS_SITE.concat(KINDS_NOSITE).find(([k]) => k === kind)?.[1] || "First email";
+  return out.length
+    ? `<div class="card-contact"><span class="label">Contact</span><div class="actions">${out.join("")}</div><span class="contact-note">Sends: ${esc(label)}. Change it under Messages.</span></div>`
+    : `<div class="card-contact"><span class="label">Contact</span><span class="contact-note">No email or phone on the map. Try Find email.</span></div>`;
+}
+
+let toastTimer = 0;
+function toast(msg) {
+  $("toast").textContent = msg;
+  $("toast").hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { $("toast").hidden = true; }, 3500);
+}
+
+async function copyPlain(text) {
+  try { await navigator.clipboard.writeText(text); return true; }
+  catch {
+    const t = document.createElement("textarea");
+    t.value = text; t.style.position = "fixed"; t.style.opacity = "0";
+    document.body.appendChild(t); t.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch {}
+    t.remove();
+    return ok;
+  }
 }
 
 // ---------------- Rendering ----------------
@@ -1584,7 +1766,7 @@ function cardHtml(l) {
   const st = statusOf(l);
   const foot = [
     ready && l.website && `<button type="button" class="primary small" data-act="report" data-id="${id}">Report</button>`,
-    ready && `<button type="button" class="${l.website ? "ghost" : "primary"} small" data-act="draft" data-id="${id}" aria-expanded="${open}">${open ? "Hide email" : "Email"}</button>`,
+    ready && `<button type="button" class="${l.website ? "ghost" : "primary"} small" data-act="draft" data-id="${id}" aria-expanded="${open}">${open ? "Hide messages" : "Messages"}</button>`,
     ready && `<button type="button" class="ghost small" data-act="prompt" data-id="${id}">${l.website ? "Redesign prompt" : "Website prompt"}</button>`,
     href && (lv === "unchecked" || l.audit?.state === "error") && !state.checking && `<button type="button" class="ghost small" data-act="check" data-id="${id}">Check website</button>`,
     !l.email && `<a class="btn ghost small" href="${esc(search)}" target="_blank" rel="noopener">Find email</a>`,
@@ -1599,8 +1781,10 @@ function cardHtml(l) {
       <pre>${esc(d.body)}</pre>
       <div class="actions">
         <button type="button" class="primary small" data-act="copy" data-id="${id}">Copy email</button>
-        ${l.email ? `<a class="btn ghost small" href="mailto:${esc(l.email)}?subject=${encodeURIComponent(d.subject)}&amp;body=${encodeURIComponent(d.body)}">Open in mail app</a>` : ""}
       </div>
+      <p class="subj"><b>Short message</b> for WhatsApp, SMS, Messenger or a contact form</p>
+      <pre>${esc(shortMessage(l, kind))}</pre>
+      <div class="actions"><button type="button" class="ghost small" data-act="copymsg" data-id="${id}">Copy message</button></div>
     </div>` : "";
   return `<article class="card ${lv}${followUpDue(l) ? " due" : ""}">
     <div class="score" title="Opportunity score (higher = better lead)">${badge}</div>
@@ -1612,6 +1796,7 @@ function cardHtml(l) {
     ${contact ? `<p class="meta">${contact}</p>` : `<p class="meta">No contact details on the map</p>`}
     <div class="card-body">${body}</div>
     <div class="card-foot">${foot}</div>
+    ${ready ? contactRowHtml(l, kind) : ""}
     ${ready && !state.example ? `<div class="card-status">
       <label for="st-${id}">Status</label>
       <select id="st-${id}" data-act="status" data-id="${id}">${STATUSES.map(([k, label]) => `<option value="${k}"${k === st.s ? " selected" : ""}>${label}</option>`).join("")}</select>
@@ -1757,7 +1942,7 @@ async function checkLeads(targets) {
   else if (state.stop) setStatus(`Stopped after ${done} checks. Press Check websites to continue.`);
   else {
     const hot = state.leads.filter(l => l.score !== null && l.score >= 60).length;
-    setStatus(`Done. ${hot} hot leads. Open a card's email draft to contact them.`);
+    setStatus(`Done. ${hot} hot leads. Use the Contact buttons on each card to reach them.`);
   }
 }
 
@@ -1867,10 +2052,22 @@ function boot() {
     render();
   }));
   $("list").addEventListener("click", (e) => {
-    const btn = e.target.closest("button[data-act]");
-    if (!btn) return;
+    const btn = e.target.closest("[data-act]");
+    if (!btn || btn.tagName === "SELECT") return;
     const l = state.leads.find(x => x.id === btn.dataset.id);
     if (!l) return;
+    const kind = kindsFor(l).some(([k]) => k === state.kind[l.id]) ? state.kind[l.id] : "first";
+    if (btn.dataset.act === "send") {
+      // The link opens as usual; this copies the text where the app can't take it, and moves the status on.
+      const notes = [];
+      if (btn.dataset.copy === "msg") { copyPlain(shortMessage(l, kind)); notes.push("Message copied: paste it in"); }
+      if (!state.example && advanceStatus(l, kind)) notes.push(`Marked as ${STATUS_LABEL[statusOf(l).s]}`);
+      if (notes.length) toast(notes.join(". ") + ".");
+      setTimeout(render, 400);
+      return;
+    }
+    if (btn.dataset.act === "copyaddr") { copyPlain(l.email).then(ok => toast(ok ? `Copied ${l.email}` : "Couldn't copy. Select the address on the card instead.")); return; }
+    if (btn.dataset.act === "copymsg") { copyPlain(shortMessage(l, kind)).then(ok => toast(ok ? "Message copied." : "Couldn't copy. Open Messages and select the text.")); return; }
     if (btn.dataset.act === "draft") { state.open.has(l.id) ? state.open.delete(l.id) : state.open.add(l.id); render(); }
     else if (btn.dataset.act === "check") startChecks([l]);
     else if (btn.dataset.act === "copy") copyDraft(l, btn);
