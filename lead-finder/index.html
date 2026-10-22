@@ -130,6 +130,22 @@ body.report-open { overflow: hidden; }
   display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; }
 .rv-note { font-size: 13px; color: var(--muted); margin: 0; flex: 1 1 220px; min-width: 0; }
 .rv-page { padding-block: 24px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+/* Redesign editor */
+#designView { position: fixed; inset: 0; z-index: 60; background: var(--bg); overflow: auto; }
+.dv-grid { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 20px; align-items: start; padding-block: 20px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+@media (max-width: 900px) { .dv-grid { grid-template-columns: minmax(0, 1fr); } }
+.dv-controls { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 12px; }
+.dv-controls input[type=color] { width: 100%; height: 40px; padding: 3px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.dv-stage { min-width: 0; position: sticky; top: 76px; }
+.dv-frame { background: #fff; overflow: hidden; }
+.dv-frame.desk { position: relative; width: 100%; aspect-ratio: 1280 / 820; border: 1px solid var(--line); border-radius: 10px; }
+.dv-frame.desk iframe { position: absolute; top: 0; left: 0; width: 1280px; height: 820px; border: 0; transform: scale(var(--s, 0.5)); transform-origin: 0 0; }
+.dv-frame.phone { width: 390px; max-width: 100%; height: 780px; margin: 0 auto; border: 10px solid #111; border-radius: 36px; }
+.dv-frame.phone iframe { width: 100%; height: 100%; border: 0; }
+@media (max-width: 900px) { .dv-stage { position: static; } }
+@media print { #designView { display: none !important; } }
+
 @media print {
   body.report-open { overflow: visible; background: #fff; }
   body.report-open > .wrap, .rv-bar { display: none !important; }
@@ -281,7 +297,7 @@ body.report-open { overflow: hidden; }
       <ol>
         <li><b>First email:</b> oder 3 ta ashol problem bolun, free report offer korun. Link ba attachment deben na.</li>
         <li><b>Follow-up</b> 3 din pore, <b>Last follow-up</b> 7 din pore. Beshirbhag reply ase follow-up theke.</li>
-        <li>Reply dile <b>Client report</b> khulun, <b>Save as PDF</b> korun, "Send report" email er sathe attach kore pathan.</li>
+        <li>Reply dile <b>Redesign concept</b> e headline/service thik korun, tarpor <b>Client report</b> khule <b>Save as PDF</b> kore "Send report" email er sathe pathan.</li>
         <li>Call e report ta dekhiye recommended package ta bolun. Guarantee thakle bolun.</li>
       </ol>
     </section>
@@ -309,6 +325,7 @@ body.report-open { overflow: hidden; }
     <p class="rv-note" id="rvNote"></p>
     <div class="actions">
       <button type="button" class="ghost small" id="rvRecheck" hidden>Re-check for screenshots</button>
+      <button type="button" class="ghost small" id="rvDesign">Edit redesign</button>
       <button type="button" class="ghost small" id="rvCopy">Copy "send report" email</button>
       <button type="button" class="ghost small" id="rvHtml">Download HTML</button>
       <button type="button" class="primary small" id="rvPdf">Save as PDF</button>
@@ -317,11 +334,64 @@ body.report-open { overflow: hidden; }
   <div class="rv-page" id="reportDoc"></div>
 </div>
 
+<div id="designView" role="dialog" aria-modal="true" aria-label="Homepage redesign concept" hidden>
+  <div class="rv-bar">
+    <button type="button" class="ghost small" id="dvBack">← Back to leads</button>
+    <p class="rv-note" id="dvNote"></p>
+    <div class="actions">
+      <div class="tabs" role="group" aria-label="Preview size">
+        <button type="button" class="tab" id="dvDesk" aria-pressed="true">Desktop</button>
+        <button type="button" class="tab" id="dvPhone" aria-pressed="false">Phone</button>
+      </div>
+      <button type="button" class="ghost small" id="dvReport">Open client report</button>
+      <button type="button" class="primary small" id="dvDownload">Download homepage</button>
+    </div>
+  </div>
+  <div class="dv-grid">
+    <form class="dv-controls" id="dvForm" autocomplete="off">
+      <div class="row2">
+        <div class="field">
+          <label for="dvStyle">Style</label>
+          <select id="dvStyle"></select>
+        </div>
+        <div class="field">
+          <label for="dvColor">Brand colour</label>
+          <input type="color" id="dvColor" value="#0f766e">
+        </div>
+      </div>
+      <div class="field">
+        <label for="dvHead">Headline</label>
+        <textarea id="dvHead" rows="2"></textarea>
+      </div>
+      <div class="field">
+        <label for="dvSub">Intro line</label>
+        <textarea id="dvSub" rows="3"></textarea>
+      </div>
+      <div class="field">
+        <label for="dvCta">Main button</label>
+        <input type="text" id="dvCta">
+      </div>
+      <div class="field">
+        <label for="dvServices">Services (one per line, "Name: short description")</label>
+        <textarea id="dvServices" rows="7"></textarea>
+      </div>
+      <div class="field">
+        <label for="dvAbout">About text</label>
+        <textarea id="dvAbout" rows="4"></textarea>
+      </div>
+      <button type="button" class="ghost small" id="dvReset">Reset to suggestions</button>
+      <p class="hint">The concept uses their name, phone, address, hours, logo and photos when it can find them. Changes show in the client report too.</p>
+    </form>
+    <div class="dv-stage"><div class="dv-frame desk" id="dvFrame"><iframe id="dvIframe" title="Homepage concept preview"></iframe></div></div>
+  </div>
+</div>
+
 <script>
 "use strict";
 const NOMINATIM = "https://nominatim.openstreetmap.org/search";
 const OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter", "https://overpass.private.coffee/api/interpreter"];
 const PSI = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed";
+const CURRENT_YEAR = new Date().getFullYear();
 
 // [key, label, OpenStreetMap tags], grouped for the dropdown.
 const CATEGORY_GROUPS = [
@@ -563,6 +633,7 @@ function toLead(el) {
     email: t.email || t["contact:email"] || "",
     address: [street, t["addr:city"], t["addr:postcode"]].filter(Boolean).join(", "),
     facebook: t["contact:facebook"] || t.facebook || "",
+    hours: t.opening_hours || "",
     map: `https://www.openstreetmap.org/${el.type}/${el.id}`,
     chain: Boolean(t.brand || t["brand:wikidata"]),
     audit: null,
@@ -703,6 +774,31 @@ const ISSUES = {
     title: () => "No visitor tracking",
     impact: () => "You can't see how many people visit your site, where they come from, or which pages bring in enquiries.",
     fix: () => "Set up Google Analytics and Search Console so you can see what's working." },
+  no_cta: { points: 10, sev: "important",
+    email: () => "there's no clear button telling visitors what to do next, like call, book or get a quote",
+    title: () => "No clear next step for visitors",
+    impact: () => "Your homepage has no clear button like “Book an appointment” or “Get a free quote”. Visitors who are ready to buy have to hunt for how to contact you, and many simply leave.",
+    fix: () => "Put one clear call to action at the top of the page and repeat it as visitors scroll." },
+  no_tel: { points: 8, sev: "important",
+    email: () => "the phone number isn't tap-to-call, so mobile visitors can't call you with one tap",
+    title: () => "No tap-to-call button",
+    impact: () => "Your phone number isn't a tap-to-call link, so people on phones have to copy it or type it in. Every extra step loses calls.",
+    fix: () => "Add a tap-to-call button that stays visible on phones." },
+  no_form: { points: 8, sev: "important",
+    email: () => "there's no contact or booking form, so visitors who don't want to call can't reach you",
+    title: () => "No contact or booking form",
+    impact: () => "Many people prefer not to call, especially in the evening. Without a form or online booking, those visitors go to a competitor who has one.",
+    fix: () => "Add a short enquiry form or online booking that sends straight to your email or phone." },
+  no_reviews: { points: 6, sev: "minor",
+    email: () => "the site doesn't show any customer reviews, which are what convince new customers to choose you",
+    title: () => "No customer reviews on the site",
+    impact: () => "Your website doesn't show reviews or testimonials. Most people read reviews before choosing a local business, and showing them on your site builds trust right when people decide.",
+    fix: () => "Show your best Google reviews on the homepage, updated automatically." },
+  outdated_copyright: { points: 6, sev: "minor",
+    email: (a) => `the footer still says © ${a.copyrightYear}, which makes the business look inactive`,
+    title: () => "Looks out of date",
+    impact: (a) => `Your footer still says © ${a.copyrightYear}. Visitors notice, and it makes them wonder whether you're still in business.`,
+    fix: () => "Refresh the content and make the year update itself." },
 };
 const SEV_LABEL = { critical: "Critical", important: "Important", minor: "Minor" };
 const SEV_RANK = { critical: 0, important: 1, minor: 2 };
@@ -824,29 +920,29 @@ ${call} Or just reply with any questions.`],
     first: [`Quick note about ${l.name}'s website`,
 `Hi ${l.name} team,
 
-I came across ${l.name} while looking at ${what}${where} and had a quick look at your website (${domainOf(l.website)}). A few things stood out that are probably costing you customers:
+I came across ${l.name} while looking at ${what}${where} and had a quick look at your website (${domainOf(l.website)}). A few things stood out that are probably stopping visitors from becoming customers:
 
 ${bullets}
 
-All of these are fixable, usually within a few days. I'm a web developer who works with WordPress and small business websites, and I've put together a free report with screenshots of how your site loads on a phone and how it compares with other ${what} nearby.
+I'm a web developer who redesigns websites for small businesses, so I put together two things for you, free: a short report showing what's holding the site back, and a first design of what a new, faster homepage for ${l.name} could look like.
 
-Would you like me to send it over?`],
+Would you like me to send them over?`],
     followup: [`Re: Quick note about ${l.name}'s website`,
 `Hi ${l.name} team,
 
 Just following up on my note about ${domainOf(l.website)}. The biggest issue I found: ${top}.
 
-Your free report is ready. Just reply "yes" and I'll send it over.`],
+Your free report and the homepage design I made for you are ready. Just reply "yes" and I'll send them over.`],
     last: [`Re: Quick note about ${l.name}'s website`,
 `Hi ${l.name} team,
 
 I don't want to fill your inbox, so this is my last note. If the website isn't a priority right now, no problem at all.
 
-If it becomes one, the free report on ${domainOf(l.website)} is yours whenever you want it, and my ${rec.name.toLowerCase()} is ${rec.price}.`],
+If it becomes one, the free report and new homepage design for ${domainOf(l.website)} are yours whenever you want them, and my ${rec.name.toLowerCase()} is ${rec.price}.`],
     report: [`Your website report: ${l.name}`,
 `Hi ${l.name} team,
 
-Thanks for getting back to me. Your report is attached. The short version:
+Thanks for getting back to me. Your report is attached, including a first design of your new homepage. The short version:
 
 ${bullets}
 
@@ -881,6 +977,10 @@ function verdict(l) {
   const city = state.city ? cityLabel(state.city).split(",")[0] : "your area";
   if (!l.website) return `Customers searching for ${what} in ${city} can't find you online, so they call the businesses that have a website.`;
   if (issues.includes("down")) return "Right now your website doesn't load, so everyone who looks you up finds a dead end.";
+  const checks = conversionChecks(l);
+  const missing = checks.filter(([, ok]) => !ok).length;
+  const slow = issues.includes("psi_low") || (a.lcp != null && a.lcp > 3);
+  if (missing >= 2) return `Your website isn't turning visitors into customers. ${missing === checks.length ? `It doesn't do any of the ${checks.length} things` : `It's missing ${missing} of the ${checks.length} things`} that bring in calls and bookings${slow ? ", and it's slow on phones" : ""}.`;
   const crit = issues.filter(c => ISSUES[c]?.sev === "critical");
   if (crit.length) return `Your website has ${issues.length} problem${issues.length > 1 ? "s" : ""} that cost you customers. The most urgent: ${ISSUES[crit[0]].title(a)}.`;
   if (issues.includes("psi_low")) return "Your website works, but it's slow on phones, and slow sites lose visitors before they ever see your services.";
@@ -907,6 +1007,31 @@ function reportHtml(l) {
   </header>
   <p class="rp-verdict">${esc(verdict(l))}</p>`);
 
+  if (l.website && !(a.issues || []).includes("down")) {
+    const checks = conversionChecks(l);
+    const have = checks.filter(([, ok]) => ok).length;
+    if (checks.length >= 3) {
+      parts.push(`<section><h2>${have < checks.length ? "Why your website isn't bringing in more customers" : "Your website covers the basics"}</h2>
+        <p class="rp-cap">Websites that turn visitors into calls and bookings do all of these. Yours does <b>${have} of ${checks.length}</b>.</p>
+        <ul class="rp-conv">${checks.map(([label, ok]) => `<li class="${ok ? "ok" : "no"}"><span>${ok ? "✓" : "✕"}</span>${esc(label)}</li>`).join("")}</ul></section>`);
+    }
+  }
+
+  parts.push(conceptSectionHtml(l));
+
+  if (a.film && a.film.length) {
+    const film = (a.film || []);
+    const step = Math.max(1, Math.ceil(film.length / 8));
+    const frames = film.filter((_, i) => i % step === 0).slice(0, 8);
+    const lcpText = a.lcp ? `Your main content appears after <b>${a.lcp.toFixed(1)} seconds</b>. Google's target is under 2.5 seconds.` : "";
+    parts.push(`<section><h2>How your site loads on a phone today</h2><div>
+      <div>${frames.length ? `<p class="rp-cap">What a customer sees while your homepage loads, second by second:</p><div class="rp-film" style="--cols:${frames.length}">${frames.map(f =>
+        `<figure><img src="${esc(f.src)}" alt=""><figcaption>${(f.t / 1000).toFixed(1)}s</figcaption></figure>`).join("")}</div>` : ""}
+        ${lcpText ? `<p class="rp-cap">${lcpText}</p>` : ""}
+        ${a.field ? `<p class="rp-cap">Real Chrome users visiting your site over the last 28 days rate it: <b>${{ FAST: "Fast", AVERAGE: "Needs improvement", SLOW: "Slow" }[a.field] || esc(a.field)}</b>.</p>` : ""}
+      </div></div></section>`);
+  }
+
   if (l.website && !(a.issues || []).includes("down") && [a.perf, a.seo, a.bp, a.a11y].some(x => x != null)) {
     const tiles = [["Speed", a.perf, "How fast it loads on a phone"], ["Google search", a.seo, "How well Google can read it"],
       ["Security & quality", a.bp, "Modern, safe code"], ["Accessibility", a.a11y, "Usable by everyone"]];
@@ -914,20 +1039,6 @@ function reportHtml(l) {
       <div class="rp-tile"><div class="n ${scoreTone(v)}">${v ?? "–"}<small>/100</small></div><div class="l"><b>${label}</b><br>${hint}</div>
       <div class="rp-meter"><i class="bg-${scoreTone(v) || "mid"}" style="width:${v ?? 0}%"></i></div></div>`).join("")}</div>
       <p class="rp-note">Scores from Google's own testing tool. 90+ is good, under 50 is poor.</p></section>`);
-  }
-
-  if (a.shot || (a.film && a.film.length)) {
-    const film = (a.film || []);
-    const step = Math.max(1, Math.ceil(film.length / 8));
-    const frames = film.filter((_, i) => i % step === 0).slice(0, 8);
-    const lcpText = a.lcp ? `Your main content appears after <b>${a.lcp.toFixed(1)} seconds</b>. Google's target is under 2.5 seconds.` : "";
-    parts.push(`<section><h2>What your customers see on a phone</h2><div class="rp-see">
-      ${a.shot ? `<div class="rp-phone"><img src="${esc(a.shot)}" alt="Your homepage on a mobile phone"></div>` : ""}
-      <div>${frames.length ? `<p class="rp-cap">Your page loading, second by second:</p><div class="rp-film" style="--cols:${frames.length <= 5 ? frames.length : Math.ceil(frames.length / 2)}">${frames.map(f =>
-        `<figure><img src="${esc(f.src)}" alt=""><figcaption>${(f.t / 1000).toFixed(1)}s</figcaption></figure>`).join("")}</div>` : ""}
-        ${lcpText ? `<p class="rp-cap">${lcpText}</p>` : ""}
-        ${a.field ? `<p class="rp-cap">Real Chrome users visiting your site over the last 28 days rate it: <b>${{ FAST: "Fast", AVERAGE: "Needs improvement", SLOW: "Slow" }[a.field] || esc(a.field)}</b>.</p>` : ""}
-      </div></div></section>`);
   }
 
   if (l.website && (a.issues || []).length) {
@@ -1076,7 +1187,24 @@ const REPORT_CSS = `
 .rp-contact { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 14px; } .rp-contact span { overflow-wrap: anywhere; } .rp-contact a { color: #8fe0c7; }
 .rp-by { margin: 14px 0 0 !important; font-size: 13px; color: #b7c4be; }
 .rp-foot { margin-top: 22px; font-size: 12px; color: var(--r-muted); }
+.rp-conv { list-style: none; padding: 0; margin: 14px 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px; }
+.rp-conv li { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 8px; background: var(--r-soft); font-size: 14px; break-inside: avoid; }
+.rp-conv li.no { background: #fcefed; }
+.rp-conv span { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 12px; }
+.rp-conv .ok span { background: var(--r-good); } .rp-conv .no span { background: var(--r-bad); }
+.rp-ba { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; margin-top: 14px; }
+.rp-cf { margin: 0; width: 211px; flex: none; }
+.rp-cf .rp-phone { width: 211px; }
+.rp-cf figcaption { text-align: center; font-weight: 700; font-size: 14px; margin-top: 8px; }
+.mk-phone { box-sizing: content-box !important; width: 195px; height: 422px; border: 8px solid var(--r-ink); border-radius: 26px; overflow: hidden; background: #fff; position: relative; }
+.mk-phone iframe, .mk-desk iframe { position: absolute; top: 0; left: 0; border: 0; transform-origin: 0 0; pointer-events: none; background: #fff; }
+.mk-phone iframe { width: 390px; height: 844px; transform: scale(0.5); }
+.rp-gains { flex: 1 1 220px; align-self: center; }
+.mk-desk { position: relative; margin-top: 22px; width: 100%; max-width: 640px; aspect-ratio: 1280 / 760; overflow: hidden; border: 1px solid var(--r-line); border-radius: 10px; break-inside: avoid; }
+.mk-desk iframe { width: 1280px; height: 760px; transform: scale(var(--s, 0.5)); }
 @media (max-width: 640px) {
+  .rp-conv { grid-template-columns: minmax(0, 1fr); }
+  .rp-ba { justify-content: center; }
   .rp { padding: 24px 18px; border-radius: 10px; }
   .rp h1 { font-size: 26px; }
   .rp-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1088,6 +1216,8 @@ const REPORT_CSS = `
 @media print {
   .rp { border: 0; border-radius: 0; padding: 0 3px; max-width: none; }
   .rp section { break-inside: auto; } .rp h2 { break-after: avoid; }
+  .rp-concept { break-before: page; } .rp-ba { break-inside: avoid; }
+  .mk-desk { max-width: 540px; --s: 0.421875 !important; }
   @page { margin: 14mm; }
 }`;
 
@@ -1096,6 +1226,8 @@ let reportLead = null;
 function openReport(l) {
   reportLead = l;
   $("reportDoc").innerHTML = reportHtml(l);
+  $("reportView").hidden = false;
+  fitFrames($("reportDoc"));
   const needsShots = l.website && l.audit?.state === "done" && !(l.audit.issues || []).includes("down") && !l.audit.shot;
   $("rvRecheck").hidden = !needsShots || state.example;
   $("rvNote").textContent = needsShots
@@ -1130,8 +1262,640 @@ function downloadReportHtml(l) {
 <title>${esc(l.website ? "Website review" : "Website proposal")}: ${esc(l.name)}</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap">
 <style>body { margin: 0; background: #eef2f0; padding: 24px 12px; } ${REPORT_CSS}</style></head>
-<body>${reportHtml(l)}</body></html>`;
+<body>${reportHtml(l)}
+<script>function fit(){document.querySelectorAll(".mk-desk").forEach(function(w){w.style.setProperty("--s",w.clientWidth/1280)})}addEventListener("load",fit);addEventListener("resize",fit);<\/script>
+</body></html>`;
   downloadFile(`website-review-${slugify(l.name)}.html`, doc, "text/html;charset=utf-8");
+}
+
+// ---------------- Reading the client's current site ----------------
+// Browsers can't read another site's HTML directly, so this goes through public read-only
+// proxies, trying each in turn. Everything here is best effort: no content just means
+// the redesign uses industry defaults.
+const CONTENT_PROXIES = [
+  (u) => [`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`, "html"],
+  (u) => [`https://corsproxy.io/?url=${encodeURIComponent(u)}`, "html"],
+  (u) => [`https://r.jina.ai/${u}`, "text"],
+];
+const CTA_RE = /\b(book (now|online|today|an? (appointment|table|visit|call|consultation))|schedule (now|online|an? \w+)|get (a |your )?(free )?(quote|estimate|valuation|consultation)|request (an? )?(appointment|quote|callback)|call (us )?(now|today)|reserve( a table)?|order (now|online)|start (your )?free trial|enquire now|contact us today)\b/i;
+const REVIEW_RE = /testimonial|reviews?\b|what (our )?(clients|customers|patients|guests) say|★★★★|trustindex|elfsight|birdeye|trustpilot/i;
+const FORM_RE = /wpcf7|wpforms|gform_|ninja-forms|formidable|elementor-form|calendly|acuityscheduling|setmore|simplybook|booksy|opentable|resy\.com|zocdoc|square\.site|vagaro|fresha/i;
+const GENERIC_HEADING = /^(welcome|home|about|contact|get in touch|our team|meet|why|testimonial|review|faq|hours|location|find us|follow|news|blog|copyright|menu|call|book|privacy|cookie|subscribe|newsletter|quick links|useful links|social)/i;
+
+async function fetchWithTimeout(url, ms) {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), ms);
+  try { return await fetch(url, { signal: ctl.signal }); } finally { clearTimeout(t); }
+}
+
+async function fetchSiteContent(url) {
+  const target = normUrl(url);
+  for (const make of CONTENT_PROXIES) {
+    const [proxied, kind] = make(target);
+    try {
+      const r = await fetchWithTimeout(proxied, 15000);
+      if (!r.ok) continue;
+      const text = await r.text();
+      if (text.length < 300) continue;
+      const c = kind === "html" ? parseHtmlContent(text, target) : parseTextContent(text, target);
+      if (c.words > 40) return c;
+    } catch {}
+  }
+  return null;
+}
+
+function cleanEmails(list) {
+  return [...new Set(list.map(e => e.trim().toLowerCase().replace(/^mailto:/, "").split("?")[0]))]
+    .filter(e => /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/.test(e) && !/\.(png|jpe?g|gif|webp|svg)$|example\.|sentry|wixpress|domain\.com|yourname|@2x/.test(e)).slice(0, 3);
+}
+
+function parseHtmlContent(html, base) {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const abs = (u) => { try { return u ? new URL(u, base).href : ""; } catch { return ""; } };
+  const txt = (el) => (el?.textContent || "").replace(/\s+/g, " ").trim();
+  const meta = (sel) => (doc.querySelector(sel)?.getAttribute("content") || "").trim();
+  const imgSrc = (img) => abs(img.getAttribute("data-src") || img.getAttribute("data-lazy-src") || img.getAttribute("src") || "");
+  doc.querySelectorAll("script, style, noscript, template").forEach(n => n.remove());
+  const bodyText = txt(doc.body);
+  const imgs = [...doc.querySelectorAll("img")];
+  const logoImg = imgs.find(i => /logo/i.test(`${i.getAttribute("src")} ${i.alt} ${i.className} ${i.id} ${i.parentElement?.className || ""}`));
+  const photos = imgs.filter(i => i !== logoImg)
+    .map(i => ({ src: imgSrc(i), w: parseInt(i.getAttribute("width") || "0", 10) }))
+    .filter(i => /^https?:/.test(i.src) && !/\.svg|icon|sprite|pixel|spacer|badge|avatar|\.gif|gravatar|facebook\.com|google\.com\/maps/i.test(i.src) && (i.w === 0 || i.w >= 300));
+  const ogImage = abs(meta('meta[property="og:image"]'));
+  const theme = meta('meta[name="theme-color"]');
+  const years = [...bodyText.matchAll(/(?:©|copyright)\s*(?:\d{4}\s*[-–]\s*)?((?:19|20)\d{2})/gi)].map(m => +m[1]).filter(y => y <= CURRENT_YEAR);
+  return {
+    fetched: true,
+    title: (doc.title || "").trim().slice(0, 120),
+    description: (meta('meta[name="description"]') || meta('meta[property="og:description"]')).slice(0, 300),
+    h1: txt(doc.querySelector("h1")).slice(0, 140),
+    headings: [...doc.querySelectorAll("h2, h3")].map(txt).filter(t => t.length > 2 && t.length < 70 && !GENERIC_HEADING.test(t)).slice(0, 12),
+    paragraphs: [...doc.querySelectorAll("p")].map(txt).filter(t => t.length > 80 && t.length < 600 && !/cookie|copyright|©|all rights reserved/i.test(t)).slice(0, 4),
+    hasTel: Boolean(doc.querySelector('a[href^="tel:"]')),
+    hasForm: [...doc.querySelectorAll("form")].some(f => f.querySelector("textarea, input[type=email], input[type=tel]")) || FORM_RE.test(html),
+    hasCta: [...doc.querySelectorAll("a, button")].some(e => CTA_RE.test(txt(e))),
+    hasReviews: REVIEW_RE.test(bodyText) || /trustindex|elfsight|birdeye|reviews-widget/i.test(html),
+    emails: cleanEmails([...doc.querySelectorAll('a[href^="mailto:"]')].map(a => a.getAttribute("href")).concat(bodyText.match(EMAIL_TEXT_RE) || [])),
+    phones: [...new Set([...doc.querySelectorAll('a[href^="tel:"]')].map(a => txt(a) || a.getAttribute("href").slice(4)))].slice(0, 2),
+    logo: logoImg ? imgSrc(logoImg) : "",
+    hero: ogImage || photos[0]?.src || "",
+    images: [...new Set(photos.map(p => p.src))].slice(0, 6),
+    themeColor: /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(theme) ? theme : "",
+    year: years.length ? Math.max(...years) : 0,
+    words: bodyText.split(" ").length,
+  };
+}
+
+// Plain-text/markdown fallback (from the reader proxy): fewer signals, so unknowns stay null.
+function parseTextContent(md, base) {
+  const lines = md.split("\n").map(s => s.trim());
+  const heads = lines.filter(s => /^#{1,3}\s/.test(s)).map(s => s.replace(/^#+\s*/, "").replace(/[*_]/g, "").trim());
+  const images = [...md.matchAll(/!\[[^\]]*\]\((https?:[^)\s]+)\)/g)].map(m => m[1]).filter(u => !/\.svg|icon|logo|sprite|\.gif/i.test(u));
+  const logo = [...md.matchAll(/!\[([^\]]*)\]\((https?:[^)\s]+)\)/g)].find(m => /logo/i.test(m[1] + m[2]));
+  const plain = md.replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1");
+  const years = [...plain.matchAll(/(?:©|copyright)\s*(?:\d{4}\s*[-–]\s*)?((?:19|20)\d{2})/gi)].map(m => +m[1]).filter(y => y <= CURRENT_YEAR);
+  return {
+    fetched: true,
+    title: (md.match(/^Title:\s*(.+)$/m)?.[1] || "").trim().slice(0, 120),
+    description: "",
+    h1: heads[0] || "",
+    headings: heads.slice(1).filter(t => t.length > 2 && t.length < 70 && !GENERIC_HEADING.test(t)).slice(0, 12),
+    paragraphs: lines.filter(s => s.length > 80 && s.length < 600 && !/^[#!\[|>*-]|cookie|copyright|©/i.test(s)).map(s => s.replace(/[*_]/g, "")).slice(0, 4),
+    hasTel: /\(tel:/i.test(md),
+    hasForm: FORM_RE.test(md) ? true : null,
+    hasCta: CTA_RE.test(plain),
+    hasReviews: REVIEW_RE.test(plain),
+    emails: cleanEmails(plain.match(EMAIL_TEXT_RE) || []),
+    phones: [],
+    logo: logo ? logo[2] : "",
+    hero: images[0] || "",
+    images: [...new Set(images)].slice(0, 6),
+    themeColor: "",
+    year: years.length ? Math.max(...years) : 0,
+    words: plain.split(/\s+/).length,
+  };
+}
+const EMAIL_TEXT_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+
+// Turns what the page is missing into scored problems. Needs enough real text to judge:
+// a site that renders everything with JavaScript would otherwise look empty.
+function applyContentIssues(l) {
+  const c = l.content, a = l.audit;
+  if (!c || !a || a.state !== "done") return;
+  if (!l.email && c.emails?.length) l.email = c.emails[0];
+  if (c.words < 150) return;
+  const add = (code) => { if (!a.issues.includes(code)) a.issues.push(code); };
+  if (c.hasCta === false) add("no_cta");
+  if (c.hasTel === false) add("no_tel");
+  if (c.hasForm === false) add("no_form");
+  if (c.hasReviews === false) add("no_reviews");
+  if (c.year && c.year <= CURRENT_YEAR - 2) { a.copyrightYear = c.year; add("outdated_copyright"); }
+}
+
+// What a website needs to turn visitors into customers, and whether this one has it.
+function conversionChecks(l) {
+  const a = l.audit || {}, is = a.issues || [], c = l.content;
+  const known = c && c.words >= 150;
+  return [
+    ["Works well on phones", !is.includes("no_viewport")],
+    ["Loads in under 3 seconds", a.lcp == null ? null : a.lcp <= 3],
+    ["Secure, with no browser warnings", !is.includes("no_https") && !is.includes("ssl_broken")],
+    ["A clear button to call, book or get a quote", known ? c.hasCta : null],
+    ["Tap-to-call phone number", known ? c.hasTel : null],
+    ["Contact or booking form", known ? c.hasForm : null],
+    ["Customer reviews on the page", known ? c.hasReviews : null],
+    ["Set up properly for Google", !is.includes("no_title") && !is.includes("no_meta_desc")],
+  ].filter(([, ok]) => ok === true || ok === false);
+}
+
+// ---------------- Homepage redesign concept ----------------
+// Starter copy per industry; every line can be edited in the redesign view.
+const INDUSTRY = {
+  dentist: { noun: "dental practice", cta: "Book an appointment", vibe: "clean", color: "#0f766e",
+    head: "Gentle, modern dental care in {city}",
+    sub: "Check-ups, whitening, implants and emergency care for the whole family, with clear prices and easy online booking.",
+    services: "Check-ups & cleaning: Thorough exams and hygiene visits for every age\nTeeth whitening: A brighter smile in a single visit\nDental implants: Natural-looking, long-lasting tooth replacement\nClear aligners & braces: Straighter teeth, discreetly\nEmergency appointments: Fast help when you're in pain\nChildren's dentistry: Friendly visits kids look forward to",
+    why: "Gentle, unhurried care: We explain every step and never rush you\nBook online in a minute: Pick a time that suits you, day or night\nClear prices up front: You'll know the cost before we start" },
+  doctor: { noun: "clinic", cta: "Book an appointment", vibe: "clean", color: "#1d4ed8",
+    head: "Caring, convenient healthcare in {city}",
+    sub: "Same-week appointments, experienced doctors and a team that takes time to listen.",
+    services: "General consultations: Expert care for everyday health concerns\nHealth checks: Screening that catches problems early\nVaccinations: Travel, flu and routine immunisations\nWomen's health: Confidential, specialist care\nLong-term conditions: Ongoing support for diabetes, asthma and more\nChildren's health: Gentle care for little ones",
+    why: "Appointments that fit your day: Early, late and same-week slots\nDoctors who listen: Time to talk, not a rushed five minutes\nEverything in one place: Tests, results and follow-ups under one roof" },
+  veterinary: { noun: "vet clinic", cta: "Book a visit", vibe: "warm", color: "#15803d",
+    head: "Kind, expert care for your pets in {city}",
+    sub: "Check-ups, vaccinations, surgery and emergencies, from a team that treats every pet like family.",
+    services: "Wellness exams: Regular check-ups to keep pets healthy\nVaccinations: Protection tailored to your pet\nDental care: Cleaning and treatment for healthy teeth\nSurgery: Safe, modern procedures with careful aftercare\nUrgent care: Fast help when your pet needs it most\nPuppy & kitten care: The best start for new family members",
+    why: "Calm, gentle handling: Stress-free visits for nervous pets\nEasy booking: Online appointments in under a minute\nClear advice and prices: No surprises, ever" },
+  physiotherapist: { noun: "physiotherapy clinic", cta: "Book an assessment", vibe: "clean", color: "#0e7490",
+    head: "Move better and feel better in {city}",
+    sub: "Hands-on physiotherapy for pain, injuries and recovery, with a clear plan from your first visit.",
+    services: "Back & neck pain: Lasting relief, not just a quick fix\nSports injuries: Get back to training safely\nPost-surgery rehab: Rebuild strength after an operation\nSports massage: Release tension and recover faster\nPosture & ergonomics: Fix the habits behind the pain\nHome exercise plans: Simple routines that fit your day",
+    why: "A clear plan from day one: You'll know what's wrong and how we'll fix it\nOne-to-one sessions: Full attention from the same physio\nFlexible times: Early, evening and weekend appointments" },
+  lawyer: { noun: "law firm", cta: "Book a free consultation", vibe: "elegant", color: "#1e3a5f",
+    head: "Clear, trusted legal advice in {city}",
+    sub: "Experienced lawyers who explain your options in plain English and fight for the best result.",
+    services: "Family law: Divorce, custody and agreements handled with care\nPersonal injury: Get the compensation you deserve\nBusiness law: Contracts, disputes and company matters\nWills & estates: Protect your family's future\nProperty law: Smooth buying, selling and leasing\nEmployment law: Advice for employees and employers",
+    why: "Plain-English advice: No jargon, just clear options\nFixed-fee options: Know the cost before we begin\nFast responses: We reply within one working day" },
+  accountant: { noun: "accounting firm", cta: "Book a free call", vibe: "clean", color: "#1f4e79",
+    head: "Stress-free accounting and tax in {city}",
+    sub: "We handle the numbers so you can run your business, with fixed monthly fees and no surprises.",
+    services: "Tax returns: Personal and business, filed on time\nBookkeeping: Tidy books every month\nPayroll: Accurate, on-time pay for your team\nBusiness advice: Plans that grow your profit\nCompany setup: The right structure from day one\nSales tax & VAT: Returns handled for you",
+    why: "Fixed monthly fees: No hourly surprises\nA dedicated accountant: One person who knows your business\nCloud software: See your numbers any time" },
+  real_estate: { noun: "real estate agency", cta: "Get a free valuation", vibe: "elegant", color: "#7c2d12",
+    head: "Sell faster and buy smarter in {city}",
+    sub: "Local experts with honest valuations, standout marketing and personal service from listing to keys.",
+    services: "Free home valuation: An honest price based on local sales\nSelling: Professional photos, marketing and negotiation\nBuying: Find the right home before it hits the market\nLettings: Reliable tenants and stress-free management\nNew developments: First access to new homes\nMortgage guidance: Introductions to trusted advisers",
+    why: "Local market experts: We know every street in {city}\nMarketing that sells: Pro photos, video and online reach\nOne point of contact: Your agent, from listing to keys" },
+  plumber: { noun: "plumbing company", cta: "Get a free quote", vibe: "bold", color: "#1d4ed8",
+    head: "Fast, reliable plumbers in {city}",
+    sub: "Leaks, blockages, boilers and bathrooms, fixed right the first time by friendly local plumbers.",
+    services: "Emergency repairs: Burst pipes and leaks fixed fast\nDrain unblocking: Clear blockages without the mess\nBoilers & water heaters: Repairs, servicing and installs\nBathroom installs: From design to finished room\nLeak detection: Find hidden leaks before they cause damage\nPipe repairs: Modern pipework that lasts",
+    why: "On time, every time: We turn up when we say we will\nUpfront pricing: A fixed quote before any work starts\nWork guaranteed: If it's not right, we come back" },
+  electrician: { noun: "electrical company", cta: "Get a free quote", vibe: "bold", color: "#b45309",
+    head: "Safe, certified electricians in {city}",
+    sub: "From small repairs to full rewires, done safely, tidily and on time by qualified local electricians.",
+    services: "Fault finding & repairs: Tripping power and dead sockets sorted\nRewiring: Safe, modern wiring for older homes\nLighting: Indoor, outdoor and smart lighting\nPanel upgrades: Modern fuse boards for safety\nEV chargers: Home charging installed and certified\nSafety inspections: Certificates for landlords and sales",
+    why: "Fully qualified: Certified electricians on every job\nTidy and on time: We respect your home and your schedule\nFixed quotes: The price we quote is the price you pay" },
+  hvac: { noun: "heating and cooling company", cta: "Book a service", vibe: "bold", color: "#0369a1",
+    head: "Heating and cooling you can count on in {city}",
+    sub: "Installs, repairs and servicing for every season, with fast response and honest advice.",
+    services: "AC repair: Cool again, fast\nHeating repair: A warm home, same day where possible\nNew system installs: Efficient systems that cut your bills\nAnnual servicing: Prevent breakdowns before they happen\nHeat pumps: Low-carbon heating and cooling\nIndoor air quality: Cleaner, healthier air at home",
+    why: "Fast response: Same-day appointments for breakdowns\nHonest advice: Repair when you can, replace when you should\nService plans: Peace of mind all year round" },
+  roofer: { noun: "roofing company", cta: "Get a free inspection", vibe: "bold", color: "#9a3412",
+    head: "Strong, watertight roofs in {city}",
+    sub: "Repairs, replacements and inspections from experienced local roofers who stand behind their work.",
+    services: "Roof repairs: Leaks and damage fixed fast\nRoof replacement: New roofs built to last decades\nFree inspections: Honest reports with photos\nGutters: Cleaning, repairs and new gutters\nFlat roofs: Durable modern flat roofing\nStorm damage: Emergency cover and insurance help",
+    why: "Free photo inspections: See exactly what's wrong\nWork that lasts: Quality materials and careful fitting\nClean sites: We leave your home as we found it" },
+  builder: { noun: "building company", cta: "Get a free quote", vibe: "bold", color: "#c2410c",
+    head: "Quality building work in {city}",
+    sub: "Extensions, renovations and new builds, managed from plans to finishing touches.",
+    services: "Extensions: More space without moving\nRenovations: Transform tired rooms\nKitchens & bathrooms: Complete design and fit\nLoft conversions: Turn wasted space into rooms\nNew builds: From foundations to keys\nProject management: One team handling everything",
+    why: "One team, start to finish: No juggling trades\nClear timelines: A schedule you can plan around\nFixed-price quotes: No nasty surprises" },
+  cleaning: { noun: "cleaning company", cta: "Get a free quote", vibe: "clean", color: "#0891b2",
+    head: "Spotless homes and offices in {city}",
+    sub: "Reliable, vetted cleaners on a schedule that suits you, with everything supplied.",
+    services: "Regular home cleaning: Weekly or fortnightly visits\nDeep cleaning: Top to bottom, every corner\nEnd of tenancy: Get your deposit back\nOffice cleaning: A fresh workplace every morning\nCarpet & upholstery: Like-new fabrics\nAfter-builder cleans: Move straight in",
+    why: "Trusted cleaners: The same friendly team each visit\nEverything supplied: Products and equipment included\nHappiness promise: Not perfect? We come back and fix it" },
+  car_repair: { noun: "garage", cta: "Book your car in", vibe: "bold", color: "#b91c1c",
+    head: "Honest car repairs and servicing in {city}",
+    sub: "Servicing, repairs and inspections at fair prices, with no work done without your OK.",
+    services: "Servicing: Keep your car running smoothly\nInspections: Safety checks done properly\nBrakes & tyres: Checks and replacements\nDiagnostics: Warning lights read and fixed\nClutch & gearbox: Repairs done right\nAir conditioning: Re-gas and repairs",
+    why: "No surprise bills: We call before any extra work\nFair, clear prices: Quotes before we start\nWhile-you-wait jobs: Quick work done the same day" },
+  restaurant: { noun: "restaurant", cta: "Reserve a table", vibe: "warm", color: "#9f1239",
+    head: "Food worth coming back for in {city}",
+    sub: "Seasonal dishes, a warm welcome and a table waiting for you. Book online in seconds.",
+    services: "Lunch: Fresh, quick and full of flavour\nDinner: Seasonal plates made to share\nPrivate dining: Celebrations for groups of all sizes\nTakeaway & delivery: Your favourites at home\nWeekend brunch: The best way to start Saturday\nGift vouchers: The perfect present",
+    why: "Fresh ingredients: Cooked from scratch every day\nBook in seconds: Pick your table online\nDietary needs welcome: Vegan, gluten-free and more" },
+  cafe: { noun: "cafe", cta: "See our menu", vibe: "warm", color: "#78350f",
+    head: "Great coffee and fresh food in {city}",
+    sub: "Specialty coffee, homemade cakes and all-day breakfast in a cosy spot you'll want to stay in.",
+    services: "Specialty coffee: Made with care, every cup\nAll-day breakfast: Hearty and healthy options\nHomemade cakes: Baked every morning\nLunch: Sandwiches, salads and soups\nOrder ahead: Skip the queue\nCatering: Coffee and food for your office or event",
+    why: "Made fresh daily: Baked and prepared in-house\nOrder ahead: Skip the queue on busy mornings\nA place to stay: Wi-Fi, plugs and good music" },
+  salon: { noun: "salon", cta: "Book now", vibe: "warm", color: "#9d174d",
+    head: "Look and feel your best in {city}",
+    sub: "Cuts, colour and beauty treatments from talented stylists. Book online in under a minute.",
+    services: "Cuts & styling: For every hair type and length\nColour: Balayage, highlights and full colour\nTreatments: Repair, smooth and shine\nBridal & events: Look perfect on the big day\nNails: Manicures, pedicures and gels\nBrows & lashes: Shape, tint and lift",
+    why: "Talented stylists: Trained in the latest techniques\nBook online 24/7: Choose your stylist and time\nA relaxing visit: Great coffee and zero rush" },
+  spa: { noun: "spa", cta: "Book a treatment", vibe: "elegant", color: "#3f6212",
+    head: "Relax, unwind and restore in {city}",
+    sub: "Massages, facials and body treatments in a calm space designed for real rest.",
+    services: "Massage: Swedish, deep tissue and hot stone\nFacials: Glowing, healthy skin\nBody treatments: Scrubs, wraps and polish\nCouples packages: Share the experience\nSpa days: Make a day of it\nGift vouchers: The gift of calm",
+    why: "Expert therapists: Fully qualified and experienced\nEasy online booking: Choose your treatment and time\nA true escape: Quiet rooms and no rush" },
+  gym: { noun: "gym", cta: "Start your free trial", vibe: "bold", color: "#dc2626",
+    head: "Get stronger, fitter and healthier in {city}",
+    sub: "Modern equipment, expert coaches and classes for every level. Try it free this week.",
+    services: "Personal training: Coaching built around your goals\nGroup classes: HIIT, strength, spin and more\nStrength zone: Racks, platforms and free weights\nCardio: Modern machines\nNutrition coaching: Eat for your goals\nBeginner programs: Start with confidence",
+    why: "Coaches who care: Help on the floor, not just at sign-up\nNo long contracts: Flexible monthly memberships\nFor every level: Beginners welcome" },
+  hotel: { noun: "hotel", cta: "Check availability", vibe: "elegant", color: "#1e3a8a",
+    head: "Your comfortable stay in {city}",
+    sub: "Stylish rooms, a great location and friendly service. Book direct for the best rate.",
+    services: "Rooms & suites: Comfortable, stylish and quiet\nBreakfast: Fresh and served every morning\nMeetings & events: Spaces for every occasion\nParking: Easy parking for guests\nLocal tips: The best of {city} on your doorstep\nLate check-out: Ask us when you book",
+    why: "Best rate, booked direct: No booking site fees\nGreat location: Close to the best of {city}\nFriendly local team: Here to help" },
+};
+const GROUP_INDUSTRY = {
+  "Health & medical": { noun: "practice", cta: "Book an appointment", vibe: "clean", color: "#0f766e",
+    services: "Consultations: Expert advice tailored to you\nTreatments: Modern, effective care\nCheck-ups: Prevention that keeps you well\nSpecialist care: Help for specific conditions\nFollow-up support: We're with you after your visit\nFamily care: Looking after every age" },
+  "Professional services": { noun: "firm", cta: "Book a free consultation", vibe: "elegant", color: "#1e3a5f",
+    services: "Free consultation: Understand your options\nAdvice & planning: Clear, practical guidance\nOngoing support: A partner as you grow\nDocuments & paperwork: Handled correctly\nRepresentation: We act on your behalf\nFixed-fee packages: Know the cost up front" },
+  "Home services & trades": { noun: "local company", cta: "Get a free quote", vibe: "bold", color: "#1d4ed8",
+    services: "Repairs: Fast fixes done properly\nInstallations: Fitted right first time\nMaintenance: Prevent problems before they start\nEmergency call-outs: Help when you need it\nFree quotes: Clear prices before we start\nCommercial work: For shops and offices too" },
+  "Automotive": { noun: "local business", cta: "Book now", vibe: "bold", color: "#b91c1c",
+    services: "Servicing: Keep your vehicle running smoothly\nRepairs: Fixed right at fair prices\nInspections: Safety checks you can trust\nParts & accessories: Quality parts in stock\nTyres: Fitting and balancing\nHonest advice: Straight answers, no upselling" },
+  "Food & drink": { noun: "local favourite", cta: "See our menu", vibe: "warm", color: "#9f1239",
+    services: "Our menu: Fresh dishes made daily\nTakeaway: Your favourites to go\nDelivery: Straight to your door\nCatering: Food for events and offices\nPrivate events: Celebrate with us\nGift vouchers: A treat for someone special" },
+  "Beauty, fitness & wellness": { noun: "studio", cta: "Book now", vibe: "warm", color: "#9d174d",
+    services: "Signature treatments: Our most-loved services\nClasses & sessions: For every level\nPackages: Better value when you book more\nConsultations: Advice tailored to you\nProducts: Professional-grade products to take home\nGift vouchers: The perfect present" },
+  "Shops & retail": { noun: "local shop", cta: "Visit us today", vibe: "warm", color: "#4338ca",
+    services: "New arrivals: Fresh stock every week\nBest sellers: Our customers' favourites\nExpert advice: Help choosing the right product\nOrder online: Click and collect or delivery\nGift ideas: Something for everyone\nLoyalty rewards: Save every time you shop" },
+  "Hotels, travel & events": { noun: "local favourite", cta: "Check availability", vibe: "elegant", color: "#1e3a8a",
+    services: "Rooms & packages: Comfortable stays and great value\nEvents: Spaces for every occasion\nGroup bookings: Plans for teams and families\nLocal experiences: Make the most of {city}\nSpecial offers: Better rates when you book direct\nGift vouchers: Give an experience" },
+  "Education & childcare": { noun: "local school", cta: "Book a visit", vibe: "clean", color: "#2563eb",
+    services: "Programs: Learning for every age and level\nSmall groups: Attention for every learner\nOne-to-one: Personal sessions\nTrial lessons: Try before you commit\nFlexible schedules: Mornings, evenings and weekends\nProgress reports: See how you're doing" },
+  "Other local services": { noun: "local business", cta: "Get in touch", vibe: "clean", color: "#0f766e",
+    services: "Our main service: What we do best\nConsultations: Advice tailored to you\nPackages: Options for every budget\nFast turnaround: When you need it quickly\nAftercare: Support after the job is done\nFree quotes: Clear prices up front" },
+};
+const GENERIC_WHY = "Local and trusted: Proudly serving {city}\nEasy to reach: Call, message or book online\nClear prices: Know the cost before we start";
+
+function industryFor(category) {
+  if (INDUSTRY[category]) return INDUSTRY[category];
+  const group = CATEGORY_GROUPS.find(([, items]) => items.some(([k]) => k === category))?.[0] || "Other local services";
+  const g = GROUP_INDUSTRY[group];
+  return { ...g, head: "Quality you can count on in {city}", sub: "Friendly, reliable service with clear prices and an easy way to get in touch.", why: GENERIC_WHY };
+}
+
+const VIBES = {
+  clean: { label: "Clean", fonts: "family=Plus+Jakarta+Sans:wght@400;500;600;700;800", hf: "'Plus Jakarta Sans', system-ui, sans-serif", bf: "'Plus Jakarta Sans', system-ui, sans-serif", hw: 800, radius: "14px" },
+  warm: { label: "Warm", fonts: "family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Nunito+Sans:wght@400;600;700;800", hf: "'Fraunces', Georgia, serif", bf: "'Nunito Sans', system-ui, sans-serif", hw: 700, radius: "18px" },
+  bold: { label: "Bold", fonts: "family=Archivo:wght@400;500;600;700;800;900", hf: "'Archivo', system-ui, sans-serif", bf: "'Archivo', system-ui, sans-serif", hw: 900, radius: "8px" },
+  elegant: { label: "Elegant", fonts: "family=Playfair+Display:wght@600;700&family=Lato:wght@400;700;900", hf: "'Playfair Display', Georgia, serif", bf: "'Lato', system-ui, sans-serif", hw: 700, radius: "4px" },
+};
+
+function hexToRgb(h) { h = h.replace("#", ""); if (h.length === 3) h = h.split("").map(x => x + x).join(""); const n = parseInt(h, 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+function rgbToHex(r, g, b) { return "#" + [r, g, b].map(x => Math.round(Math.max(0, Math.min(255, x))).toString(16).padStart(2, "0")).join(""); }
+function mixHex(a, b, t) { const A = hexToRgb(a), B = hexToRgb(b); return rgbToHex(...A.map((x, i) => x + (B[i] - x) * t)); }
+function luminance(h) { const [r, g, b] = hexToRgb(h).map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; }
+function isBrandish(h) { if (!/^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(h)) return false; const [r, g, b] = hexToRgb(h); return Math.max(r, g, b) - Math.min(r, g, b) >= 40 && luminance(h) > 0.01 && luminance(h) < 0.85; }
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2;
+  if (mx === mn) return [0, 0, l];
+  const d = mx - mn, s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+  const h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [h / 6, s, l];
+}
+function hslToHex(h, s, l) {
+  const f = (n) => { const k = (n + h * 12) % 12, a = s * Math.min(l, 1 - l); return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)); };
+  return rgbToHex(f(0) * 255, f(8) * 255, f(4) * 255);
+}
+// Darken a brand color (keeping its hue) until white text on it passes WCAG AA (4.5:1).
+function readableBrand(hex) {
+  let [h, s, l] = rgbToHsl(...hexToRgb(hex));
+  s = Math.max(s, 0.45);
+  let c = hslToHex(h, s, l);
+  for (let i = 0; i < 30 && 1.05 / (luminance(c) + 0.05) < 4.5; i++) { l -= 0.025; c = hslToHex(h, s, l); }
+  return c;
+}
+function palette(h) {
+  const a = readableBrand(/^#[0-9a-f]{6}$/i.test(h) ? h : "#0f766e");
+  return { a, ad: mixHex(a, "#000000", 0.32), at: mixHex(a, "#ffffff", 0.45), tint: mixHex(a, "#ffffff", 0.92) };
+}
+
+// Most common saturated color in the top of the client's screenshot, usually their header or logo.
+function colorFromShot(src) {
+  return new Promise((resolve) => {
+    if (!src) return resolve("");
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const w = 60, h = Math.max(1, Math.round(60 * img.height / img.width));
+        const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+        const ctx = cv.getContext("2d"); ctx.drawImage(img, 0, 0, w, h);
+        const d = ctx.getImageData(0, 0, w, Math.max(1, Math.round(h * 0.45))).data;
+        const buckets = {};
+        for (let i = 0; i < d.length; i += 4) {
+          const r = d[i], g = d[i + 1], b = d[i + 2];
+          if (Math.max(r, g, b) - Math.min(r, g, b) < 45 || Math.max(r, g, b) < 50) continue;
+          const k = `${r >> 4},${g >> 4},${b >> 4}`; buckets[k] = (buckets[k] || 0) + 0.5 + rgbToHsl(r, g, b)[1];
+        }
+        const best = Object.entries(buckets).sort((x, y) => y[1] - x[1])[0];
+        if (!best || best[1] < 6) return resolve("");
+        resolve(rgbToHex(...best[0].split(",").map(n => n * 16 + 8)));
+      } catch { resolve(""); }
+    };
+    img.onerror = () => resolve("");
+    img.src = src;
+  });
+}
+
+function prettyHours(h) {
+  if (!h) return "";
+  const D = { Mo: "Mon", Tu: "Tue", We: "Wed", Th: "Thu", Fr: "Fri", Sa: "Sat", Su: "Sun", PH: "Holidays" };
+  return h.replace(/\b(Mo|Tu|We|Th|Fr|Sa|Su|PH)\b/g, m => D[m]).replace(/\s*;\s*/g, " · ").replace(/\boff\b/gi, "closed").replace(/24\/7/, "Open 24/7");
+}
+function cityShort() { return state.city ? cityLabel(state.city).split(",")[0].trim() : "your area"; }
+function fillVars(s, l) { return String(s || "").replace(/\{city\}/g, cityShort()).replace(/\{name\}/g, l.name); }
+function parseLines(text) {
+  return String(text || "").split("\n").map(s => s.trim()).filter(Boolean)
+    .map(s => { const i = s.indexOf(":"); return i > 0 ? [s.slice(0, i).trim(), s.slice(i + 1).trim()] : [s, ""]; });
+}
+
+function designDefaults(l) {
+  const ind = industryFor(state.category);
+  const c = l.content || {};
+  const desc = c.description && c.description.length >= 50 && c.description.length <= 220 ? c.description : "";
+  const theme = isBrandish(c.themeColor || "") ? rgbToHex(...hexToRgb(c.themeColor)) : "";
+  return {
+    style: ind.vibe,
+    color: theme || l.brandColor || ind.color,
+    headline: fillVars(ind.head, l),
+    sub: desc || fillVars(ind.sub, l),
+    cta: ind.cta,
+    services: fillVars(ind.services, l),
+    about: c.paragraphs?.[0] || `At ${l.name}, great service starts with listening. Whether it's your first visit or your fiftieth, you'll get honest advice, clear prices and work we're proud to put our name on.`,
+  };
+}
+function designOf(l) { return { ...designDefaults(l), ...(l.design || {}) }; }
+
+const ico = (d, s = 18) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const IC = {
+  phone: '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  pin: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  arrow: '<path d="M5 12h14M13 5l7 7-7 7"/>',
+  mail: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/>',
+  spark: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/>',
+};
+const STAR = '<svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg>';
+
+function mockupHtml(l) {
+  const d = designOf(l);
+  const s = settings();
+  const v = VIBES[d.style] || VIBES.clean;
+  const c = l.content || {};
+  const ind = industryFor(state.category);
+  const p = palette(d.color);
+  const city = cityShort();
+  const phone = l.phone || c.phones?.[0] || "";
+  const tel = phone.replace(/[^\d+]/g, "");
+  const hours = prettyHours(l.hours);
+  const services = parseLines(d.services).slice(0, 9);
+  const why = parseLines(fillVars(ind.why, l)).slice(0, 3);
+  const name = esc(l.name);
+  const initial = esc((l.name.match(/[A-Za-z0-9]/) || ["•"])[0].toUpperCase());
+  const img = (src, alt, cls = "") => `<img${cls ? ` class="${cls}"` : ""} src="${esc(src)}" alt="${esc(alt)}" onerror="this.remove()">`;
+  const heroPic = c.hero || "";
+  const aboutPic = (c.images || []).find(u => u !== heroPic) || "";
+  const cta = esc(d.cta || "Get in touch");
+  const callBtn = (cls) => tel ? `<a class="btn ${cls}" href="tel:${esc(tel)}">${ico(IC.phone)} Call ${esc(phone)}</a>` : "";
+  const designer = s.name && s.name !== "[Your Name]" ? ` · designed by ${esc(s.name)}` : "";
+  const facts = [
+    hours && `<div class="row">${ico(IC.clock)}<div><b>Opening hours</b>${esc(hours)}</div></div>`,
+    phone && `<div class="row">${ico(IC.phone)}<div><b>Call us</b>${esc(phone)}</div></div>`,
+    l.address && `<div class="row">${ico(IC.pin)}<div><b>Find us</b>${esc(l.address)}</div></div>`,
+  ].filter(Boolean);
+
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${name}: homepage concept</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?${v.fonts}&display=swap">
+<style>
+:root{--a:${p.a};--ad:${p.ad};--at:${p.at};--tint:${p.tint};--ink:#141a22;--muted:#596273;--line:#e4e7ec;--soft:#f6f7f9;--r:${v.radius};--hf:${v.hf};--bf:${v.bf}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;font:17px/1.65 var(--bf);color:var(--ink);background:#fff;-webkit-font-smoothing:antialiased}
+img{max-width:100%;display:block}a{color:inherit}
+.w{max-width:1180px;margin:0 auto;padding:0 28px}
+h1,h2,h3{font-family:var(--hf);font-weight:${v.hw};line-height:1.1;margin:0;letter-spacing:-.015em;text-wrap:balance}
+.concept{background:#0b0f14;color:#b8c2cf;font:500 12px/1.4 system-ui,sans-serif;text-align:center;padding:7px 12px;letter-spacing:.02em}.concept b{color:#fff}
+.top{background:var(--tint);font-size:14px}.top .w{display:flex;flex-wrap:wrap;gap:6px 26px;justify-content:space-between;padding-block:9px}
+.top span{display:inline-flex;align-items:center;gap:7px}.top svg{color:var(--a)}.top a{text-decoration:none;font-weight:700}
+header{position:sticky;top:0;z-index:10;background:rgba(255,255,255,.97);border-bottom:1px solid var(--line)}
+header .w{display:flex;align-items:center;justify-content:space-between;gap:20px;min-height:78px}
+.brand{display:flex;align-items:center;gap:12px;text-decoration:none;font:${v.hw} 21px/1.15 var(--hf);min-width:0}
+.brand img{max-height:50px;max-width:180px;width:auto}.bfb{align-items:center;gap:12px}
+.mark{flex:none;width:42px;height:42px;border-radius:var(--r);background:var(--a);color:#fff;display:grid;place-items:center;font:800 19px var(--hf)}
+nav{display:flex;gap:30px;font-weight:600;font-size:15px}nav a{text-decoration:none}nav a:hover{color:var(--a)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;background:var(--a);color:#fff;text-decoration:none;font-weight:800;font-size:16px;padding:16px 26px;border-radius:var(--r);border:0;cursor:pointer;white-space:nowrap;box-shadow:0 10px 24px -12px var(--a);font-family:var(--bf)}
+.btn:hover{background:var(--ad)}.btn.ghost{background:#fff;color:var(--ink);box-shadow:inset 0 0 0 2px var(--line)}.btn.sm{padding:12px 18px;font-size:15px}
+.hero{background:linear-gradient(180deg,var(--tint),#fff 88%)}
+.hero .w{display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center;padding-block:76px 88px}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-weight:800;font-size:13px;letter-spacing:.09em;text-transform:uppercase;color:var(--a);margin:0 0 18px}
+.hero h1{font-size:clamp(38px,5.2vw,64px)}
+.lead{font-size:20px;color:var(--muted);margin:22px 0 32px;max-width:32em}
+.ctas{display:flex;flex-wrap:wrap;gap:12px}
+.ticks{display:flex;flex-wrap:wrap;gap:10px 26px;margin-top:32px;font-size:15px;font-weight:600}.ticks span{display:inline-flex;gap:8px;align-items:center}.ticks svg{color:var(--a)}
+.visual{position:relative;min-height:460px;border-radius:calc(var(--r)*2);background:radial-gradient(circle at 22% 18%,var(--at) 0,transparent 52%),radial-gradient(circle at 85% 90%,var(--a) 0,transparent 58%),var(--ad);overflow:hidden}
+.visual img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.mono{position:absolute;left:32px;top:24px;color:#fff;font:${v.hw} 190px/1 var(--hf);opacity:.16}
+.card{position:absolute;right:22px;bottom:22px;width:min(310px,84%);background:#fff;border-radius:var(--r);padding:20px 22px;box-shadow:0 26px 50px -22px rgba(0,0,0,.45);display:grid;gap:14px;font-size:15px}
+.row{display:flex;gap:12px;align-items:flex-start}.row svg{color:var(--a);flex:none;margin-top:3px}
+.row b{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+section{padding:96px 0}
+.head{max-width:660px;margin-bottom:46px}.head h2{font-size:clamp(30px,3.6vw,46px)}.head p{color:var(--muted);font-size:19px;margin:14px 0 0}
+.g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px}
+.svc{border:1px solid var(--line);border-radius:var(--r);padding:28px;background:#fff;transition:border-color .2s,transform .2s}.svc:hover{border-color:var(--a);transform:translateY(-3px)}
+.svc .i{width:50px;height:50px;border-radius:var(--r);background:var(--tint);color:var(--a);display:grid;place-items:center;margin-bottom:18px}
+.svc h3{font-size:21px}.svc p{color:var(--muted);margin:8px 0 0;font-size:16px}
+.why{background:var(--soft)}.num{font:800 14px var(--bf);color:var(--a);letter-spacing:.1em}.why h3{font-size:23px;margin-top:10px}.why p{color:var(--muted);margin:8px 0 0}
+.about .w{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center}
+.pic{position:relative;aspect-ratio:4/3;border-radius:calc(var(--r)*2);background:linear-gradient(135deg,var(--a),var(--ad));overflow:hidden}
+.pic img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.since{position:absolute;left:24px;bottom:24px;display:inline-flex;gap:8px;align-items:center;background:#fff;color:var(--ink);font-weight:800;font-size:15px;padding:10px 16px;border-radius:999px}.since svg{color:var(--a)}
+.about p{color:var(--muted);font-size:18px;margin:18px 0 28px}
+.rev{border:1px dashed #cfd5de;border-radius:var(--r);padding:26px;background:#fff}
+.stars{display:flex;gap:2px;color:#f2a900;margin-bottom:14px}.rev p{margin:0;color:var(--muted)}.who{margin-top:18px;font-weight:800;font-size:15px}
+.step{width:46px;height:46px;border-radius:50%;background:var(--a);color:#fff;display:grid;place-items:center;font-weight:800;margin-bottom:16px}
+.steps h3{font-size:21px}.steps p{color:var(--muted);margin:8px 0 0}
+.band{background:var(--ad);color:#fff;padding:72px 0}.band .w{display:flex;flex-wrap:wrap;gap:24px;align-items:center;justify-content:space-between}
+.band h2{font-size:clamp(28px,3.4vw,42px);max-width:16em}.band p{margin:10px 0 0;opacity:.85;font-size:18px}
+.band .btn{background:#fff;color:var(--ad)}.band .btn.ghost{background:transparent;color:#fff;box-shadow:inset 0 0 0 2px rgba(255,255,255,.55)}
+.contact .w{display:grid;grid-template-columns:.9fr 1.1fr;gap:56px}
+.info{display:grid;gap:24px;align-content:start;margin-top:30px}.info .row{font-size:17px}
+form{background:var(--soft);border-radius:calc(var(--r)*1.5);padding:32px;display:grid;gap:14px}
+label{font-weight:700;font-size:14px;display:grid;gap:6px}
+input,textarea{font:inherit;font-size:16px;padding:13px 14px;border:1px solid var(--line);border-radius:var(--r);background:#fff;color:var(--ink);width:100%}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+footer{background:#0b0f14;color:#97a2b0;padding:44px 0 100px;font-size:14px}footer .w{display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-between}footer b{color:#fff}
+.callbar{display:none}
+@media (max-width:900px){
+nav,header .btn,.top .hide-m{display:none}.w{padding:0 20px}.top .w{justify-content:center}
+.hero .w,.about .w,.contact .w{grid-template-columns:1fr;gap:36px}.hero .w{padding-block:44px 56px}
+.visual{min-height:280px}.mono{font-size:140px}.lead{font-size:18px}.g3{grid-template-columns:1fr}section{padding:64px 0}.head{margin-bottom:30px}.two{grid-template-columns:1fr}
+.callbar{display:grid;grid-template-columns:${tel ? "1fr 1fr" : "1fr"};gap:10px;position:fixed;left:0;right:0;bottom:0;padding:10px 14px calc(10px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid var(--line);z-index:20}
+.callbar .btn{padding:14px 10px;font-size:15px}
+}
+</style></head>
+<body>
+<div class="concept">Homepage concept for <b>${name}</b>${designer}</div>
+${hours || phone || l.address ? `<div class="top"><div class="w">
+  ${hours ? `<span>${ico(IC.clock, 16)} ${esc(hours)}</span>` : ""}
+  ${l.address ? `<span class="hide-m">${ico(IC.pin, 16)} ${esc(l.address)}</span>` : ""}
+  ${phone ? `<span>${ico(IC.phone, 16)} <a href="tel:${esc(tel)}">${esc(phone)}</a></span>` : ""}
+</div></div>` : ""}
+<header><div class="w">
+  <a class="brand" href="#">${c.logo ? `<img src="${esc(c.logo)}" alt="${name}" onerror="this.remove();document.getElementById('bfb').style.display='flex'"><span id="bfb" class="bfb" style="display:none"><span class="mark">${initial}</span><span>${name}</span></span>` : `<span class="mark">${initial}</span><span>${name}</span>`}</a>
+  <nav><a href="#services">Services</a><a href="#about">About</a><a href="#reviews">Reviews</a><a href="#contact">Contact</a></nav>
+  ${callBtn("sm") || `<a class="btn sm" href="#contact">${cta}</a>`}
+</div></header>
+<div class="hero"><div class="w">
+  <div>
+    <p class="eyebrow">${ico(IC.pin, 15)} ${esc(ind.noun)} in ${esc(city)}</p>
+    <h1>${esc(d.headline)}</h1>
+    <p class="lead">${esc(d.sub)}</p>
+    <div class="ctas"><a class="btn" href="#contact">${cta} ${ico(IC.arrow)}</a>${tel ? `<a class="btn ghost" href="tel:${esc(tel)}">${ico(IC.phone)} ${esc(phone)}</a>` : `<a class="btn ghost" href="#services">Our services</a>`}</div>
+    <div class="ticks">${why.map(([t]) => `<span>${ico(IC.check)} ${esc(t)}</span>`).join("")}</div>
+  </div>
+  <div class="visual"><span class="mono">${initial}</span>${heroPic ? img(heroPic, l.name) : ""}
+    ${facts.length ? `<div class="card">${facts.join("")}</div>` : `<div class="card"><div class="row">${ico(IC.spark)}<div><b>Easy booking</b>${cta} in under a minute</div></div></div>`}
+  </div>
+</div></div>
+<section id="services"><div class="w">
+  <div class="head"><h2>How we can help</h2><p>Everything you need from one trusted ${esc(ind.noun)} in ${esc(city)}.</p></div>
+  <div class="g3">${services.map(([t, x]) => `<div class="svc"><div class="i">${ico(IC.check, 22)}</div><h3>${esc(t)}</h3>${x ? `<p>${esc(x)}</p>` : ""}</div>`).join("")}</div>
+</div></section>
+<section class="why"><div class="w">
+  <div class="head"><h2>Why ${esc(city)} chooses ${name}</h2></div>
+  <div class="g3">${why.map(([t, x], i) => `<div><span class="num">0${i + 1}</span><h3>${esc(t)}</h3><p>${esc(x)}</p></div>`).join("")}</div>
+</div></section>
+<section class="about" id="about"><div class="w">
+  <div class="pic"><span class="mono">${initial}</span><span class="since">${ico(IC.pin, 16)} Proudly serving ${esc(city)}</span>${aboutPic ? img(aboutPic, l.name) : ""}</div>
+  <div><h2>About ${name}</h2><p>${esc(d.about)}</p><a class="btn" href="#contact">${cta} ${ico(IC.arrow)}</a></div>
+</div></section>
+<section id="reviews" style="background:var(--soft)"><div class="w">
+  <div class="head"><h2>What our customers say</h2><p>Your best Google reviews appear here and update automatically.</p></div>
+  <div class="g3">${[1, 2, 3].map(() => `<div class="rev"><div class="stars">${STAR.repeat(5)}</div><p>“Your customers' own words go here, pulled straight from your Google reviews.”</p><div class="who">Customer name · Google review</div></div>`).join("")}</div>
+</div></section>
+<section class="steps"><div class="w">
+  <div class="head"><h2>Getting started is easy</h2></div>
+  <div class="g3">
+    <div><div class="step">1</div><h3>Get in touch</h3><p>${tel ? "Call us or " : ""}${esc(d.cta || "contact us").toLowerCase()} online in under a minute.</p></div>
+    <div><div class="step">2</div><h3>We listen</h3><p>We talk through what you need and give you a clear plan and price.</p></div>
+    <div><div class="step">3</div><h3>You're looked after</h3><p>We deliver on time and follow up to make sure you're happy.</p></div>
+  </div>
+</div></section>
+<div class="band"><div class="w">
+  <div><h2>Ready when you are</h2><p>${esc(d.cta || "Get in touch")} today. It takes less than a minute.</p></div>
+  <div class="ctas"><a class="btn" href="#contact">${cta}</a>${tel ? `<a class="btn ghost" href="tel:${esc(tel)}">${ico(IC.phone)} Call now</a>` : ""}</div>
+</div></div>
+<section class="contact" id="contact"><div class="w">
+  <div><h2>Visit or contact us</h2>
+    <div class="info">${facts.join("")}${l.email ? `<div class="row">${ico(IC.mail)}<div><b>Email</b>${esc(l.email)}</div></div>` : ""}</div>
+  </div>
+  <form onsubmit="return false"><div class="two"><label>Your name<input placeholder="Jane Smith"></label><label>Phone<input placeholder="Your number"></label></div>
+    <label>Email<input placeholder="you@email.com"></label><label>How can we help?<textarea rows="4" placeholder="Tell us a little about what you need"></textarea></label>
+    <button class="btn" type="submit">${cta}</button></form>
+</div></section>
+<footer><div class="w"><span><b>${name}</b>${l.address ? ` · ${esc(l.address)}` : ""}</span><span>Concept design: text and photos are placeholders until your real content is added.</span></div></footer>
+<div class="callbar">${tel ? `<a class="btn ghost" href="tel:${esc(tel)}">${ico(IC.phone)} Call</a>` : ""}<a class="btn" href="#contact">${cta}</a></div>
+</body></html>`;
+}
+
+// Before/after block used inside the client report.
+function conceptSectionHtml(l) {
+  const doc = esc(mockupHtml(l));
+  const a = l.audit || {};
+  const now = l.website && a.shot
+    ? `<figure class="rp-cf"><div class="rp-phone"><img src="${esc(a.shot)}" alt="Your current homepage on a phone"></div><figcaption>Now</figcaption></figure>` : "";
+  const gains = l.website
+    ? ["A clear headline saying what you do and where", "Call and booking buttons always within reach", "Your services, reviews and opening hours up front", "Built to load fast on phones"]
+    : ["Customers find you on Google instead of a competitor", "Call and booking buttons always within reach", "Your services, reviews and opening hours up front", "Built to load fast on phones"];
+  return `<section class="rp-concept"><h2>${l.website ? "Your homepage, redesigned" : "Your new homepage"}</h2>
+    <p class="rp-cap">A first concept for ${esc(l.name)}, built around one goal: turning visitors into calls and bookings.</p>
+    <div class="rp-ba">${now}
+      <figure class="rp-cf"><div class="mk-phone"><iframe title="Redesigned homepage on a phone" srcdoc="${doc}" width="390" height="844" scrolling="no" tabindex="-1"></iframe></div><figcaption>${l.website ? "After the redesign" : "Your new website"}</figcaption></figure>
+      <ul class="rp-list rp-checks rp-gains">${gains.map(g => `<li>${g}</li>`).join("")}</ul>
+    </div>
+    <div class="mk-desk"><iframe title="Redesigned homepage on a computer" srcdoc="${doc}" width="1280" height="760" scrolling="no" tabindex="-1"></iframe></div>
+    <p class="rp-note">Concept design. Final text, photos and colours will be yours.</p></section>`;
+}
+
+function fitFrames(root) {
+  root.querySelectorAll(".mk-desk").forEach(w => w.style.setProperty("--s", String(w.clientWidth / 1280)));
+}
+
+// ---------------- Redesign editor ----------------
+let designLead = null;
+let designMode = "desk";
+let designTimer = 0;
+const DESIGN_FIELDS = { dvStyle: "style", dvColor: "color", dvHead: "headline", dvSub: "sub", dvCta: "cta", dvServices: "services", dvAbout: "about" };
+
+function openDesign(l) {
+  designLead = l;
+  const d = designOf(l);
+  for (const [id, key] of Object.entries(DESIGN_FIELDS)) $(id).value = d[key];
+  $("dvNote").textContent = l.content?.fetched
+    ? "Built from their current site and map listing. Edit anything on the left."
+    : "Built from their map listing and industry. Edit anything on the left to make it theirs.";
+  $("designView").hidden = false;
+  document.body.classList.add("report-open");
+  setDesignMode(designMode);
+  renderDesign();
+  $("dvBack").focus();
+  if (!l.brandColor && !l.design?.color && l.audit?.shot && !isBrandish(l.content?.themeColor || "")) {
+    colorFromShot(l.audit.shot).then(c => {
+      if (!c || !isBrandish(c)) return;
+      l.brandColor = c;
+      if (designLead === l && !l.design?.color) { $("dvColor").value = readableBrand(c); renderDesign(); }
+    });
+  }
+}
+
+function closeDesign() {
+  $("designView").hidden = true;
+  designLead = null;
+  if (!reportLead) document.body.classList.remove("report-open");
+}
+
+function renderDesign() {
+  if (!designLead) return;
+  $("dvIframe").srcdoc = mockupHtml(designLead);
+  fitDesign();
+}
+
+function fitDesign() {
+  const f = $("dvFrame");
+  if (designMode === "desk") f.style.setProperty("--s", String(f.clientWidth / 1280));
+}
+
+function setDesignMode(mode) {
+  designMode = mode;
+  $("dvFrame").className = `dv-frame ${mode}`;
+  $("dvDesk").setAttribute("aria-pressed", String(mode === "desk"));
+  $("dvPhone").setAttribute("aria-pressed", String(mode === "phone"));
+  requestAnimationFrame(fitDesign);
+}
+
+function onDesignInput(e) {
+  const key = DESIGN_FIELDS[e.target.id];
+  if (!key || !designLead) return;
+  designLead.design = { ...(designLead.design || {}), [key]: e.target.value };
+  clearTimeout(designTimer);
+  designTimer = setTimeout(() => { renderDesign(); render(); }, 250);
+}
+
+function downloadMockup(l) {
+  downloadFile(`homepage-concept-${slugify(l.name)}.html`, mockupHtml(l), "text/html;charset=utf-8");
 }
 
 // ---------------- Rendering ----------------
@@ -1179,6 +1943,7 @@ function cardHtml(l) {
   const search = `https://www.google.com/search?q=${encodeURIComponent(`"${l.name}" ${state.city.split(",")[0] || ""} owner email`)}`;
   const foot = [
     d && `<button type="button" class="primary small" data-act="report" data-id="${esc(l.id)}">${l.website ? "Client report" : "Proposal"}</button>`,
+    d && `<button type="button" class="ghost small" data-act="design" data-id="${esc(l.id)}">${l.website ? "Redesign concept" : "Homepage concept"}</button>`,
     d && `<button type="button" class="ghost small" data-act="draft" data-id="${esc(l.id)}" aria-expanded="${open}">${open ? "Hide email" : "Email draft"}</button>`,
     href && (lv === "unchecked" || l.audit?.state === "error") && !state.checking && `<button type="button" class="ghost small" data-act="check" data-id="${esc(l.id)}">Check website</button>`,
     !l.email && `<a class="btn ghost small" href="${esc(search)}" target="_blank" rel="noopener">Find email</a>`,
@@ -1312,6 +2077,11 @@ async function checkLeads(targets) {
       try {
         const res = await checkSite(l.website, key);
         l.audit = { ...res, state: "done" };
+        if (!res.issues.includes("down")) {
+          setStatus(`Reading ${domainOf(l.website)} for the redesign concept…`);
+          l.content = await fetchSiteContent(l.website).catch(() => null);
+          applyContentIssues(l);
+        }
       } catch (e) {
         l.audit = null;
         if (e instanceof QuotaError) quota = true;
@@ -1376,8 +2146,13 @@ function downloadCsv() {
 // ---------------- Boot ----------------
 const EXAMPLES = [
   { id: "ex1", name: "Example: Hillside Family Dental", website: "hillside-dental.example", phone: "+1 512 555 0101", email: "", address: "1200 Congress Ave, Austin", facebook: "", map: "",
-    audit: { state: "done", issues: ["no_https", "no_viewport", "psi_low", "a11y_low", "old_jquery", "no_meta_desc"], perf: 23, seo: 75, bp: 57, a11y: 62, lcp: 9.4,
-      platform: "WordPress", jquery: "1.12.4", metrics: { fcp: 4100, lcp: 9400, tbt: 870, cls: 0.31, si: 7600 } } },
+    hours: "Mo-Fr 08:00-17:00; Sa 09:00-13:00",
+    audit: { state: "done", issues: ["no_https", "no_viewport", "psi_low", "a11y_low", "no_cta", "old_jquery", "no_tel", "no_form", "no_meta_desc", "no_reviews", "outdated_copyright"],
+      perf: 23, seo: 75, bp: 57, a11y: 62, lcp: 9.4, copyrightYear: 2019,
+      platform: "WordPress", jquery: "1.12.4", metrics: { fcp: 4100, lcp: 9400, tbt: 870, cls: 0.31, si: 7600 } },
+    content: { fetched: true, words: 640, hasTel: false, hasForm: false, hasCta: false, hasReviews: false, year: 2019, emails: [], phones: [], images: [], logo: "", hero: "",
+      description: "", headings: [], h1: "Welcome to Hillside Family Dental",
+      paragraphs: ["Hillside Family Dental has looked after Austin families for over twenty years. Our friendly team offers everything from routine cleanings to crowns and whitening in a relaxed, welcoming setting."] } },
   { id: "ex2", name: "Example: Lakeway Smiles", website: "", phone: "+1 512 555 0142", email: "", address: "Lakeway, Austin", facebook: "", map: "", audit: null },
   { id: "ex3", name: "Example: Barton Creek Dentistry", website: "bartoncreekdental.example", phone: "", email: "hello@bartoncreekdental.example", address: "Austin", facebook: "", map: "",
     audit: { state: "done", issues: ["psi_low", "no_analytics"], perf: 41, seo: 92, bp: 96, a11y: 88, lcp: 5.2, platform: "Wix",
@@ -1447,7 +2222,25 @@ function boot() {
     else if (btn.dataset.act === "copy") copyDraft(l, btn);
     else if (btn.dataset.act === "kind") { state.kind[l.id] = btn.dataset.kind; render(); }
     else if (btn.dataset.act === "report") openReport(l);
+    else if (btn.dataset.act === "design") openDesign(l);
   });
+  $("dvStyle").innerHTML = Object.entries(VIBES).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join("");
+  $("dvForm").addEventListener("input", onDesignInput);
+  $("dvForm").addEventListener("change", onDesignInput);
+  $("dvBack").addEventListener("click", closeDesign);
+  $("dvDesk").addEventListener("click", () => setDesignMode("desk"));
+  $("dvPhone").addEventListener("click", () => setDesignMode("phone"));
+  $("dvDownload").addEventListener("click", () => designLead && downloadMockup(designLead));
+  $("dvReport").addEventListener("click", () => { const l = designLead; if (!l) return; closeDesign(); openReport(l); });
+  $("dvReset").addEventListener("click", () => {
+    if (!designLead) return;
+    designLead.design = {};
+    const d = designOf(designLead);
+    for (const [id, key] of Object.entries(DESIGN_FIELDS)) $(id).value = d[key];
+    renderDesign(); render();
+  });
+  $("rvDesign").addEventListener("click", () => { const l = reportLead; if (!l) return; closeReport(); openDesign(l); });
+  window.addEventListener("resize", () => { if (reportLead) fitFrames($("reportDoc")); if (designLead) fitDesign(); });
   $("rvBack").addEventListener("click", closeReport);
   $("rvPdf").addEventListener("click", () => window.print());
   $("rvHtml").addEventListener("click", () => reportLead && downloadReportHtml(reportLead));
@@ -1460,7 +2253,11 @@ function boot() {
     await startChecks([l]);
     if (reportLead === l) openReport(l);
   });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && reportLead) closeReport(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    if (designLead) closeDesign();
+    else if (reportLead) closeReport();
+  });
   if (state.example) state.open.add("ex1");
   render();
 }

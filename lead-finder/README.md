@@ -36,6 +36,23 @@ Key ta code e rakha hoy na, karon repo public: code e thakle je keu niye use kor
 - **Your details, prices:** naam, title, email, WhatsApp, portfolio, call booking link, package er dam ar
   guarantee. Report ar email e eguloi boshe, browser mone rakhe.
 
+### Redesign bikrir feature
+
+- **"Keno customer ashche na" checklist:** customer ana website e je 8 ta jinish thake (mobile, 3 second e
+  load, HTTPS, Call/Book button, tap-to-call, contact form, review, Google setup), tar kon gulo client er
+  site e nai, ✓/✗ diye dekhay. Report er prothom page ei ta: "Your website isn't turning visitors into
+  customers".
+- **Site er content pora:** website check er por tool client er site theke heading, description, about
+  text, logo, chobi, email, brand color ar copyright year pore. Browser shorasori onno site porte dey na,
+  tai public proxy (allorigins, corsproxy, r.jina.ai) diye pore. Kaj na korle industry er default lekha
+  use hoy.
+- **Redesign concept:** card er **Redesign concept** button e oi content, business er naam, phone,
+  address, opening hours ar brand color diye notun homepage design toiri hoy. Style (Clean, Warm, Bold,
+  Elegant), color, headline, service, about, shob edit kora jay. **Download homepage** e alada HTML file
+  hishebe pathano jay.
+- Report e **Now bonam After the redesign** (phone ar desktop) thake. PDF e eta nijer page e ase.
+- Prothom email e free report + free homepage design offer kora hoy.
+
 Screenshot gulo browser e save hoy na (onek boro). Page bondho kore abar khulle report e
 **Re-check for screenshots** chapun.
 
