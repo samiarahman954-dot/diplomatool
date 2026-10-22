@@ -75,7 +75,7 @@ Replied, Send sample > Sample sent). Kon message jabe, seta **Messages** e tab d
 
 ### Follow-up mone rakha
 
-Protiti card e **Status** ache: Not contacted, Emailed, Followed up, Replied, Sample sent, Client,
+Protiti card e **Status** ache: Not contacted, Contacted, Followed up, Replied, Sample sent, Client,
 Not interested. "Contacted" er 3 din por card upore chole ashe ar "follow-up due" dekhay. **Follow-up due**
 filter e shob ek sathe paben. Status ei browser e save thake, CSV te o ase.
 
