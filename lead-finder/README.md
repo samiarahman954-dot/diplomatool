@@ -24,6 +24,21 @@ Website check hoy Google PageSpeed diye. Key chara Google alpo kichu check korte
 "Your details & PageSpeed key" e ekbar boshiye din. Browser key ta mone rakhe, protibar dite hoy na.
 Key ta code e rakha hoy na, karon repo public: code e thakle je keu niye use korte parto.
 
+### Client ke convince korar feature
+
+- **Client report / Proposal:** protiti lead er card e button ache. Report e thake: A-F grade, 4 ta Google
+  score, phone e site er screenshot, second-by-second load howar chobi, problem gulo (ki khoti kore ar
+  kivabe thik korben), ek-i shohorer competitor der sathe tulona, speed details, apnar 3 ta package
+  (recommended ta highlight kora), guarantee ar contact. **Save as PDF** ba **Download HTML** kore pathan.
+  Website chara business er jonno "Proposal" ase: kon competitor der website ache, ar website e ki thakbe.
+- **Email sequence:** First email (free report offer, kono link/attachment chara), Follow-up (3 din pore),
+  Last follow-up (7 din pore), Send report (reply dile, PDF attach kore).
+- **Your details, prices:** naam, title, email, WhatsApp, portfolio, call booking link, package er dam ar
+  guarantee. Report ar email e eguloi boshe, browser mone rakhe.
+
+Screenshot gulo browser e save hoy na (onek boro). Page bondho kore abar khulle report e
+**Re-check for screenshots** chapun.
+
 Web version copyright year, WordPress version ar website theke email khujte pare na (browser er
 security niyom er karone). Eguloo lagle niche Python version chalan.
 
