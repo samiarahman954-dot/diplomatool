@@ -100,7 +100,10 @@ Dam, package ba guarantee tool e nai. Protiti client er dam alada, tai oigulo em
 2. **Email** > "First email": free website design er offer.
 3. Reply dile design er screenshot ba link "Send design" email e pathan.
 
-### Contact: email, WhatsApp, SMS, Messenger
+### Contact: email, WhatsApp, Messenger
+
+**Email** button shob card e thake. Email jana na thakle **Open website** diye oder contact page e email
+khujun, tarpor **Email** chepe To te likhe din: tool ta mone rakhe.
 
 Protiti card er **Contact** row:
 
@@ -109,13 +112,12 @@ Protiti card er **Contact** row:
 - **WhatsApp:** number e WhatsApp chat khule, chhoto message likha thake. Number antorjatik format e nijei
   hoy (jemon Dhaka er `01711...` > `8801711...`). Map listing e WhatsApp number dewa thakle
   "WhatsApp (listed)" dekhay. Number dekhte landline hole "WhatsApp (landline?)" dekhay.
-- **SMS** (message likha thake) ar **Call**.
 - **Messenger** (Facebook page thakle), **Instagram DM** (Instagram thakle), **Contact form** (site e contact
   page pele): message copy hoy, page khule, apni paste koren.
 - **Copy message:** chhoto message ta copy.
 
 Kono number e WhatsApp ache kina **age theke check korar public upay nai** (WhatsApp eta shudhu paid Business
-API te dey). WhatsApp chaple number e WhatsApp na thakle WhatsApp nijei bole dey; tokhon SMS ba Call use korun.
+API te dey). WhatsApp chaple number e WhatsApp na thakle WhatsApp nijei bole dey; tokhon email ba Messenger use korun.
 Unknown number theke beshi WhatsApp message pathale WhatsApp number ban korte pare, tai din e alpo kichu,
 personalized message pathan.
 
@@ -125,13 +127,7 @@ personalized message pathan.
   mobile number hole **WhatsApp**.
 - US, Canada, Australia, New Zealand, Nordic desh: WhatsApp kom chole, tai **email**, na thakle **Messenger**,
   **contact form** ba **call**.
-- Landline number hole WhatsApp/SMS jay na, tai email ba call.
-
-**Nijer SIM theke bidesh e SMS/call:** computer er time zone Bangladesh (ba India, Pakistan, Nepal, Sri Lanka)
-hole bidesher number e button "SMS (international)" / "Call (international)" dekhay ar chapar age shotorko
-kore: international SMS e taka beshi kate, landline e jay na, ar foreign number er SMS ke onekei spam bhabe.
-Call korte chaile oi desher local number soho calling app (jemon OpenPhone, JustCall, Zadarma) shosta ar
-beshi manush dhore.
+- Landline number hole WhatsApp jay na, tai email.
 
 ### Email edit kore sorasori pathano
 

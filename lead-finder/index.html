@@ -296,11 +296,11 @@ body.report-open { overflow: hidden; }
     </section>
     <section>
       <h2>Contact nai?</h2>
-      <p>Business gulo Google Maps theke ashe, phone, website ar rating soho. Kono business er phone/email na thakle card er <b>Google Maps</b> button e oder listing khulun (WhatsApp, website, social link thake), ba <b>Find on Facebook</b> e page khuje Messenger e message korun. Google Maps email dey na, tai <b>Find email</b> (ba upore <b>Find emails</b> e shob ek sathe) oder website, contact/about page, Facebook page ar web search e email khuje. Protiti card e <b>Best way</b> (sobuj button) bole dey oi desh e kon upay e reply beshi ashe: Gulf, Asia, Africa, Europe e WhatsApp; US, Canada, Australia te email, Messenger ba call. Nijer BD SIM theke bidesh e SMS ba call korle tool age shotorko kore, karon eta dami ar spam mone hoy.</p>
+      <p>Business gulo Google Maps theke ashe, phone, website ar rating soho. Kono business er phone/email na thakle card er <b>Google Maps</b> button e oder listing khulun (WhatsApp, website, social link thake), ba <b>Find on Facebook</b> e page khuje Messenger e message korun. Google Maps email dey na, tai <b>Find email</b> (ba upore <b>Find emails</b> e shob ek sathe) oder website, contact/about page, Facebook page ar web search e email khuje. Protiti card e <b>Best way</b> (sobuj button) bole dey oi desh e kon upay e reply beshi ashe: Gulf, Asia, Africa, Europe e WhatsApp; US, Canada, Australia te email ba Messenger. <b>Email</b> button shob card e ache: address jana na thakle <b>Open website</b> e contact page theke niye To te likhun.</p>
     </section>
     <section>
       <h2>Follow-up mone rakha</h2>
-      <p>Card er <b>Contact</b> row theke Gmail, WhatsApp, SMS ba Messenger e pathale status nijei "Contacted" hoye jay (ba nije bodlan). 3 din por card ta upore chole ashe ar "follow-up due" dekhay. <b>Follow-up due</b> filter e shob ek sathe paben. Status shudhu ei browser e save thake.</p>
+      <p>Card er <b>Contact</b> row theke Email, WhatsApp ba Messenger e pathale status nijei "Contacted" hoye jay (ba nije bodlan). 3 din por card ta upore chole ashe ar "follow-up due" dekhay. <b>Follow-up due</b> filter e shob ek sathe paben. Status shudhu ei browser e save thake.</p>
     </section>
     <section>
       <h2>Score</h2>
@@ -351,7 +351,7 @@ body.report-open { overflow: hidden; }
     <div class="pv-head"><h2 id="cmTitle">Email</h2><button type="button" class="ghost small" id="cmClose">Close</button></div>
     <div class="tabs" role="group" aria-label="Which email" id="cmKinds"></div>
     <p class="cm-hint" id="cmHint"></p>
-    <div class="field"><label for="cmTo">To</label><input type="email" id="cmTo" autocomplete="off" spellcheck="false"></div>
+    <div class="field"><label for="cmTo">To</label><input type="email" id="cmTo" autocomplete="off" spellcheck="false" placeholder="Their email: look on the contact page of their website"></div>
     <div class="field"><label for="cmSubject">Subject</label><input type="text" id="cmSubject"></div>
     <div class="field"><label for="cmBody">Message</label><textarea id="cmBody" rows="14"></textarea></div>
     <label class="check" id="cmAttachRow" hidden><input type="checkbox" id="cmAttach" checked> Attach the website review as a PDF</label>
@@ -386,7 +386,7 @@ const PSI = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed";
 const CURRENT_YEAR = new Date().getFullYear();
 // Bump when the website check learns something new, so older results get re-checked.
 const AUDIT_VERSION = 7;
-const APP_VERSION = "2026-10-23g";
+const APP_VERSION = "2026-10-23h";
 
 // [key, label, OpenStreetMap tags (used by the Python version)], grouped for the dropdown.
 const CATEGORY_GROUPS = [
@@ -2677,7 +2677,7 @@ function openCompose(l, kind) {
   $("cmTo").value = l.email || "";
   fillCompose();
   $("cmView").hidden = false;
-  $("cmBody").focus();
+  (l.email ? $("cmBody") : $("cmTo")).focus();
   prepareGmail().catch(() => {});
 }
 
@@ -2859,12 +2859,6 @@ function leadCallingCode(l) {
   return (intl && Object.keys(COUNTRY_OF_CODE).filter(c => intl.startsWith(c)).sort((x, y) => y.length - x.length)[0]) || countryCode();
 }
 
-// Your own country, from this computer's time zone, to warn before an international SMS or call.
-const TZ_CALLING_CODES = { "Asia/Dhaka": "880", "Asia/Kolkata": "91", "Asia/Calcutta": "91", "Asia/Karachi": "92", "Asia/Kathmandu": "977", "Asia/Colombo": "94" };
-function senderCallingCode() {
-  try { return TZ_CALLING_CODES[Intl.DateTimeFormat().resolvedOptions().timeZone] || ""; } catch { return ""; }
-}
-
 // The contact route most likely to get a reply, given the country and what the listing has.
 function bestRoute(l) {
   const cc = leadCallingCode(l);
@@ -2874,13 +2868,12 @@ function bestRoute(l) {
   const landline = wa && !l.whatsapp && phoneKind(wa) === "landline";
   if (l.whatsapp && wa) return ["whatsapp", "The listing says this number is on WhatsApp."];
   if (waFirst && wa && !landline) return ["whatsapp", `Most businesses in ${where || "this country"} answer on WhatsApp.`];
-  const why = landline ? "This number looks like a landline, which can't get WhatsApp or SMS"
+  const why = landline ? "This number looks like a landline, which can't get WhatsApp"
     : wa && !waFirst ? `Few businesses in ${where || "this country"} use WhatsApp with people they don't know` : "";
   if (l.email) return ["email", `${why ? `${why}, so email them` : "Email them"}: owners read it, and it can carry the report.`];
   if (messengerLink(l.facebook)) return ["messenger", `${why ? `${why}. ` : ""}No email, but small businesses read their Facebook page messages.`];
   if (l.content?.contactUrl) return ["form", `${why ? `${why}. ` : ""}No email, but their contact form goes to their inbox.`];
-  if (intlPhone(l.phone)) return ["call", `${why ? `${why}. ` : ""}No email: a short call gets a better answer than a text.`];
-  return ["", ""];
+  return ["email", `${why ? `${why}. ` : ""}No email found yet: look on their website's contact page, then press Email and type it in.`];
 }
 
 function instagramLink(ig) {
@@ -2910,8 +2903,9 @@ function contactRowHtml(l, kind) {
   const [best, bestWhy] = bestRoute(l);
   const btn = (attrs, label, title = "", route = "") => `<a class="btn ${route && route === best ? "primary" : "ghost"} small" ${attrs} data-id="${id}"${title ? ` title="${esc(title)}"` : ""}>${label}</a>`;
   const out = [];
+  // Always offered: when the address isn't known, type it in (it's often on their contact page).
+  out.push(`<button type="button" class="${best === "email" ? "primary" : "ghost"} small" data-act="compose" data-id="${id}" title="${l.email ? "Edit the email, then send it from your Gmail" : "Write the email and type in their address (look on their website's contact page)"}">Email</button>`);
   if (l.email) {
-    out.push(`<button type="button" class="${best === "email" ? "primary" : "ghost"} small" data-act="compose" data-id="${id}" title="Edit the email, then send it from your Gmail">Email</button>`);
     out.push(btn(`href="mailto:${esc(l.email)}?subject=${encodeURIComponent(d.subject)}&amp;body=${encodeURIComponent(d.body)}" data-act="send" data-copy=""`, "Mail app", "Open your email app with this email filled in"));
     out.push(`<button type="button" class="ghost small" data-act="copyaddr" data-id="${id}">Copy address</button>`);
   }
@@ -2920,23 +2914,10 @@ function contactRowHtml(l, kind) {
     const kindOf = l.whatsapp ? "listed" : phoneKind(wa);
     const label = kindOf === "listed" ? "WhatsApp (listed)" : kindOf === "landline" ? "WhatsApp (landline?)" : "WhatsApp";
     const title = kindOf === "listed" ? "The map listing says this number is on WhatsApp"
-      : kindOf === "landline" ? "This looks like a landline, which usually isn't on WhatsApp. If it isn't, WhatsApp will say so: use SMS or a call instead."
+      : kindOf === "landline" ? "This looks like a landline, which usually isn't on WhatsApp. If it isn't, WhatsApp will say so: email them instead."
       : kindOf === "mobile" ? "Mobile number. If it isn't on WhatsApp, WhatsApp will say so."
       : "If this number isn't on WhatsApp, WhatsApp will say so.";
     out.push(btn(`href="https://wa.me/${wa}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener" data-act="send" data-copy=""`, label, title, "whatsapp"));
-  }
-  const tel = intlPhone(l.phone);
-  if (tel) {
-    const from = senderCallingCode();
-    const abroad = Boolean(from && !tel.startsWith(from));
-    const smsWarn = "This goes from your own SIM as an international SMS: it costs extra, never reaches a landline, and a text from a foreign number often looks like spam. Email, Messenger or WhatsApp get more replies. Send it anyway?";
-    const callWarn = "This is an international call from your own SIM, which costs a lot per minute. A calling app with a local number for their country is much cheaper and gets answered more. Call anyway?";
-    out.push(btn(`href="sms:+${tel}?&amp;body=${encodeURIComponent(msg)}" data-act="send" data-copy=""${abroad ? ` data-warn="${esc(smsWarn)}"` : ""}`, abroad ? "SMS (international)" : "SMS",
-      abroad ? "International SMS from your SIM: costs extra and often looks like spam" : "Opens your phone's messages app with the text filled in"));
-    out.push(btn(`href="tel:+${tel}" data-act="send" data-copy=""${abroad ? ` data-warn="${esc(callWarn)}"` : ""}`, abroad ? "Call (international)" : "Call",
-      abroad ? "International call from your SIM: expensive. A calling app with a local number is cheaper." : "", "call"));
-  } else if (l.phone) {
-    out.push(btn(`href="tel:${esc(l.phone.replace(/[^\d+]/g, ""))}" data-act="send" data-copy=""`, "Call"));
   }
   const fb = messengerLink(l.facebook);
   if (fb) out.push(btn(`href="${esc(fb)}" target="_blank" rel="noopener" data-act="send" data-copy="msg"`, "Messenger", "Copies the message, then opens their Facebook page chat. Paste it in.", "messenger"));
@@ -2944,7 +2925,8 @@ function contactRowHtml(l, kind) {
   if (ig) out.push(btn(`href="${esc(ig)}" target="_blank" rel="noopener" data-act="send" data-copy="msg"`, "Instagram DM", "Copies the message, then opens an Instagram chat. Paste it in."));
   const form = l.content?.contactUrl;
   if (form) out.push(btn(`href="${esc(form)}" target="_blank" rel="noopener" data-act="send" data-copy="msg"`, "Contact form", "Copies the message, then opens their contact page. Paste it into the form.", "form"));
-  if (msg && (wa || tel || fb || ig || form)) out.push(`<button type="button" class="ghost small" data-act="copymsg" data-id="${id}">Copy message</button>`);
+  if (!l.email && !form && safeHref(l.website)) out.push(btn(`href="${esc(safeHref(l.website))}" target="_blank" rel="noopener"`, "Open website", "Look for their email on the contact or about page, then press Email and type it in"));
+  if (msg && (wa || fb || ig || form)) out.push(`<button type="button" class="ghost small" data-act="copymsg" data-id="${id}">Copy message</button>`);
   // Ways to find them when the listing has nothing, or as a backup.
   const where = `${l.name} ${l.address || cityLabel(state.city || "")}`;
   out.push(`<a class="btn ghost small" href="${esc(l.gmaps || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(where)}`)}" target="_blank" rel="noopener" title="Their Google Maps listing often shows a phone number, website, WhatsApp or social links">Google Maps</a>`);
@@ -3053,10 +3035,10 @@ function cardHtml(l) {
       <p class="subj"><b>Subject:</b> ${esc(d.subject)}</p>
       <pre>${esc(d.body)}</pre>
       <div class="actions">
-        ${l.email ? `<button type="button" class="primary small" data-act="compose" data-id="${id}">Edit &amp; send</button>` : ""}
-        <button type="button" class="${l.email ? "ghost" : "primary"} small" data-act="copy" data-id="${id}">Copy email</button>
+        <button type="button" class="primary small" data-act="compose" data-id="${id}">Edit &amp; send</button>
+        <button type="button" class="ghost small" data-act="copy" data-id="${id}">Copy email</button>
       </div>
-      <p class="subj"><b>Short message</b> for WhatsApp, SMS, Messenger or a contact form</p>
+      <p class="subj"><b>Short message</b> for WhatsApp, Messenger or a contact form</p>
       <pre>${esc(shortMessage(l, kind))}</pre>
       <div class="actions"><button type="button" class="ghost small" data-act="copymsg" data-id="${id}">Copy message</button></div>
     </div>` : "";
@@ -3209,7 +3191,14 @@ async function checkLeads(targets) {
       try {
         const res = await checkSite(l.website, key);
         l.audit = { ...res, state: "done" };
-        await cleanShots(l.audit);
+        // Google's tester is sometimes blocked by firewalls or times out on slow servers. Before
+        // telling a business its site is down, check that it really doesn't open.
+        if (res.issues.includes("down") && !res.issues.includes("ssl_broken")) {
+          setStatus(`Double-checking ${domainOf(l.website)}…`);
+          const c = await fetchSiteContent(l.website).catch(() => null);
+          if (c) { l.content = c; if (!l.email && c.emails?.length) Object.assign(l, { email: c.emails[0], emailFrom: "their website" }); l.audit = { state: "error", issues: [], error: "Google's tester couldn't load it (the site may block automated tools), but it opens normally. Press Check website to try again." }; }
+        }
+        if (l.audit.state === "done") await cleanShots(l.audit);
         if (!res.issues.includes("down")) {
           setStatus(`Reading ${domainOf(l.website)}…`);
           l.content = await fetchSiteContent(l.website).catch(() => null);
@@ -3412,7 +3401,7 @@ function boot() {
   $("cmGmail").addEventListener("click", () => { const l = composeLead; if (l && !state.example && advanceStatus(l, composeKind)) toast(`Marked as ${STATUS_LABEL[statusOf(l).s]}.`); });
   $("rvPdf").addEventListener("click", () => window.print());
   $("rvHtml").addEventListener("click", () => reportLead && downloadReportHtml(reportLead));
-  $("rvCopy").addEventListener("click", (e) => reportLead && (reportLead.email ? openCompose(reportLead, "report") : copyDraft(reportLead, e.currentTarget, "report")));
+  $("rvCopy").addEventListener("click", () => reportLead && openCompose(reportLead, "report"));
   $("rvUploadBtn").addEventListener("click", () => $("rvUpload").click());
   $("rvUpload").addEventListener("change", () => {
     const f = $("rvUpload").files[0], l = reportLead;
