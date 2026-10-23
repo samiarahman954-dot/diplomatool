@@ -249,6 +249,7 @@ body.report-open { overflow: hidden; }
           <button type="button" class="chip" data-filter="email" aria-pressed="false">Has email<i></i></button>
         </div>
         <div class="actions">
+          <button type="button" class="ghost small" id="emailBtn" hidden>Find emails</button>
           <button type="button" class="ghost small" id="fillBtn" hidden>Fill missing contacts from Google</button>
           <button type="button" class="ghost small" id="checkAllBtn" hidden>Check websites</button>
           <button type="button" class="ghost small" id="csvBtn">Download CSV</button>
@@ -279,7 +280,7 @@ body.report-open { overflow: hidden; }
     </section>
     <section>
       <h2>Contact nai?</h2>
-      <p>Business gulo Google Maps theke ashe, phone, website ar rating soho. Kono business er phone/email na thakle card er <b>Google Maps</b> button e oder listing khulun (WhatsApp, website, social link thake), ba <b>Find on Facebook</b> e page khuje Messenger e message korun. Protiti card e <b>Best way</b> (sobuj button) bole dey oi desh e kon upay e reply beshi ashe: Gulf, Asia, Africa, Europe e WhatsApp; US, Canada, Australia te email, Messenger ba call. Nijer BD SIM theke bidesh e SMS ba call korle tool age shotorko kore, karon eta dami ar spam mone hoy.</p>
+      <p>Business gulo Google Maps theke ashe, phone, website ar rating soho. Kono business er phone/email na thakle card er <b>Google Maps</b> button e oder listing khulun (WhatsApp, website, social link thake), ba <b>Find on Facebook</b> e page khuje Messenger e message korun. Google Maps email dey na, tai <b>Find email</b> (ba upore <b>Find emails</b> e shob ek sathe) oder website, contact/about page, Facebook page ar web search e email khuje. Protiti card e <b>Best way</b> (sobuj button) bole dey oi desh e kon upay e reply beshi ashe: Gulf, Asia, Africa, Europe e WhatsApp; US, Canada, Australia te email, Messenger ba call. Nijer BD SIM theke bidesh e SMS ba call korle tool age shotorko kore, karon eta dami ar spam mone hoy.</p>
     </section>
     <section>
       <h2>Follow-up mone rakha</h2>
@@ -520,7 +521,7 @@ const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch {} },
 };
-const state = { leads: [], filter: "all", city: "", category: "", example: true, checking: false, stop: false, running: null, searchSeq: 0, open: new Set(), kind: {}, statuses: {}, filling: false };
+const state = { leads: [], filter: "all", city: "", category: "", example: true, checking: false, stop: false, running: null, searchSeq: 0, open: new Set(), kind: {}, statuses: {}, filling: false, findingEmails: false };
 
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 function normUrl(u) { u = (u || "").trim(); if (!u) return ""; return /^https?:\/\//i.test(u) ? u : "http://" + u; }
@@ -1332,11 +1333,6 @@ async function fetchSiteContent(url) {
   return null;
 }
 
-function cleanEmails(list) {
-  return [...new Set(list.map(e => e.trim().toLowerCase().replace(/^mailto:/, "").split("?")[0]))]
-    .filter(e => /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/.test(e) && !/\.(png|jpe?g|gif|webp|svg)$|example\.|sentry|wixpress|domain\.com|yourname|@2x/.test(e)).slice(0, 3);
-}
-
 function parseHtmlContent(html, base) {
   const doc = new DOMParser().parseFromString(html, "text/html");
   const abs = (u) => { try { return u ? new URL(u, base).href : ""; } catch { return ""; } };
@@ -1372,7 +1368,7 @@ function parseHtmlContent(html, base) {
     menuCount: new Set([...(doc.querySelector("nav") || doc.createElement("nav")).querySelectorAll("a")].map(txt).filter(t => t.length > 1 && t.length < 30)).size,
     hasSlider: /revslider|rev_slider|slick-slider|owl-carousel|swiper-container|flexslider|carousel-inner|metaslider|smart-slider|layerslider|nivoslider|bxslider/i.test(html),
     dated: /<font[\s>]|<center>|<marquee/i.test(html) || (html.match(/<table/gi) || []).length >= 4,
-    emails: cleanEmails([...doc.querySelectorAll('a[href^="mailto:"]')].map(a => a.getAttribute("href")).concat(bodyText.match(EMAIL_TEXT_RE) || [])),
+    emails: rankEmails(emailsIn(html), base).slice(0, 3),
     phones: [...new Set([...doc.querySelectorAll('a[href^="tel:"]')].map(a => txt(a) || a.getAttribute("href").slice(4)))].slice(0, 2),
     logo: logoImg ? imgSrc(logoImg) : "",
     hero: ogImage || photos[0]?.src || "",
@@ -1408,7 +1404,7 @@ function parseTextContent(md, base) {
     hasCta: CTA_RE.test(plain),
     hasReviews: REVIEW_RE.test(plain),
     menuCount: 0, hasSlider: null, dated: null,
-    emails: cleanEmails(plain.match(EMAIL_TEXT_RE) || []),
+    emails: rankEmails(emailsIn(plain), base).slice(0, 3),
     phones: [],
     logo: logo ? logo[2] : "",
     hero: images[0] || "",
@@ -1424,12 +1420,170 @@ function parseTextContent(md, base) {
 }
 const EMAIL_TEXT_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 
+// ---------------- Finding an email address ----------------
+// Google Maps never gives out email addresses, so they come from the business's own website (home,
+// contact and about pages), its Facebook page, and web search results, in that order.
+async function fetchRaw(url, ms = 12000) {
+  for (const make of CONTENT_PROXIES) {
+    const [proxied, kind] = make(url);
+    try {
+      const r = await fetchWithTimeout(proxied, ms);
+      if (!r.ok) continue;
+      const text = await r.text();
+      if (text.length > 200) return { text, kind };
+    } catch {}
+  }
+  return null;
+}
+
+function cfDecode(hex) {
+  const key = parseInt(hex.slice(0, 2), 16);
+  let out = "";
+  for (let i = 2; i + 1 < hex.length; i += 2) out += String.fromCharCode(parseInt(hex.slice(i, i + 2), 16) ^ key);
+  return out;
+}
+
+// Every address in a page, including the ones sites hide from spam bots: Cloudflare's email
+// protection, HTML entities, escaped JSON and "name [at] domain [dot] com".
+function emailsIn(text) {
+  const found = [];
+  for (const m of text.matchAll(/data-cfemail="([0-9a-f]+)"|email-protection#([0-9a-f]+)/gi)) found.push(cfDecode(m[1] || m[2]));
+  const t = text
+    .replace(/&#0*64;|&#x0*40;|\\u0040|\\x40|%40|&commat;/gi, "@")
+    .replace(/&#0*46;|&#x0*2e;|\\u002e/gi, ".")
+    .replace(/\s*[[(]\s*at\s*[\])]\s*/gi, "@")
+    .replace(/\s*[[(]\s*dot\s*[\])]\s*/gi, ".");
+  return found.concat(t.match(EMAIL_TEXT_RE) || []);
+}
+
+const BAD_EMAIL = /^(no-?reply|donotreply|privacy|abuse|webmaster|postmaster|wordpress|admin@wordpress|example|test|user|name|email|your)@|@(example|domain|sentry|wixpress|sentry-next|godaddy|squarespace|wix|ingest)\.|\.(png|jpe?g|gif|webp|svg|js|css)$/i;
+// Best address first: one on the business's own domain, then a front-desk address.
+function rankEmails(list, website) {
+  const dom = website ? domainOf(website) : "";
+  const score = (e) => (dom && e.endsWith("@" + dom) || dom && e.split("@")[1].endsWith("." + dom) ? 4 : 0)
+    + (/^(info|contact|hello|office|enquir|inquir|booking|book|reception|appointments?|admin|mail|team|frontdesk|sales)\b/.test(e) ? 2 : 0);
+  return [...new Set(list.map(e => e.trim().toLowerCase().replace(/^mailto:/, "").split("?")[0].replace(/^[^a-z0-9]+/, "")))]
+    .filter(e => /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/.test(e) && !BAD_EMAIL.test(e))
+    .sort((a, b) => score(b) - score(a));
+}
+
+function linksIn(text, base) {
+  const out = [];
+  for (const m of text.matchAll(/href=["']([^"'#]+)["']|\]\((https?:[^)\s]+)\)/gi)) {
+    try { out.push(new URL((m[1] || m[2]).replace(/&amp;/g, "&"), base).href); } catch {}
+  }
+  return out;
+}
+
+async function emailsFromWebsite(site) {
+  const home = normUrl(site);
+  const page = await fetchRaw(home);
+  let list = page ? emailsIn(page.text) : [];
+  if (rankEmails(list, site).length) return { list, from: "their website" };
+  // Contact and about pages are where small businesses put their address.
+  const own = (page ? linksIn(page.text, home) : []).filter(u => domainOf(u) === domainOf(home) && /contact|about|impressum|kontakt|get-in-touch|reach|location|find-us|team/i.test(u));
+  const guesses = ["contact", "contact-us", "about", "about-us"].map(p => new URL(`/${p}`, home).href);
+  for (const u of [...new Set(own.concat(guesses))].slice(0, 4)) {
+    const p = await fetchRaw(u, 10000);
+    if (!p) continue;
+    list = list.concat(emailsIn(p.text));
+    if (rankEmails(list, site).length) return { list, from: "their contact page" };
+  }
+  return { list, from: "" };
+}
+
+async function emailsFromFacebook(fb) {
+  const url = /^https?:/i.test(fb) ? fb : `https://www.facebook.com/${String(fb).replace(/^@/, "")}`;
+  const page = await fetchRaw(url, 12000);
+  return page ? emailsIn(page.text) : [];
+}
+
+// DuckDuckGo's HTML results: snippets often show the email, and the first result tells us the
+// Facebook page when the listing doesn't have one.
+async function webSearch(q) {
+  const page = await fetchRaw(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`, 12000);
+  if (!page) return [];
+  const doc = new DOMParser().parseFromString(page.text, "text/html");
+  return [...doc.querySelectorAll(".result")].map(r => {
+    const a = r.querySelector("a.result__a");
+    let url = a?.getAttribute("href") || "";
+    const u = url.match(/[?&]uddg=([^&]+)/);
+    if (u) url = decodeURIComponent(u[1]);
+    return { url, title: (a?.textContent || "").trim(), snippet: (r.querySelector(".result__snippet")?.textContent || "").trim() };
+  });
+}
+
+// Stricter than sameBusiness: a search result must carry most of the name, not just one word of it.
+function nameMatches(name, title) {
+  const words = name.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").split(" ").filter(x => x.length > 2 && !/^(the|and|ltd|llc|inc|co|clinic|dental|dentist|limited|services?)$/.test(x));
+  const t = title.toLowerCase();
+  const hits = words.filter(x => t.includes(x)).length;
+  return words.length ? hits >= Math.min(2, words.length) : t.includes(name.toLowerCase());
+}
+
+async function findEmail(l) {
+  if (l.email || l.emailSearch === "running") return;
+  l.emailSearch = "running";
+  render();
+  let best = "", from = "";
+  try {
+    if (l.website) {
+      const r = await emailsFromWebsite(l.website);
+      best = rankEmails(r.list, l.website)[0] || ""; from = r.from;
+    }
+    const city = state.city ? cityShort() : "";
+    if (!best && !l.facebook) {
+      const hit = (await webSearch(`${l.name} ${city} facebook`)).find(r => /facebook\.com\/(?!sharer|share|login|groups|events)/i.test(r.url) && nameMatches(l.name, r.title));
+      if (hit) l.facebook = hit.url;
+    }
+    if (!best && l.facebook) {
+      best = rankEmails(await emailsFromFacebook(l.facebook), l.website)[0] || "";
+      if (best) from = "their Facebook page";
+    }
+    if (!best) {
+      // Only trust a search snippet that is about this business, or an address on their own domain.
+      const results = await webSearch(`${l.name} ${city} email`);
+      const dom = l.website ? domainOf(l.website) : "";
+      const list = results.filter(r => nameMatches(l.name, r.title) || (dom && domainOf(r.url) === dom)).flatMap(r => emailsIn(`${r.title} ${r.snippet}`));
+      best = rankEmails(list, l.website)[0] || "";
+      if (best) from = "a web search (double-check it)";
+    }
+  } catch {}
+  if (best) Object.assign(l, { email: best, emailFrom: from, emailSearch: "found" });
+  else l.emailSearch = "none";
+  render();
+  return Boolean(best);
+}
+
+async function findAllEmails() {
+  if (state.findingEmails) return;
+  const queue = state.leads.filter(l => !l.email && !l.emailSearch);
+  if (!queue.length) return;
+  state.findingEmails = true;
+  const total = queue.length;
+  let done = 0, found = 0;
+  const worker = async () => {
+    while (queue.length) {
+      const l = queue.shift();
+      setStatus(`Looking for email addresses: ${done} of ${total} done, ${found} found…`);
+      if (await findEmail(l)) found++;
+      done++;
+    }
+  };
+  try { await Promise.all([worker(), worker(), worker()]); }
+  finally {
+    state.findingEmails = false;
+    setStatus(`Found an email for ${found} of ${total} businesses.${found < total ? " For the rest, use WhatsApp, Messenger, their contact form or a call." : ""}`);
+    render();
+  }
+}
+
 // Turns what the page is missing into scored problems. Needs enough real text to judge:
 // a site that renders everything with JavaScript would otherwise look empty.
 function applyContentIssues(l) {
   const c = l.content, a = l.audit;
   if (!c || !a || a.state !== "done") return;
-  if (!l.email && c.emails?.length) l.email = c.emails[0];
+  if (!l.email && c.emails?.length) Object.assign(l, { email: c.emails[0], emailFrom: "their website" });
   if (c.words < 150) return;
   const add = (code) => { if (!a.issues.includes(code)) a.issues.push(code); };
   if (c.hasCta === false) add("no_cta");
@@ -2037,7 +2191,7 @@ function cardHtml(l) {
   const href = safeHref(l.website);
   const contact = [
     href && `<span><a href="${esc(href)}" target="_blank" rel="noopener">${esc(domainOf(l.website))}</a></span>`,
-    l.email && `<span>${esc(l.email)}</span>`,
+    l.email && `<span${l.emailFrom ? ` title="Found on ${esc(l.emailFrom)}"` : ""}>${esc(l.email)}${/search/.test(l.emailFrom || "") ? " (from a web search: check it)" : ""}</span>`,
     l.phone && `<span>${esc(l.phone)}</span>`,
     safeHref(l.facebook) && l.facebook.includes("facebook") && `<span><a href="${esc(safeHref(l.facebook))}" target="_blank" rel="noopener">Facebook</a></span>`,
   ].filter(Boolean).join("");
@@ -2061,7 +2215,8 @@ function cardHtml(l) {
     ready && `<button type="button" class="${l.website ? "ghost" : "primary"} small" data-act="draft" data-id="${id}" aria-expanded="${open}">${open ? "Hide messages" : "Messages"}</button>`,
     ready && `<button type="button" class="ghost small" data-act="prompt" data-id="${id}">${l.website ? "Redesign prompt" : "Website prompt"}</button>`,
     href && (lv === "unchecked" || l.audit?.state === "error") && !state.checking && `<button type="button" class="ghost small" data-act="check" data-id="${id}">Check website</button>`,
-    !l.email && `<a class="btn ghost small" href="${esc(search)}" target="_blank" rel="noopener">Find email</a>`,
+    !l.email && !state.example && l.emailSearch !== "none" && `<button type="button" class="ghost small" data-act="findemail" data-id="${id}"${l.emailSearch === "running" ? " disabled" : ""} title="Looks on their website, contact page, Facebook page and in web search results">${l.emailSearch === "running" ? "Finding email…" : "Find email"}</button>`,
+    !l.email && (l.emailSearch === "none" || state.example) && `<a class="btn ghost small" href="${esc(search)}" target="_blank" rel="noopener" title="No email on their website or Facebook page. Try Google yourself.">No email found: search Google</a>`,
     l.map && `<a class="btn ghost small" href="${esc(l.map)}" target="_blank" rel="noopener">Map</a>`,
   ].filter(Boolean).join("");
   const draftHtml = d && open ? `
@@ -2123,6 +2278,9 @@ function render() {
   $("checkAllBtn").hidden = state.checking || !unchecked || state.example;
   const missing = L.filter(needsContact).length;
   $("fillBtn").hidden = !missing || !mapsKey() || state.example || state.filling || state.checking;
+  const noEmail = L.filter(l => !l.email && !l.emailSearch).length;
+  $("emailBtn").hidden = !noEmail || state.example || state.findingEmails;
+  $("emailBtn").textContent = `Find emails (${noEmail})`;
   $("fillBtn").textContent = `Fill missing contacts from Google (${missing})`;
   if (!state.example) {
     // Screenshots and page text are too big for browser storage; they stay in memory until the page closes.
@@ -2339,6 +2497,7 @@ function boot() {
   let last = null;
   try { last = JSON.parse(store.get("lf:last") || "null"); } catch {}
   if (last && last.leads && last.leads.length) {
+    last.leads.forEach(l => { if (l.emailSearch === "running") delete l.emailSearch; });
     Object.assign(state, { leads: last.leads, city: last.city, category: last.category, example: false });
     setStatus(`Showing your last search: ${CATEGORIES[last.category]?.[0] || "businesses"} in ${last.city}.`);
   } else {
@@ -2347,6 +2506,7 @@ function boot() {
   $("form").addEventListener("submit", search);
   $("checkAllBtn").addEventListener("click", checkAll);
   $("fillBtn").addEventListener("click", () => fillFromGoogle(state.leads.filter(needsContact)));
+  $("emailBtn").addEventListener("click", findAllEmails);
   if (!mapsKey()) { $("settings").open = true; if (state.example) setStatus("Add your Google Maps API key under Settings, then pick a city and a business type."); }
   $("stopBtn").addEventListener("click", () => { state.stop = true; setStatus("Stopping after the current checks finish…"); });
   $("csvBtn").addEventListener("click", downloadCsv);
@@ -2380,6 +2540,7 @@ function boot() {
     else if (btn.dataset.act === "report") openReport(l);
     else if (btn.dataset.act === "prompt") openPrompt(l);
     else if (btn.dataset.act === "gfill") fillFromGoogle([l]);
+    else if (btn.dataset.act === "findemail") findEmail(l).then(ok => toast(ok ? `Found ${l.email} on ${l.emailFrom}.` : "No email found on their website, Facebook page or in search results."));
   });
   $("list").addEventListener("change", (e) => {
     const sel = e.target.closest("select[data-act=status]");

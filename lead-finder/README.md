@@ -100,6 +100,19 @@ Replied, Send sample > Sample sent). Kon message jabe, seta **Messages** e tab d
 
 ### Contact nai emon business
 
+**Email khoja:** Google Maps (Places API) kono business er email dey na. Tai **Find email** (card e) ba
+**Find emails (N)** (list er upore, shob ek sathe) ei kromey khoje:
+
+1. Oder website er homepage, tarpor contact/about page. Lukano email o dhore: Cloudflare "email protected",
+   `info [at] site [dot] com`, `&#64;` ityadi. Oder nijer domain er email (info@, contact@) age rakhe,
+   noreply/webmaster baad dey.
+2. Facebook page (listing e na thakle web search diye page khuje ber kore, naam mille tobei).
+3. Web search er result (naam mile emon result thekei). Eta "from a web search: check it" likha thake,
+   pathanor age ekbar mile nin.
+
+Kichu na pele "No email found: search Google" dekhay. Facebook prai login chara page dekhay na, tai Facebook
+theke email shob shomoy pawa jay na; tokhon Messenger e message korun.
+
 - Boro search e tool shohor ke kotok bhag e bhag kore khoje (Google proti search e 20 tar beshi dey na),
   tai 60 result er jonno 9 ta search hoy.
 - Google e phone na thakle card er **Google Maps** (oder listing, sekhane WhatsApp/website/social link thake)
