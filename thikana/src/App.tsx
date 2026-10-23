@@ -1,8 +1,11 @@
-import { useState } from "react";
-import { HashRouter, Link, Route, Routes, useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { HashRouter, Link, MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { readSaved, save } from "./lib/hooks";
 import { LangContext, translate, type Lang } from "./lib/i18n";
-import { store } from "./lib/store";
+import { HOSTED_ON_CLAUDE, store, type StoreMode } from "./lib/store";
+
+// The claude.ai viewer doesn't pass "#/path" URLs through, so keep routes in memory there.
+const Router = HOSTED_ON_CLAUDE ? MemoryRouter : HashRouter;
 import { Home } from "./pages/Home";
 import { Mailbox } from "./pages/Mailbox";
 import { Write } from "./pages/Write";
@@ -18,6 +21,10 @@ export function App() {
     document.documentElement.lang = l;
     return l;
   });
+  const [mode, setMode] = useState<StoreMode>(store.mode);
+  useEffect(() => {
+    store.ready.then(setMode);
+  }, []);
   const setLang = (l: Lang) => {
     setLangState(l);
     save("thikana.lang", l);
@@ -26,7 +33,7 @@ export function App() {
 
   return (
     <LangContext.Provider value={{ lang, setLang }}>
-      <HashRouter>
+      <Router>
         <div className="wrap">
           <header className="top">
             <Link to="/" className="brand">
@@ -39,7 +46,9 @@ export function App() {
               {lang === "bn" ? "English" : "বাংলা"}
             </button>
           </header>
-          {store.mode === "local" && <div className="banner">{translate(lang, "demoMode")}</div>}
+          {mode === "local" && (
+            <div className="banner">{translate(lang, HOSTED_ON_CLAUDE ? "signedOut" : "demoMode")}</div>
+          )}
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/write" element={<FreshWrite />} />
@@ -47,7 +56,7 @@ export function App() {
             <Route path="*" element={<Home />} />
           </Routes>
         </div>
-      </HashRouter>
+      </Router>
     </LangContext.Provider>
   );
 }

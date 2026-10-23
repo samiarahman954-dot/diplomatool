@@ -33,8 +33,12 @@ export interface KnownVillage {
   letters: number;
 }
 
+export type StoreMode = "local" | "supabase" | "claude";
+
 export interface Store {
-  mode: "local" | "supabase";
+  mode: StoreMode;
+  /** The backend this view actually uses (the hosted build falls back to local when signed out). */
+  ready: Promise<StoreMode>;
   send(letter: NewLetter): Promise<{ id: string; deliverAt: string }>;
   mailbox(key: string): Promise<Letter[]>;
   recent(limit: number): Promise<Letter[]>;

@@ -43,6 +43,13 @@ Without Supabase keys the app runs in **demo mode**: letters are saved only in y
 
 The anon key can only call the functions in `schema.sql`; row-level security keeps the tables themselves closed.
 
+## Hosted on Claude
+
+`npm run build:claude` builds `dist/thikana.html` plus `dist/assets/` for claude.ai artifact hosting.
+Letters are stored in the artifact's shared database. On that host only the owner (and, on Team plans,
+organisation members) can post; people outside the organisation can read when signed in. For a site where
+anyone can post, use Supabase below.
+
 ## Deploy
 
 `npm run build` produces a static site (hash routing, relative paths). It works on Vercel, Netlify,

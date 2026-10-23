@@ -58,6 +58,7 @@ export function supabaseStore(url: string, anonKey: string): Store {
 
   return {
     mode: "supabase",
+    ready: Promise.resolve("supabase"),
 
     async send(n: NewLetter) {
       const rows = await rpc<{ id: string; deliver_at: string }[]>("send_letter", {

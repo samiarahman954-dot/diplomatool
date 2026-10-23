@@ -83,6 +83,15 @@ const dict = {
   err_link: { bn: "লিংক দেওয়া যাবে না।", en: "No links, please." },
   err_address: { bn: "দুটো ঠিকানাই পুরো দিন।", en: "Please complete both addresses." },
   err_secret: { bn: "গোপন শব্দ অন্তত ৪ অক্ষরের দিন।", en: "The secret word needs at least 4 characters." },
+  err_readonly: {
+    bn: "এই পাতায় আপনি শুধু চিঠি পড়তে পারবেন, লিখতে পারবেন না। লেখার অনুমতির জন্য মালিককে বলুন।",
+    en: "You can read letters on this page but not post them. Ask the owner for access to write.",
+  },
+  err_full: { bn: "ডাকঘর ভরে গেছে, এখন আর চিঠি নেওয়া যাচ্ছে না।", en: "The post office is full and can't take new letters right now." },
+  signedOut: {
+    bn: "চিঠি দেখতে Claude-এ সাইন ইন করুন। এখন যা লিখবেন তা শুধু এই ব্রাউজারে থাকবে।",
+    en: "Sign in to Claude to see everyone's letters. Anything you write now stays in this browser only.",
+  },
   err_generic: { bn: "কিছু একটা ভুল হয়েছে।", en: "Something went wrong." },
   minutes: { bn: "মিনিট", en: "min" },
   hours: { bn: "ঘণ্টা", en: "h" },

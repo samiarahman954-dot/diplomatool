@@ -13,7 +13,7 @@ import { store } from "../lib/store";
 import { mailboxPath } from "./Home";
 
 const FROM_KEY = "thikana.from";
-const SERVER_ERRORS = ["empty", "too_long", "phone", "email", "link"];
+const SERVER_ERRORS = ["empty", "too_long", "phone", "email", "link", "readonly", "full"];
 
 export function Write() {
   const { t, lang } = useT();

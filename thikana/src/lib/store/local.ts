@@ -33,6 +33,7 @@ const toLetter = (l: Stored): Letter => ({ ...l, body: isDelivered(l.deliverAt) 
 
 export const localStore: Store = {
   mode: "local",
+  ready: Promise.resolve("local"),
 
   async send(n: NewLetter) {
     const geo = await loadGeo();

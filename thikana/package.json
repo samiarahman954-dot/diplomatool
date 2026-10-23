@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc -b",
-    "geo": "node scripts/build-geo.mjs"
+    "geo": "node scripts/build-geo.mjs",
+    "build:claude": "tsc -b && vite build --mode claude && node scripts/artifact-page.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
