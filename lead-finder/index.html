@@ -644,10 +644,28 @@ async function checkSite(url, key) {
   if (sc("font-size") === 0) a.issues.push("small_fonts");
   if (a.a11y !== null && a.a11y < 70) a.issues.push("a11y_low");
   if (a.bytes !== null && a.bytes > 4e6) a.issues.push("heavy_page");
+  if (sc("target-size") === 0) a.issues.push("small_targets");
   if (sc("color-contrast") === 0) a.issues.push("low_contrast");
   if (sc("image-aspect-ratio") === 0) a.issues.push("stretched_images");
   if (sc("image-size-responsive") === 0) a.issues.push("blurry_images");
   if (a.metrics.cls !== null && a.metrics.cls > 0.25) a.issues.push("layout_shift");
+  // Boxes for the report's annotated screenshot, in full-page screenshot pixels.
+  const fps = lr.fullPageScreenshot || {};
+  a.shotSize = fps.screenshot?.width ? { w: fps.screenshot.width, h: fps.screenshot.height } : null;
+  const rectOf = (n) => {
+    const r = n && ((n.lhId && fps.nodes?.[n.lhId]) || n.boundingRect);
+    return r && r.width > 4 && r.height > 4 ? { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) } : null;
+  };
+  const marksFor = (auditId, code) => a.issues.includes(code)
+    ? (A[auditId]?.details?.items || []).map(it => rectOf(it.node || it.subItems?.items?.find(x => x.node)?.node || it.items?.[0]?.node))
+      .filter(Boolean).slice(0, 3).map(r => ({ code, ...r }))
+    : [];
+  a.marks = [
+    ...marksFor("color-contrast", "low_contrast"), ...marksFor("target-size", "small_targets"),
+    ...marksFor("image-aspect-ratio", "stretched_images"), ...marksFor("image-size-responsive", "blurry_images"),
+    ...marksFor("layout-shifts", "layout_shift"), ...marksFor("layout-shift-elements", "layout_shift"),
+    ...marksFor("largest-contentful-paint-element", "psi_low").slice(0, 1),
+  ];
   if (urls.length && !urls.some(u => ANALYTICS.some(m => u.includes(m)))) a.issues.push("no_analytics");
   return a;
 }
@@ -799,6 +817,141 @@ function settings() {
 // Problems that come from how a site was built, not from one setting. When a site has them,
 // patching costs nearly as much as rebuilding, which is why the report recommends a redesign.
 const FOUNDATION = ["no_viewport", "old_jquery", "layout_shift"];
+// Design problems read from the page itself.
+Object.assign(ISSUES, {
+  weak_headline: { points: 8, sev: "important",
+    email: () => "the first headline visitors see doesn't say what you do or where",
+    title: () => "A headline that doesn't sell",
+    impact: () => "The first headline doesn't say what the business does or where, so visitors have to work it out.",
+    fix: () => "Open with a headline that names the service and the city." },
+  no_location: { points: 4, sev: "minor",
+    email: () => "the homepage doesn't say which city you serve",
+    title: () => "Doesn't say where you are",
+    impact: () => "The headline, page title and intro don't mention the city, which matters to local customers and to Google.",
+    fix: () => "Mention the city and service area at the top of the page." },
+  busy_menu: { points: 4, sev: "minor",
+    email: (a) => `the menu has ${a.menuCount || "too many"} items, which makes it hard to find the basics`,
+    title: () => "A crowded menu",
+    impact: () => "Too many menu items make visitors hesitate, and the few things most people want get lost.",
+    fix: () => "Cut the menu to the five or six things people look for." },
+  wall_of_text: { points: 4, sev: "minor",
+    email: () => "the homepage is a long wall of text that's hard to scan on a phone",
+    title: () => "A wall of text",
+    impact: () => "There's so much text that key information gets buried, especially on a phone.",
+    fix: () => "Short, scannable sections with the key points first." },
+  slider: { points: 4, sev: "minor",
+    email: () => "the top of the page is a rotating slider, which most visitors ignore",
+    title: () => "A rotating slider at the top",
+    impact: () => "Most visitors never see past the first slide, and moving content pulls attention away from the phone number and booking button.",
+    fix: () => "One strong image and message that doesn't move." },
+  dated_markup: { points: 8, sev: "important",
+    email: () => "the site is built with techniques from the early 2000s, and it shows in the look",
+    title: () => "A dated look and structure",
+    impact: () => "The page is built with techniques from the early 2000s, which shows in a dated look and pages that break on phones.",
+    fix: () => "A modern, consistent design built for phones." },
+  small_targets: { points: 6, sev: "important",
+    email: () => "some buttons and links are too small to tap on a phone",
+    title: () => "Buttons too small to tap",
+    impact: () => "Some buttons and links are too small or too close together to tap accurately on a phone.",
+    fix: () => "Large, well-spaced buttons." },
+});
+Object.assign(ISSUE_GROUP, { weak_headline: "design", no_location: "design", busy_menu: "design", wall_of_text: "design", slider: "design", dated_markup: "design", small_targets: "design" });
+FOUNDATION.push("dated_markup");
+
+// What a customer experiences, in the report's design review: what I saw on their site, why it
+// costs them customers, and what the redesign changes. Problems not listed here appear only briefly.
+const DESIGN_COPY = {
+  down: {
+    seen: (a) => `When I opened your site${a.why ? `, ${a.why}` : ", it didn't load"}.`,
+    why: () => "Everyone who finds you on Google, a business card or social media hits a dead end, and most will call a competitor instead.",
+    after: "A fast, reliable website that's always up" },
+  ssl_broken: {
+    seen: () => "Browsers show a full-page security warning before your site opens.",
+    why: () => "Almost nobody clicks past a warning like that, so most visitors never see your site at all.",
+    after: "Secure, with no browser warnings" },
+  no_https: {
+    seen: () => "Chrome shows “Not Secure” next to your web address.",
+    why: () => "That label makes people wary of calling or filling in a form, especially on a first visit.",
+    after: "Secure, with no “Not Secure” label" },
+  no_viewport: {
+    seen: () => "On a phone, your site shows the desktop layout shrunk down, so the text is tiny and visitors have to pinch and zoom.",
+    why: () => "Most local customers find you on their phone. If the site is hard to use there, they go back to Google and call the next business.",
+    after: "Designed for phones first, readable without zooming" },
+  psi_low: {
+    seen: (a) => a.lcp ? `Your homepage takes ${a.lcp.toFixed(1)} seconds to show its main content on a phone. Google's target is 2.5 seconds.` : `Google scores your homepage ${a.perf}/100 for speed on a phone.`,
+    why: () => "Google's research found that more than half of mobile visitors leave a page that takes longer than 3 seconds to load.",
+    after: "Loads in about 2 seconds on a phone" },
+  weak_headline: {
+    seen: (a, c) => c?.h1 ? `The first headline visitors see is “${c.h1.length > 90 ? `${c.h1.slice(0, 87)}…` : c.h1}”. It doesn't say what you do or where.` : "Your homepage has no clear main headline.",
+    why: () => "Visitors decide within a few seconds whether they're in the right place. A vague headline makes them work it out, and many won't.",
+    after: "A headline that says exactly what you do and where" },
+  no_location: {
+    seen: () => `Your headline, page title and intro don't mention ${cityShort()}.`,
+    why: () => "Local customers want to know you serve their area, and Google uses it to decide who to show in local searches.",
+    after: `${cityShort()} and your service area right at the top` },
+  no_cta: {
+    seen: () => "There's no clear button like “Book an appointment” or “Get a free quote” on your homepage.",
+    why: () => "Visitors who are ready to act have to hunt for how to contact you, and many simply leave.",
+    after: "One clear call to action at the top, repeated as visitors scroll" },
+  no_tel: {
+    seen: (a, c, l) => { const p = l?.phone || c?.phones?.[0]; return `Your phone number${p ? ` (${p})` : ""} isn't a tap-to-call button.`; },
+    why: () => "On a phone, people want to tap and call. Copying a number by hand loses calls.",
+    after: "A tap-to-call button that stays visible on phones" },
+  no_form: {
+    seen: () => "There's no enquiry form or online booking on your homepage.",
+    why: () => "Many people prefer not to call, especially in the evening. Without a form, they contact a competitor who has one.",
+    after: "A short enquiry or booking form" },
+  no_reviews: {
+    seen: () => "Your homepage doesn't show any customer reviews or testimonials.",
+    why: () => "Most people read reviews before choosing a local business. Showing them on your site builds trust at the moment people decide.",
+    after: "Your best Google reviews on the homepage" },
+  dated_markup: {
+    seen: () => "The page is built with techniques from the early 2000s, such as layout tables and font tags.",
+    why: () => "It shows: a dated look, inconsistent text and pages that break on phones. Visitors read an old-looking site as a business that doesn't keep up.",
+    after: "A modern, consistent design" },
+  outdated_copyright: {
+    seen: (a) => `The footer still says © ${a.copyrightYear}.`,
+    why: () => "Visitors notice, and it makes them wonder whether you're still in business.",
+    after: "Fresh, current content" },
+  small_fonts: {
+    seen: () => "Much of the text is too small to read on a phone without zooming.",
+    why: () => "When reading takes effort, people skim past your services and miss why they should choose you.",
+    after: "Comfortable text sizes on every screen" },
+  low_contrast: {
+    seen: () => "Some text is faint against its background.",
+    why: () => "It's hard to read on a phone outdoors and for older visitors, so your message gets lost.",
+    after: "Clear, high-contrast text" },
+  small_targets: {
+    seen: () => "Some buttons and links are too small or too close together to tap accurately.",
+    why: () => "People tap the wrong thing or give up, which makes the site feel broken.",
+    after: "Large, well-spaced buttons" },
+  layout_shift: {
+    seen: () => "The page jumps around while it loads, moving text and buttons as you try to read or tap.",
+    why: () => "Visitors lose their place or tap the wrong thing, which makes the site feel broken.",
+    after: "A stable page that doesn't jump" },
+  stretched_images: {
+    seen: () => "Some photos are stretched or squashed.",
+    why: () => "Distorted photos make a business look careless.",
+    after: "Photos cropped properly for every screen" },
+  blurry_images: {
+    seen: () => "Some photos look blurry on modern phone screens.",
+    why: () => "First impressions are visual, and blurry photos feel cheap.",
+    after: "Sharp photos sized for modern screens" },
+  busy_menu: {
+    seen: (a, c) => `Your menu has ${c?.menuCount} items.`,
+    why: () => "Too many choices make visitors hesitate, and the few things most people want (services, prices, contact) get lost.",
+    after: "A short menu with the five or six things people look for" },
+  wall_of_text: {
+    seen: (a, c) => `Your homepage has about ${Math.round((c?.words || 0) / 100) * 100} words.`,
+    why: () => "On a phone that's a lot of scrolling. Most visitors scan, so the key information gets buried.",
+    after: "Short, scannable sections with the key points first" },
+  slider: {
+    seen: () => "The top of your homepage is a rotating slider.",
+    why: () => "Most visitors never see past the first slide, and moving content pulls attention away from your phone number and booking button.",
+    after: "One strong image and message that doesn't move" },
+};
+
+
 function redesignReasons(l) {
   const a = l.audit || {};
   return (a.issues || []).filter(c => FOUNDATION.includes(c) || (c === "psi_low" && a.perf != null && a.perf < 30));
@@ -914,163 +1067,116 @@ If you like it, I can build the full website for you. I'm happy to go through th
 }
 
 // ---------------- Client report ----------------
-function grade(l) {
-  const a = l.audit || {};
-  if (!l.website) return { letter: "F", health: 0 };
-  if ((a.issues || []).includes("down")) return { letter: "F", health: 0 };
-  const parts = [a.perf, a.seo, a.bp, a.a11y].filter(x => x != null);
-  let health = parts.length ? Math.round(parts.reduce((s, x) => s + x, 0) / parts.length) : Math.max(0, 100 - (l.score || 0));
-  // Critical problems cap the grade whatever the averages say.
-  if ((a.issues || []).some(c => ISSUES[c]?.sev === "critical")) health = Math.min(health, 59);
-  const letter = health >= 90 ? "A" : health >= 75 ? "B" : health >= 60 ? "C" : health >= 45 ? "D" : "F";
-  return { letter, health };
-}
-
 function tone(v, good, poor) { return v == null ? "" : v <= good ? "good" : v <= poor ? "mid" : "bad"; }
 function scoreTone(v) { return v == null ? "" : v >= 90 ? "good" : v >= 50 ? "mid" : "bad"; }
 
-function verdict(l) {
+// Problems a customer can see or feel, in the order the report discusses them.
+// Critical problems lead, then the ones we can point to on the screenshot, then the rest by weight.
+function visibleMarks(l) {
   const a = l.audit || {};
-  const issues = a.issues || [];
-  if (issues.includes("down")) return "Right now your website doesn't load, so everyone who looks you up finds a dead end.";
-  const checks = conversionChecks(l);
-  const missing = checks.filter(([, ok]) => !ok).length;
-  const slow = issues.includes("psi_low") || (a.lcp != null && a.lcp > 3);
-  if (missing >= 2) return `Your website isn't turning visitors into customers. ${missing === checks.length ? `It doesn't do any of the ${checks.length} things` : `It's missing ${missing} of the ${checks.length} things`} that bring in calls and bookings${slow ? ", and it's slow on phones" : ""}.`;
-  const crit = issues.filter(c => ISSUES[c]?.sev === "critical");
-  if (crit.length) return `Your website has ${issues.length} problem${issues.length > 1 ? "s" : ""} that cost you customers. The most urgent: ${ISSUES[crit[0]].title(a)}.`;
-  if (issues.includes("psi_low")) return "Your website works, but it's slow on phones, and slow sites lose visitors before they ever see your services.";
-  if (issues.length) return "Your website is in fair shape. A few fixes would help you get more customers from Google.";
-  return "Your website is in good shape.";
+  if (!(a.fullShot && a.shotSize?.w)) return new Set();
+  const ch = Math.min(a.shotSize.h, Math.round(a.shotSize.w * 2.6));
+  return new Set((a.marks || []).filter(m => m.y < ch - 12).map(m => m.code));
+}
+function customerIssues(l) {
+  const a = l.audit || {};
+  const shown = visibleMarks(l);
+  const rank = (c) => ISSUES[c].sev === "critical" ? 0 : shown.has(c) ? 1 : SEV_RANK[ISSUES[c].sev] + 1;
+  return (a.issues || []).filter(c => DESIGN_COPY[c]).sort((x, y) => rank(x) - rank(y) || ISSUES[y].points - ISSUES[x].points);
 }
 
-// The client report, for businesses that have a website.
-function reportHtml(l) {
+// Their homepage on a phone, with numbered boxes on the elements behind each problem.
+function annotatedShot(l, numbers) {
   const a = l.audit || {};
-  const g = grade(l);
-  const issues = (a.issues || []).filter(c => ISSUES[c]);
-  const down = issues.includes("down");
+  if (!(a.fullShot && a.shotSize?.w)) {
+    return a.shot ? `<div class="rp-phone"><img src="${esc(a.shot)}" alt="Your homepage on a phone"></div>` : "";
+  }
+  const { w, h } = a.shotSize;
+  const ch = Math.min(h, Math.round(w * 2.6));
+  const pct = (v, total) => `${(Math.max(0, v) / total * 100).toFixed(2)}%`;
+  const marks = (a.marks || []).filter(m => numbers[m.code] && m.y < ch - 12).map(m =>
+    `<span class="rp-mark" style="left:${pct(m.x, w)};top:${pct(m.y, ch)};width:${pct(Math.min(m.w, w - m.x), w)};height:${pct(Math.min(m.h, ch - m.y), ch)}"><b>${numbers[m.code]}</b></span>`).join("");
+  return `<div class="rp-phone"><div class="rp-crop" style="aspect-ratio:${w} / ${ch}"><img src="${esc(a.fullShot)}" alt="Your homepage on a phone">${marks}</div></div>`;
+}
+
+// The client report, for businesses that have a website: a designer's review of what a new
+// customer experiences, then the offer.
+function reportHtml(l) {
+  const a = l.audit || {}, c = l.content || {};
+  const down = (a.issues || []).includes("down");
   const date = new Date(a.checkedAt || Date.now()).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
-  const what = (CATEGORIES[state.category]?.[0] || "local businesses").toLowerCase();
-  const city = state.city ? cityShort() : "";
+  const domain = domainOf(l.website);
+  const seen = customerIssues(l);
+  // The biggest problems get the full treatment; the rest are listed briefly so the report stays readable.
+  const top = seen.slice(0, 8);
+  const rest = seen.slice(8);
+  const others = (a.issues || []).filter(code => ISSUES[code] && !DESIGN_COPY[code]);
+  const numbers = Object.fromEntries(top.map((code, i) => [code, i + 1]));
+  const redesign = needsRedesign(l);
+  const me = senderName();
   const parts = [];
 
   parts.push(`<header class="rp-head">
     <div>
       <p class="rp-eyebrow">Website review</p>
       <h1>${esc(l.name)}</h1>
-      <p class="rp-sub">${esc(domainOf(l.website))} · tested on a mobile phone, ${esc(date)}</p>
+      <p class="rp-sub">${esc(domain)} · reviewed on a phone, ${esc(date)}${me !== "[Your name]" ? ` · by ${esc(me)}` : ""}</p>
     </div>
-    <div class="rp-grade g-${g.letter}"><b>${g.letter}</b><span>${g.health}/100</span></div>
-  </header>
-  <p class="rp-verdict">${esc(verdict(l))}</p>`);
+  </header>`);
 
-  if (!down) {
-    const checks = conversionChecks(l);
-    const have = checks.filter(([, ok]) => ok).length;
-    if (checks.length >= 3) {
-      parts.push(`<section><h2>${have < checks.length ? "Why your website isn't bringing in more customers" : "Your website covers the basics"}</h2>
-        <p class="rp-cap">Websites that turn visitors into calls and bookings do all of these. Yours does <b>${have} of ${checks.length}</b>.</p>
-        <ul class="rp-conv">${checks.map(([label, ok]) => `<li class="${ok ? "ok" : "no"}"><span>${ok ? "✓" : "✕"}</span>${esc(label)}</li>`).join("")}</ul></section>`);
+  const faster = state.leads.filter(x => x !== l && x.website && x.audit?.state === "done" && x.audit.lcp && a.lcp && x.audit.lcp < a.lcp / 2)
+    .sort((x, y) => x.audit.lcp - y.audit.lcp)[0];
+  const intro = down
+    ? `I tried to open ${domain} the way a new customer would, and it didn't load. Here's what that means for your business, and how to fix it.`
+    : seen.length
+      ? `I looked at ${domain} the way a new customer would: on a phone, for the first time. Several things put visitors off before they ever call or book. Here are the biggest ones, what they cost you, and how a redesign fixes them.${faster ? ` For comparison, ${faster.name}, another ${(CATEGORIES[state.category]?.[0] || "business").toLowerCase().replace(/s$/, "")} in ${cityShort()}, shows its page in ${faster.audit.lcp.toFixed(1)} seconds; yours takes ${a.lcp.toFixed(1)}.` : ""}`
+      : `I looked at ${domain} the way a new customer would: on a phone, for the first time. It does the basics well.`;
+  parts.push(`<p class="rp-verdict">${esc(intro)}</p>`);
+
+  if (top.length) {
+    const shot = annotatedShot(l, numbers);
+    const marked = new Set([...visibleMarks(l)].filter(code => numbers[code]));
+    parts.push(`<section><h2>What a new customer sees</h2>
+      <div class="rp-glance${shot ? "" : " no-shot"}">${shot}
+        <div><p class="rp-cap">The ${top.length} biggest problems${marked.size ? ", marked on your homepage" : ""}:</p>
+        <ol class="rp-points">${top.map(code => `<li><span class="rp-num">${numbers[code]}</span><b>${esc(ISSUES[code].title(a))}</b></li>`).join("")}</ol>
+        ${rest.length + others.length ? `<p class="rp-cap">Plus ${rest.length + others.length} smaller issue${rest.length + others.length > 1 ? "s" : ""}, listed at the end.</p>` : ""}</div>
+      </div></section>`);
+
+    parts.push(`<section><h2>The problems, one by one</h2>${top.map(code => `
+      <div class="rp-issue"><span class="rp-num">${numbers[code]}</span><div>
+        <h3>${esc(ISSUES[code].title(a))}</h3>
+        <p><b>What I saw:</b> ${esc(DESIGN_COPY[code].seen(a, c, l))}${marked.has(code) ? " It's marked on the screenshot." : ""}</p>
+        <p><b>Why it costs you customers:</b> ${esc(DESIGN_COPY[code].why(a, c, l))}</p>
+      </div></div>`).join("")}</section>`);
+  }
+
+  if (rest.length || others.length) {
+    parts.push(`<section><h2>Also holding the site back</h2>${rest.length ? `<ul class="rp-also">${rest.map(code =>
+      `<li><b>${esc(ISSUES[code].title(a))}.</b> ${esc(DESIGN_COPY[code].seen(a, c, l))}</li>`).join("")}</ul>` : ""}
+      ${others.length ? `<p class="rp-cap"><b>Behind the scenes:</b> ${others.map(code => { const t = ISSUES[code].title(a); return esc(t[0].toLowerCase() + t.slice(1)); }).join(", ")}.</p>` : ""}</section>`);
+  }
+
+  if (seen.length || others.length) {
+    if (redesign) {
+      const reasons = redesignReasons(l);
+      parts.push(`<section class="rp-offer"><h2>What a redesign changes</h2>
+        <p>${reasons.length
+          ? "Several of these problems come from how the site was originally built, so fixing them one at a time would cost almost as much as starting fresh, and it would still look like an older website. A redesign fixes all of them at once."
+          : "Together these problems add up to a website that looks and works older than your business is. A redesign fixes all of them at once."}</p>
+        ${top.length ? `<div class="rp-table-wrap"><table class="rp-ba-table"><thead><tr><th>Now</th><th>After the redesign</th></tr></thead><tbody>${top.map(code =>
+          `<tr><td>${esc(ISSUES[code].title(a))}</td><td>${esc(DESIGN_COPY[code].after)}</td></tr>`).join("")}${rest.length + others.length ? `<tr><td>The ${rest.length + others.length} smaller issues</td><td>Fixed as part of the redesign</td></tr>` : ""}</tbody></table></div>` : ""}
+      </section>`);
     }
+    parts.push(`<section class="rp-next"><h2>${redesign ? "See your new homepage first, for free" : "Want help fixing these?"}</h2>
+      <p>${redesign
+        ? "I'd like to show you what your website could look like. I'll design a sample of your new homepage using your own content and photos, so you can see the difference on your own phone before deciding anything. No cost and no obligation."
+        : "These can be fixed on your current site. Reply and I'll explain what's involved. No obligation."}</p>
+      <p><b>${redesign ? "Just reply “yes” to my message and I'll send it over." : "Just reply to my message."}</b></p>
+      <p class="rp-by">${esc(settings().sign).replace(/\n/g, "<br>")}</p></section>`);
   }
 
-  const film = a.film || [];
-  if (a.shot || film.length) {
-    const step = Math.max(1, Math.ceil(film.length / 6));
-    const frames = film.filter((_, i) => i % step === 0).slice(0, 6);
-    parts.push(`<section><h2>How your website looks on a phone today</h2><div class="rp-see">
-      ${a.shot ? `<div class="rp-phone"><img src="${esc(a.shot)}" alt="Your homepage on a mobile phone"></div>` : ""}
-      <div>
-        ${frames.length ? `<p class="rp-cap">What a customer sees while your homepage loads, second by second:</p><div class="rp-film" style="--cols:${frames.length}">${frames.map(f =>
-          `<figure><img src="${esc(f.src)}" alt=""><figcaption>${(f.t / 1000).toFixed(1)}s</figcaption></figure>`).join("")}</div>` : ""}
-        ${a.lcp ? `<p class="rp-cap">Your main content appears after <b>${a.lcp.toFixed(1)} seconds</b>. Google's target is under 2.5 seconds.</p>` : ""}
-        ${a.field ? `<p class="rp-cap">Real Chrome users visiting your site over the last 28 days rate it: <b>${{ FAST: "Fast", AVERAGE: "Needs improvement", SLOW: "Slow" }[a.field] || esc(a.field)}</b>.</p>` : ""}
-      </div></div></section>`);
-  }
-
-  if (!down && [a.perf, a.seo, a.bp, a.a11y].some(x => x != null)) {
-    const tiles = [["Speed", a.perf, "How fast it loads on a phone"], ["Google search", a.seo, "How well Google can read it"],
-      ["Security & quality", a.bp, "Modern, safe code"], ["Accessibility", a.a11y, "Usable by everyone"]];
-    parts.push(`<section><h2>Your scores</h2><div class="rp-tiles">${tiles.map(([label, v, hint]) => `
-      <div class="rp-tile"><div class="n ${scoreTone(v)}">${v ?? "–"}<small>/100</small></div><div class="l"><b>${label}</b><br>${hint}</div>
-      <div class="rp-meter"><i class="bg-${scoreTone(v) || "mid"}" style="width:${v ?? 0}%"></i></div></div>`).join("")}</div>
-      <p class="rp-note">Scores from Google's own testing tool. 90+ is good, under 50 is poor.</p></section>`);
-  }
-
-  if (issues.length) {
-    const groups = ISSUE_GROUPS.map(([key, title, intro]) => {
-      const items = issues.filter(c => (ISSUE_GROUP[c] || "trust") === key)
-        .sort((x, y) => SEV_RANK[ISSUES[x].sev] - SEV_RANK[ISSUES[y].sev] || ISSUES[y].points - ISSUES[x].points);
-      const problem = (c) => `
-        <div class="rp-problem"><span class="rp-pill sev-${ISSUES[c].sev}">${SEV_LABEL[ISSUES[c].sev]}</span>
-          <div><h4>${esc(ISSUES[c].title(a))}</h4><p>${esc(ISSUES[c].impact(a))}</p><p><b>How it gets fixed:</b> ${esc(ISSUES[c].fix(a))}</p></div></div>`;
-      // The heading travels with its first problem so it never sits alone at the bottom of a printed page.
-      return items.length ? `<div class="rp-group"><div class="rp-keep"><h3 class="rp-gh">${title} <span>${items.length}</span></h3><p class="rp-cap">${intro}</p>${problem(items[0])}</div>${items.slice(1).map(problem).join("")}</div>` : "";
-    }).join("");
-    parts.push(`<section><h2>What we found</h2><p class="rp-cap">${issues.length} problem${issues.length > 1 ? "s" : ""}, grouped by what they affect.</p>${groups}</section>`);
-  } else if (a.state === "done") {
-    parts.push(`<section><h2>What we found</h2><p>No major problems found in this test.</p></section>`);
-  }
-
-  if (issues.length) {
-    const reasons = redesignReasons(l);
-    parts.push(needsRedesign(l)
-      ? `<section class="rp-why"><h2>Why we recommend a redesign</h2>
-        <p>${down
-          ? "A website that doesn't load can't be fixed with small changes. It needs to be rebuilt on a reliable foundation."
-          : reasons.length
-            ? `These problems aren't separate small bugs. ${reasons.length === 1 ? "One of them comes" : `${reasons.length} of them come`} from how the site was originally built (${reasons.map(c => ISSUES[c].title(a).toLowerCase()).join("; ")}). Fixing them one by one usually costs almost as much as starting fresh, and the site would still look and work like an older website.`
-            : `With ${issues.length} problems across design, speed and getting customers to contact you, patching them one at a time would cost almost as much as starting fresh, and the result would still feel like an older website.`}</p>
-        <p>A redesign fixes everything in this report at once:</p>
-        <ul class="rp-list rp-checks">
-          <li>A modern design that looks trustworthy on phones, where most of your customers find you</li>
-          <li>Clear buttons to call, book or get a quote on every screen</li>
-          <li>A fast, secure website that Google can rank well</li>
-          <li>Your real services, photos and reviews, presented properly</li>
-          <li>A website that's easy to keep up to date</li>
-        </ul></section>`
-      : `<section class="rp-why"><h2>What we recommend</h2>
-        <p>Your website's foundations are sound. The problems above can be fixed on your current site, which is quicker and cheaper than a full redesign.</p></section>`);
-  }
-
-  const others = state.leads.filter(x => x !== l && x.website && x.audit?.state === "done" && x.audit.perf != null)
-    .sort((x, y) => y.audit.perf - x.audit.perf).slice(0, 4);
-  if (others.length) {
-    const you = down ? 0 : a.perf;
-    const rows = [...others.map(x => ({ name: x.name, v: x.audit.perf, you: false })), { name: `${l.name} (you)`, v: you, you: true }]
-      .sort((x, y) => (y.v ?? -1) - (x.v ?? -1));
-    parts.push(`<section><h2>How you compare</h2>
-      <p class="rp-cap">Mobile speed score of other ${esc(what)}${city ? ` in ${esc(city)}` : ""}, tested the same way. Higher is better.</p>
-      <div class="rp-bars">${rows.map(r => `<div class="rp-bar${r.you ? " you" : ""}"><span class="nm">${esc(r.name)}</span>
-        <span class="track"><i class="bg-${r.you ? scoreTone(r.v) || "bad" : "ink"}" style="width:${Math.max(2, r.v ?? 0)}%"></i></span>
-        <span class="v">${r.v == null ? "–" : r.v}</span></div>`).join("")}</div></section>`);
-  }
-
-  const m = a.metrics;
-  if (m && Object.values(m).some(v => v != null)) {
-    const rows = [
-      ["First thing appears", "First Contentful Paint", m.fcp, (v) => `${(v / 1000).toFixed(1)} s`, "under 1.8 s", tone(m.fcp, 1800, 3000)],
-      ["Main content appears", "Largest Contentful Paint", m.lcp, (v) => `${(v / 1000).toFixed(1)} s`, "under 2.5 s", tone(m.lcp, 2500, 4000)],
-      ["Page frozen to taps", "Total Blocking Time", m.tbt, (v) => `${Math.round(v).toLocaleString("en-US")} ms`, "under 200 ms", tone(m.tbt, 200, 600)],
-      ["Layout jumps around", "Cumulative Layout Shift", m.cls, (v) => v.toFixed(2), "under 0.10", tone(m.cls, 0.1, 0.25)],
-      ["Looks fully loaded", "Speed Index", m.si, (v) => `${(v / 1000).toFixed(1)} s`, "under 3.4 s", tone(m.si, 3400, 5800)],
-    ].filter(r => r[2] != null);
-    const word = { good: "Good", mid: "Needs work", bad: "Poor" };
-    parts.push(`<section><h2>Speed details</h2><div class="rp-table-wrap"><table class="rp-metrics">
-      <thead><tr><th>What it measures</th><th>Your site</th><th>Google's target</th><th></th></tr></thead>
-      <tbody>${rows.map(([plain, tech, v, fmt, target, t]) => `<tr><td>${plain}<br><small>${tech}</small></td><td class="num ${t}">${fmt(v)}</td><td class="num">${target}</td><td class="${t}">${word[t]}</td></tr>`).join("")}</tbody>
-    </table></div></section>`);
-  }
-
-  const sign = settings().sign;
-  parts.push(`<section class="rp-next"><h2>${needsRedesign(l) ? "See your new website before you decide" : "Next step"}</h2>
-    <p>${needsRedesign(l)
-      ? "If you're interested, I'll make you a free sample redesign of your homepage, using your own content and photos, so you can see exactly what your new website could look like. No cost and no obligation. Just reply to my email."
-      : "If you'd like help fixing these problems, reply to my email and I'll explain what's involved. No obligation."}</p>
-    <p class="rp-by">${esc(sign).replace(/\n/g, "<br>")}</p></section>`);
-
-  parts.push(`<footer class="rp-foot">Tested with Google PageSpeed Insights on a simulated mobile phone on ${esc(date)}. Scores vary slightly between tests. Prepared for ${esc(l.name)}.</footer>`);
+  parts.push(`<footer class="rp-foot">Reviewed on ${esc(date)} with Google's mobile testing tool and a read-through of ${esc(domain)}. Prepared for ${esc(l.name)}.</footer>`);
   return `<article class="rp">${parts.join("\n")}</article>`;
 }
 
@@ -1141,6 +1247,26 @@ const REPORT_CSS = `
 .rp-contact { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 14px; } .rp-contact span { overflow-wrap: anywhere; } .rp-contact a { color: #8fe0c7; }
 .rp-by { margin: 14px 0 0 !important; font-size: 13px; color: #b7c4be; }
 .rp-foot { margin-top: 22px; font-size: 12px; color: var(--r-muted); }
+.rp-glance { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 24px; align-items: start; margin-top: 14px; }
+.rp-glance .rp-phone { break-inside: avoid; }
+.rp-glance.no-shot { grid-template-columns: minmax(0, 1fr); }
+.rp-crop { position: relative; overflow: hidden; background: #fff; }
+.rp-crop img { display: block; width: 100%; height: auto; }
+.rp-mark { position: absolute; border: 2px solid #e0362a; border-radius: 4px; background: rgba(224, 54, 42, 0.1); min-width: 8px; min-height: 8px; }
+.rp-mark b { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #e0362a; color: #fff; font: 700 10px/18px "Figtree", sans-serif; text-align: center; }
+.rp-points { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; font-size: 14px; color: var(--r-muted); }
+.rp-points li { display: flex; gap: 10px; align-items: center; }
+.rp-points b { color: var(--r-ink); font-size: 15px; }
+.rp-num { flex: none; width: 24px; height: 24px; border-radius: 50%; background: #e0362a; color: #fff; display: grid; place-items: center; font: 700 12px "Figtree", sans-serif; margin-top: 1px; }
+.rp-issue { display: flex; gap: 12px; padding: 14px 0; border-top: 1px solid var(--r-line); break-inside: avoid; }
+.rp-issue h3 { font-size: 16px; } .rp-issue p { margin: 5px 0 0; color: var(--r-muted); font-size: 14px; } .rp-issue p b { color: var(--r-ink); }
+.rp-also { margin: 6px 0 0; padding-left: 18px; font-size: 14px; color: var(--r-muted); } .rp-also li + li { margin-top: 6px; } .rp-also b { color: var(--r-ink); }
+.rp-offer p { margin: 0 0 12px; max-width: 64ch; }
+.rp-ba-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.rp-ba-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--r-muted); padding: 8px 10px; border-bottom: 2px solid var(--r-line); }
+.rp-ba-table td { padding: 9px 10px; border-bottom: 1px solid var(--r-line); vertical-align: top; }
+.rp-ba-table td:first-child { color: #b3261e; } .rp-ba-table td:last-child { color: var(--r-good); font-weight: 600; }
+.rp-ba-table td:first-child::before { content: "\\2715  "; } .rp-ba-table td:last-child::before { content: "\\2713  "; }
 .rp-conv { list-style: none; padding: 0; margin: 14px 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px; }
 .rp-conv li { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 8px; background: var(--r-soft); font-size: 14px; break-inside: avoid; }
 .rp-conv li.no { background: #fcefed; }
@@ -1148,6 +1274,7 @@ const REPORT_CSS = `
 .rp-conv .ok span { background: var(--r-good); } .rp-conv .no span { background: var(--r-bad); }
 @media (max-width: 640px) {
   .rp-conv { grid-template-columns: minmax(0, 1fr); }
+  .rp-glance { grid-template-columns: minmax(0, 1fr); } .rp-glance .rp-phone { max-width: 230px; }
   .rp { padding: 24px 18px; border-radius: 10px; }
   .rp h1 { font-size: 26px; }
   .rp-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1278,6 +1405,9 @@ function parseHtmlContent(html, base) {
     hasForm: [...doc.querySelectorAll("form")].some(f => f.querySelector("textarea, input[type=email], input[type=tel]")) || FORM_RE.test(html),
     hasCta: [...doc.querySelectorAll("a, button")].some(e => CTA_RE.test(txt(e))),
     hasReviews: REVIEW_RE.test(bodyText) || /trustindex|elfsight|birdeye|reviews-widget/i.test(html),
+    menuCount: new Set([...(doc.querySelector("nav") || doc.createElement("nav")).querySelectorAll("a")].map(txt).filter(t => t.length > 1 && t.length < 30)).size,
+    hasSlider: /revslider|rev_slider|slick-slider|owl-carousel|swiper-container|flexslider|carousel-inner|metaslider|smart-slider|layerslider|nivoslider|bxslider/i.test(html),
+    dated: /<font[\s>]|<center>|<marquee/i.test(html) || (html.match(/<table/gi) || []).length >= 4,
     emails: cleanEmails([...doc.querySelectorAll('a[href^="mailto:"]')].map(a => a.getAttribute("href")).concat(bodyText.match(EMAIL_TEXT_RE) || [])),
     phones: [...new Set([...doc.querySelectorAll('a[href^="tel:"]')].map(a => txt(a) || a.getAttribute("href").slice(4)))].slice(0, 2),
     logo: logoImg ? imgSrc(logoImg) : "",
@@ -1313,6 +1443,7 @@ function parseTextContent(md, base) {
     hasForm: FORM_RE.test(md) ? true : null,
     hasCta: CTA_RE.test(plain),
     hasReviews: REVIEW_RE.test(plain),
+    menuCount: 0, hasSlider: null, dated: null,
     emails: cleanEmails(plain.match(EMAIL_TEXT_RE) || []),
     phones: [],
     logo: logo ? logo[2] : "",
@@ -1342,6 +1473,15 @@ function applyContentIssues(l) {
   if (c.hasForm === false) add("no_form");
   if (c.hasReviews === false) add("no_reviews");
   if (c.year && c.year <= CURRENT_YEAR - 2) { a.copyrightYear = c.year; add("outdated_copyright"); }
+  const h1 = (c.h1 || "").trim();
+  const plainName = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  if (!h1 || /^(welcome|home|homepage|hello|hi)\b/i.test(h1) || h1.length < 12 || plainName(h1) === plainName(l.name)) add("weak_headline");
+  const city = state.city ? cityShort().toLowerCase() : "";
+  if (city && ![c.title, c.h1, c.description, (c.text || "").slice(0, 1500)].join(" ").toLowerCase().includes(city)) add("no_location");
+  if (c.menuCount > 8) { a.menuCount = c.menuCount; add("busy_menu"); }
+  if (c.words > 1500) add("wall_of_text");
+  if (c.hasSlider) add("slider");
+  if (c.dated) add("dated_markup");
 }
 
 // What a website needs to turn visitors into customers, and whether this one has it.
@@ -1985,7 +2125,7 @@ function downloadCsv() {
 const EXAMPLES = [
   { id: "ex1", name: "Example: Hillside Family Dental", website: "hillside-dental.example", phone: "+1 512 555 0101", email: "", address: "1200 Congress Ave, Austin", facebook: "", map: "",
     hours: "Mo-Fr 08:00-17:00; Sa 09:00-13:00",
-    audit: { state: "done", issues: ["no_https", "no_viewport", "psi_low", "a11y_low", "no_cta", "old_jquery", "layout_shift", "no_tel", "no_form", "low_contrast", "no_meta_desc", "no_reviews", "outdated_copyright", "blurry_images"],
+    audit: { state: "done", issues: ["no_https", "no_viewport", "psi_low", "a11y_low", "no_cta", "old_jquery", "layout_shift", "weak_headline", "no_tel", "no_form", "low_contrast", "no_meta_desc", "no_reviews", "outdated_copyright", "blurry_images", "slider"],
       perf: 23, seo: 75, bp: 57, a11y: 62, lcp: 9.4, copyrightYear: 2019,
       platform: "WordPress", jquery: "1.12.4", metrics: { fcp: 4100, lcp: 9400, tbt: 870, cls: 0.31, si: 7600 } },
     content: { fetched: true, words: 640, hasTel: false, hasForm: false, hasCta: false, hasReviews: false, year: 2019, emails: [], phones: [], images: [], logo: "", hero: "",

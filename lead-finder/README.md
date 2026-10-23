@@ -32,13 +32,19 @@ Dam, package ba guarantee tool e nai. Protiti client er dam alada, tai oigulo em
    lekha porte koshto, page laaphay, purono copyright), sathe customer ana jinish gulo (Call/Book button,
    tap-to-call, form, review).
 2. **Email** > "First email": 3 ta ashol problem + free report er offer (link/attachment chara).
-3. Reply dile **Report** > **Save as PDF**, "Send report" email er sathe pathan. Report e thake:
-   - "Why your website isn't bringing in more customers" (8 ta jinish er ✓/✗)
-   - phone e site er screenshot ar load howar chobi, 4 ta Google score
-   - problem gulo bhag kore: Design, Customer ana, Speed, Security, Google; protitar khoti ar shomadhan
-   - **"Why we recommend a redesign"**: keno chhoto chhoto fix na kore redesign dorkar
-   - competitor er sathe tulona, speed details
-   - shesh e: "interested hole ami free sample redesign dekhate pari"
+3. Reply dile **Report** > **Save as PDF**, "Send report" email er sathe pathan. Report ta ekjon designer er
+   review er moto lekha, kono speed table ba score er bhir nai:
+   - shuru: "I looked at your site the way a new customer would..." (faster competitor thakle tar tulona)
+   - **What a new customer sees:** oder homepage er phone screenshot, problem er jaygay laal box ar number
+     (faint lekha, chhoto button, blurry/stretched chobi, deri te ashe emon chobi), pashe top 8 problem
+   - **The problems, one by one:** protitar "What I saw" (oder site er ashol lekha uddhrito kore, jemon
+     headline "Welcome to...") ar "Why it costs you customers"
+   - **Also holding the site back:** baki gulo ek line kore, technical jinish ek line e "Behind the scenes"
+   - **What a redesign changes:** Now > After the redesign table
+   - shesh e offer: "See your new homepage first, for free"
+   Design analysis e ja dhore: mobile layout, "Not Secure", speed, headline kichu bole na, shohorer naam nai,
+   Call/Book button nai, tap-to-call nai, form nai, review nai, menu te 8+ item, lekhar deyal, slider,
+   purono dhoroner code, chhoto button, faint lekha, blurry/stretched chobi, page laaphay, purono copyright.
 4. Client "yes" bolle **Redesign prompt**: screenshot download korun, prompt copy kore
    [Claude](https://claude.ai/new) e paste korun, screenshot attach korun. Prompt e oder site er pura lekha,
    chobi, logo, brand color, map er tottho ar shob problem thake. Claude shesh e "main changes" er list dey,
