@@ -385,8 +385,8 @@ body.report-open { overflow: hidden; }
 const PSI = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed";
 const CURRENT_YEAR = new Date().getFullYear();
 // Bump when the website check learns something new, so older results get re-checked.
-const AUDIT_VERSION = 5;
-const APP_VERSION = "2026-10-23e";
+const AUDIT_VERSION = 6;
+const APP_VERSION = "2026-10-23f";
 
 // [key, label, OpenStreetMap tags (used by the Python version)], grouped for the dropdown.
 const CATEGORY_GROUPS = [
@@ -696,10 +696,16 @@ async function checkSite(url, key) {
   // can't be read through a proxy.
   const libs = (A["js-libraries"]?.details?.items || []).map(i => ({ name: String(i.name || ""), version: String(i.version || "") }));
   a.eraClues = eraSignals(urls.join("\n"));
+  // Security: libraries with published vulnerabilities, insecure content, console errors.
+  a.vulns = knownVulns(libs.concat(a.jquery && !libs.some(x => /^jquery$/i.test(x.name)) ? [{ name: "jQuery", version: a.jquery }] : []));
+  a.mixed = sc("is-on-https") === 0 ? (A["is-on-https"]?.details?.items || []).length : 0;
+  a.consoleErrors = (A["errors-in-console"]?.details?.items || []).length;
+  a.template = templateOf(urls);
   const bs = libs.find(x => /^bootstrap$/i.test(x.name) && x.version);
   if (bs && /^[23]\./.test(bs.version) && !a.eraClues.some(e => /Bootstrap/.test(e.what))) a.eraClues.push({ what: `Bootstrap ${bs.version.split(".")[0]}`, year: bs.version.startsWith("2") ? 2013 : 2016, strong: bs.version.startsWith("2") });
   const mz = libs.find(x => /^modernizr$/i.test(x.name) && /^[12]\./.test(x.version));
   if (mz) a.eraClues.push({ what: `Modernizr ${mz.version}`, year: 2014, strong: false });
+  a.wpVersion = (urls.map(u => u.match(/wp-includes\/(?!js\/jquery)[^?]+\?ver=(\d+\.\d+(?:\.\d+)?)/)).find(Boolean) || [])[1] || "";
   const wpv = urls.map(u => u.match(/wp-includes\/(?!js\/jquery)[^?]+\?ver=(\d+\.\d+)/)).find(Boolean);
   if (wpv && wpYear(wpv[1]) <= CURRENT_YEAR - 4 && !a.eraClues.some(e => /^WordPress \d/.test(e.what))) a.eraClues.push({ what: `WordPress ${wpv[1]}, a version from ${wpYear(wpv[1])}`, year: wpYear(wpv[1]), strong: false });
   if (sc("doctype") === 0) a.eraClues.push({ what: "a page structure from before 2010 (no doctype)", year: 2008, strong: true });
@@ -710,6 +716,67 @@ async function checkSite(url, key) {
   a.mapEmbed = urls.some(u => /google\.[a-z.]+\/maps|maps\.googleapis|maps\.gstatic|api\.mapbox|openstreetmap/.test(u));
   a.v = AUDIT_VERSION;
   return a;
+}
+
+// Versions with publicly listed vulnerabilities (CVE numbers), for the security check.
+const VULNS = [
+  [/^jquery$/i, "3.5.0", "jQuery", "CVE-2020-11022 and CVE-2020-11023 (cross-site scripting)"],
+  [/^jquery ?ui$/i, "1.13.0", "jQuery UI", "CVE-2021-41182, CVE-2021-41183 and CVE-2021-41184 (cross-site scripting)"],
+  [/^bootstrap$/i, (v) => (v.startsWith("3.") ? "3.4.1" : "4.3.1"), "Bootstrap", "CVE-2019-8331 (cross-site scripting)"],
+  [/^moment(\.js)?$/i, "2.29.4", "Moment.js", "CVE-2022-24785 and CVE-2022-31129"],
+  [/^lodash$/i, "4.17.21", "Lodash", "CVE-2021-23337 (command injection)"],
+  [/^handlebars$/i, "4.7.7", "Handlebars", "CVE-2021-23369 (remote code execution)"],
+  [/^angular ?js$|^angular$/i, (v) => (v.startsWith("1.") ? "99" : "0"), "AngularJS", "no longer maintained since January 2022, so new security holes are never fixed"],
+];
+function olderThan(v, min) {
+  const a = v.split(".").map(n => parseInt(n, 10) || 0), b = min.split(".").map(Number);
+  for (let i = 0; i < 3; i++) { if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) < (b[i] || 0); }
+  return false;
+}
+function knownVulns(libs) {
+  const out = [];
+  for (const { name, version } of libs) {
+    if (!version || !/^\d/.test(version)) continue;
+    const hit = VULNS.find(([re]) => re.test(name.trim()));
+    if (!hit) continue;
+    const min = typeof hit[1] === "function" ? hit[1](version) : hit[1];
+    if (olderThan(version, min) && !out.some(x => x.lib === hit[2])) out.push({ lib: hit[2], version, cve: hit[3] });
+  }
+  return out;
+}
+
+// Ready-made themes and site builders, read from the files the page loads.
+const TEMPLATES = [
+  [/wixstatic\.com|parastorage\.com/, "Wix", "website builder"], [/squarespace\.com|sqspcdn/, "Squarespace", "website builder"],
+  [/wsimg\.com/, "GoDaddy's website builder", "website builder"], [/editmysite\.com|weebly/, "Weebly", "website builder"],
+  [/irp\.cdn-website\.com|dudamobile/, "Duda", "website builder"], [/jimdo/, "Jimdo", "website builder"],
+  [/\/themes\/divi\/|et-core|divi-builder/i, "the Divi theme", "theme"], [/\/themes\/avada\//i, "the Avada theme", "theme"],
+  [/\/themes\/astra\//i, "the Astra theme", "theme"], [/\/themes\/oceanwp\//i, "the OceanWP theme", "theme"],
+  [/\/themes\/generatepress\//i, "the GeneratePress theme", "theme"], [/\/themes\/hello-elementor\//i, "the Hello Elementor theme", "theme"],
+  [/\/themes\/kadence\//i, "the Kadence theme", "theme"], [/\/themes\/(flatsome|betheme|enfold|bridge|salient|the7)\//i, (m) => `the ${m[1][0].toUpperCase()}${m[1].slice(1)} theme`, "theme"],
+  [/\/themes\/(twenty[a-z]+)\//i, (m) => `WordPress's free ${m[1]} theme`, "theme"],
+  [/elementor/i, "the Elementor page builder", "page builder"], [/js_composer|wpbakery/i, "the WPBakery page builder", "page builder"],
+];
+function templateOf(urls) {
+  const all = urls.join("\n");
+  for (const [re, name, kind] of TEMPLATES) {
+    const m = all.match(re);
+    if (m) return { name: typeof name === "function" ? name(m) : name, kind };
+  }
+  return null;
+}
+
+// Mozilla's free HTTP Observatory grades a site's security headers (A+ to F). Asked for when a
+// report opens; skipped quietly if it doesn't answer.
+async function fetchObservatory(l) {
+  const a = l.audit;
+  if (!a || a.obsTried || state.example) return;
+  a.obsTried = true;
+  try {
+    const r = await fetchWithTimeout(`https://observatory-api.mdn.mozilla.net/api/v2/scan?host=${encodeURIComponent(domainOf(l.website))}`, 30000, { method: "POST" });
+    const j = await r.json();
+    if (j.grade) a.observatory = { grade: j.grade, failed: j.tests_failed ?? null, total: j.tests_quantity ?? null };
+  } catch {}
 }
 
 // Lighthouse sometimes photographs a page before it has painted (a preloader, a video header, a
@@ -999,6 +1066,24 @@ Object.assign(ISSUES, {
     impact: () => "The site shows in the device's standard fonts, which makes it look generic.",
     fix: () => "A typeface chosen for your brand." },
 });
+Object.assign(ISSUES, {
+  vuln_libs: { points: 15, sev: "critical",
+    email: (a) => `the site loads ${a.vulns[0].lib} ${a.vulns[0].version}, which has publicly known security vulnerabilities`,
+    title: () => "Code with publicly known security holes",
+    impact: (a) => `The site loads ${a.vulns.map(v => `${v.lib} ${v.version}`).join(", ")}, versions with published vulnerabilities.`,
+    fix: () => "Current, maintained versions of everything the site runs." },
+  template_site: { points: 8, sev: "important",
+    email: (a) => `the site is built on ${a.template.name}, a ready-made ${a.template.kind}, and looks like many other sites rather than like your business`,
+    title: () => "A generic, template look",
+    impact: (a) => `The site is built on ${a.template.name}, a ready-made ${a.template.kind} used on a huge number of websites.`,
+    fix: () => "A design made for your business." },
+  outdated_cms: { points: 8, sev: "important",
+    email: (a) => `the site runs WordPress ${a.wpVersion}, which is no longer the current version`,
+    title: () => "Out-of-date website software",
+    impact: (a) => `The site runs WordPress ${a.wpVersion}. WordPress only fully supports its latest version with security fixes.`,
+    fix: () => "Up-to-date software, kept updated." },
+});
+Object.assign(ISSUE_GROUP, { vuln_libs: "trust", template_site: "design", outdated_cms: "trust" });
 Object.assign(ISSUE_GROUP, { psi_mid: "speed", images_unoptimized: "speed", seo_low: "google", bp_low: "trust", default_fonts: "design" });
 ISSUES.long_page = { points: 5, sev: "important",
   email: (a) => `the homepage is about ${a.screens} phone screens long, so most visitors never reach the important parts`,
@@ -1115,6 +1200,18 @@ const DESIGN_COPY = {
     seen: (a) => `Google's accessibility check scores your site ${a.a11y}/100 (90 and above is good): faint text, small buttons or links and images without descriptions.`,
     why: () => "Older visitors and people with weaker eyesight struggle to read and use the site, and they're a big share of customers for most local businesses. Accessibility rules also increasingly apply to business websites in the US and EU.",
     after: "Easy for everyone to read and use" },
+  vuln_libs: {
+    seen: (a) => `Your site loads ${a.vulns.map(v => `${v.lib} ${v.version}`).join(", ")}. ${a.vulns.length > 1 ? "These versions have" : "This version has"} publicly listed security vulnerabilities: ${a.vulns.map(v => v.cve).join("; ")}.`,
+    why: () => "Published vulnerabilities are exactly what automated hacking tools scan for. A hacked site can be blacklisted by Google, show spam to your customers or be used to steal form data.",
+    after: "Current, maintained code with no known vulnerabilities" },
+  template_site: {
+    seen: (a, c, l) => { const also = [l?.audit?.issues?.includes("default_fonts") && "standard fonts", l?.audit?.issues?.includes("stock_photos") && "stock photos"].filter(Boolean); return `Your site is built on ${a.template.name}, a ready-made ${a.template.kind} used on a huge number of websites${also.length ? `, with ${also.join(" and ")}` : ""}. It looks like many other sites, not like your business.`; },
+    why: () => "When a site looks like a template, visitors can't tell you apart from the competition, and they have no reason to choose you over the next result on Google.",
+    after: "A design made for your business, not a template" },
+  outdated_cms: {
+    seen: (a) => `Your site runs WordPress ${a.wpVersion}, released around ${wpYear(a.wpVersion)}. WordPress only fully supports its latest version with security fixes.`,
+    why: () => "Out-of-date WordPress sites, and the plugins that come with them, are the most common target for hackers.",
+    after: "Up-to-date software, kept updated" },
   psi_mid: {
     seen: (a) => `Google scores your homepage ${a.perf}/100 for speed on a phone. Google counts 90 and above as good, so it rates your site “needs improvement”${a.lcp ? `; the main content takes ${a.lcp.toFixed(1)} seconds to appear` : ""}.${a.field === "SLOW" || a.field === "AVERAGE" ? ` Chrome's data from real visitors rates their experience on your site as ${a.field.toLowerCase()}.` : ""}`,
     why: () => "Google's research found that as a page's load time goes from one second to three, the chance a visitor leaves rises by 32%. Speed is also part of how Google ranks sites.",
@@ -1303,10 +1400,11 @@ function annotatedShot(l, numbers) {
 
 // A plain-language grade for each part of the site, for the top of the report.
 const SCORECARD = [
-  ["First impression and design", ["looks_dated", "dated_markup", "default_fonts", "long_page", "weak_headline", "stock_photos", "stretched_images", "blurry_images", "slider", "busy_menu", "wall_of_text", "outdated_copyright", "low_contrast"]],
+  ["First impression and design", ["looks_dated", "template_site", "dated_markup", "default_fonts", "long_page", "weak_headline", "stock_photos", "stretched_images", "blurry_images", "slider", "busy_menu", "wall_of_text", "outdated_copyright", "low_contrast"]],
   ["Works on a phone", ["no_viewport", "small_fonts", "small_targets", "layout_shift"]],
   ["Speed", ["psi_low", "psi_mid", "heavy_page", "images_unoptimized"]],
-  ["Trust and security", ["down", "ssl_broken", "no_https", "old_jquery", "no_reviews", "bp_low", "a11y_low"]],
+  ["Security", ["down", "ssl_broken", "no_https", "vuln_libs", "outdated_cms", "old_jquery", "bp_low"]],
+  ["Trust", ["no_reviews", "stock_photos", "a11y_low"]],
   ["Turns visitors into customers", ["no_cta", "no_tel", "no_form", "no_location", "no_directions", "no_hours"]],
   ["Looks good on Google and when shared", ["no_title", "no_meta_desc", "seo_low", "no_social_preview"]],
 ];
@@ -1325,6 +1423,25 @@ function scorecard(l) {
   });
 }
 
+// Basic security checks, each [check, passed, detail]. Rows we couldn't test are left out.
+function securityChecks(l) {
+  const a = l.audit || {}, is = new Set(a.issues || []);
+  if (a.state !== "done" || is.has("down")) return [];
+  const rows = [
+    ["Encrypted connection (HTTPS)", !is.has("no_https"), is.has("no_https") ? "Browsers mark the site “Not Secure”, and anything typed into a form travels unencrypted." : "The site uses HTTPS."],
+    ["Valid security certificate", !is.has("ssl_broken"), is.has("ssl_broken") ? "The certificate is broken, so browsers show a full-page warning." : "The certificate is valid."],
+  ];
+  if (!is.has("no_https") && a.mixed != null) rows.push(["No insecure content on secure pages", !a.mixed, a.mixed ? `${a.mixed} file${a.mixed > 1 ? "s load" : " loads"} over an unencrypted connection.` : "Everything loads securely."]);
+  if (a.vulns) rows.push(["No code with known vulnerabilities", !a.vulns.length, a.vulns.length ? a.vulns.map(v => `${v.lib} ${v.version}: ${v.cve}`).join("; ") : "None of the libraries I could identify have known vulnerabilities."]);
+  if (a.wpVersion) rows.push(["Website software up to date", !is.has("outdated_cms"), is.has("outdated_cms") ? `WordPress ${a.wpVersion}, from around ${wpYear(a.wpVersion)}.` : `WordPress ${a.wpVersion}.`]);
+  if (a.observatory) {
+    const ok = /^[AB]/.test(a.observatory.grade);
+    rows.push(["Security headers (Mozilla Observatory)", ok, `Grade ${a.observatory.grade}${a.observatory.failed != null ? `, ${a.observatory.failed} of ${a.observatory.total} tests failed` : ""}. ${ok ? "" : "Headers that protect visitors against common attacks are missing."}`.trim()]);
+  }
+  if (a.consoleErrors != null && a.v >= 6) rows.push(["No errors in the page's code", !a.consoleErrors, a.consoleErrors ? `The browser reports ${a.consoleErrors} error${a.consoleErrors > 1 ? "s" : ""} while loading the page: parts of the site are broken.` : "No errors."]);
+  return rows;
+}
+
 // What customers now expect from a small business website, and whether this one has it.
 // null = couldn't tell (the page text couldn't be read), and those rows are left out.
 function modernChecks(l) {
@@ -1338,7 +1455,8 @@ function modernChecks(l) {
     ["Brand typography, not standard fonts", a.customFonts == null ? null : a.customFonts],
     ["Photos optimised for phones", no("images_unoptimized", "heavy_page")],
     ["Secure, with no browser warnings", no("no_https", "ssl_broken")],
-    ["Current design and up-to-date technology", no("looks_dated", "dated_markup", "old_jquery")],
+    ["Current design and up-to-date technology", no("looks_dated", "dated_markup", "old_jquery", "vuln_libs", "outdated_cms")],
+    ["A design made for the business, not a template", is.has("template_site") ? false : null],
     ["A headline that says what you do and where", txt("weak_headline", "no_location")],
     ["A clear Call or Book button at the top", txt("no_cta")],
     ["Tap-to-call phone number", txt("no_tel")],
@@ -1405,20 +1523,30 @@ function reportHtml(l) {
       ? `I looked at ${domain} the way a new customer would: on a phone, for the first time. Several things put visitors off before they ever call or book. Here are the biggest ones, what they cost you, and how a redesign fixes them.${rankLine}${faster ? ` For comparison, ${faster.name}, another ${(CATEGORIES[state.category]?.[0] || "business").toLowerCase().replace(/s$/, "")} in ${cityShort()}, shows its page in ${faster.audit.lcp.toFixed(1)} seconds; yours takes ${a.lcp.toFixed(1)}.` : ""}`
       : `I looked at ${domain} the way a new customer would: on a phone, for the first time. It does the basics well.`;
   parts.push(`<p class="rp-verdict">${esc(intro)}</p>`);
-  // The whole case in one sentence, before the detail.
+  // The verdict, point by point, before the detail. Each point appears only with evidence behind it.
   const is = new Set(a.issues || []);
   const has = (...codes) => codes.some(x => is.has(x));
-  const summary = [
-    is.has("looks_dated") ? `it looks like a website from around ${a.era}` : has("dated_markup", "outdated_copyright", "stock_photos") && "it looks out of date",
-    has("no_viewport", "small_fonts", "small_targets", "layout_shift") && "it's awkward to use on a phone",
-    has("psi_low", "heavy_page") ? "it's slow to load" : has("psi_mid") && "it's slower than Google's standard",
-    has("no_cta", "no_tel", "no_form") && "it doesn't make it easy to call or book",
-    has("no_https", "ssl_broken") && "browsers warn visitors it isn't secure",
-    is.has("no_reviews") && l.reviews >= 5 && `it hides your ${l.reviews} Google reviews`,
+  const gap = modernGap(l);
+  const sec = securityChecks(l);
+  const secFailed = sec.filter(([, ok]) => ok === false).length;
+  const verdict = [
+    is.has("looks_dated") ? ["Your website looks old.", `It's built with tools from around ${a.era}, and visitors can tell.`]
+      : has("dated_markup", "outdated_copyright") && ["Your website looks out of date.", "Old page techniques and an old copyright year give it away."],
+    is.has("template_site") ? ["The design is generic.", `It's a ready-made ${a.template.kind} (${a.template.name}) that looks like many other sites, not like your business.`]
+      : has("default_fonts", "stock_photos") && ["The design is generic.", `${is.has("stock_photos") ? "Stock photos" : "Standard fonts"} make it look like any other site.`],
+    gap.missing >= 4 && ["It isn't a modern website.", `It's missing ${gap.missing} of the ${gap.checks.length} things customers now expect.`],
+    has("no_viewport", "small_fonts", "small_targets", "layout_shift") && ["It's hard to use on a phone.", "Where most of your customers will see it."],
+    has("psi_low", "heavy_page") ? ["It's slow.", a.lcp ? `${a.lcp.toFixed(1)} seconds before the main content appears on a phone.` : `Google scores its speed ${a.perf}/100.`]
+      : is.has("psi_mid") && ["It's slower than Google's standard.", `Google scores it ${a.perf}/100; 90+ is good.`],
+    secFailed && ["It has security problems.", `It fails ${secFailed} of ${sec.length} basic security checks.`],
+    has("no_cta", "no_tel", "no_form") && ["It doesn't turn visitors into customers.", "No clear way to call or book from the page."],
   ].filter(Boolean);
-  if (!down && summary.length >= 2) {
-    parts.push(`<p class="rp-bottom"><b>In short:</b> ${esc(summary.slice(0, -1).join(", "))} and ${esc(summary[summary.length - 1])}. Each of these loses you customers on its own; together they're why a new website will do more for you than fixing them one by one.</p>`);
+  if (!down && verdict.length >= 2) {
+    parts.push(`<ul class="rp-verdicts">${verdict.map(([h, t]) => `<li><b>${esc(h)}</b> ${esc(t)}</li>`).join("")}</ul>`);
   }
+  // Credit where it's due, briefly: at most three genuine strengths.
+  const good = gap.checks.filter(([, ok]) => ok).map(([t]) => t).slice(0, 3);
+  if (!down && good.length && verdict.length >= 2) parts.push(`<p class="rp-cap rp-good-line"><b>What's working:</b> ${esc(good.join("; "))}. The rest needs work.</p>`);
 
   if (!down && (seen.length || others.length)) {
     parts.push(`<section><h2>Your website at a glance</h2><div class="rp-table-wrap"><table class="rp-card"><tbody>${scorecard(l).map(r =>
@@ -1446,12 +1574,17 @@ function reportHtml(l) {
 
   if (l.notes?.trim()) parts.push(`<section class="rp-notes"><h2>My notes on the design</h2>${notesHtml(l.notes)}</section>`);
 
-  const gap = modernGap(l);
-  if (!down && gap.checks.length >= 6) {
+  if (!down && gap.missing) {
     const trade = (CATEGORIES[state.category]?.[0] || "local business").toLowerCase().replace(/s$/, "");
-    parts.push(`<section><div class="rp-keep"><h2>How your site compares with a modern website</h2>
-      <p class="rp-cap">What customers now expect from a ${esc(trade)}'s website. Yours has <b>${gap.have} of ${gap.checks.length}</b>.</p>
-      <ul class="rp-conv">${gap.checks.map(([t, ok]) => `<li class="${ok ? "ok" : "no"}"><span>${ok ? "\u2713" : "\u2715"}</span>${esc(t)}</li>`).join("")}</ul></div></section>`);
+    parts.push(`<section><div class="rp-keep"><h2>What a modern website has, and yours doesn't</h2>
+      <p class="rp-cap">Of the ${gap.checks.length} things customers now expect from a ${esc(trade)}'s website, yours is missing <b>${gap.missing}</b>:</p>
+      <ul class="rp-conv">${gap.checks.filter(([, ok]) => !ok).map(([t]) => `<li class="no"><span>\u2715</span>${esc(t)}</li>`).join("")}</ul></div></section>`);
+  }
+
+  if (!down && sec.length) {
+    parts.push(`<section><div class="rp-keep"><h2>Security check</h2>
+      <p class="rp-cap">${secFailed ? `Your site fails <b>${secFailed} of ${sec.length}</b> basic security checks.` : `Your site passes the ${sec.length} basic security checks I ran.`}</p>
+      <table class="rp-card rp-sec"><tbody>${sec.map(([t, ok, d]) => `<tr><td><span class="rp-grade-pill bg-${ok ? "good" : "bad"}">${ok ? "Pass" : "Fail"}</span></td><th>${esc(t)}</th><td>${esc(d)}</td></tr>`).join("")}</tbody></table></div></section>`);
   }
 
   if (rest.length || others.length) {
@@ -1581,6 +1714,12 @@ const REPORT_CSS = `
 .rp-vs th, .rp-vs td { font-size: 13px; } .rp-vs thead th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--r-muted); }
 .rp-vs td:nth-child(2) { color: #b3261e; } .rp-vs td:nth-child(3) { color: var(--r-good); font-weight: 600; }
 .rp-offer .rp-table-wrap { margin-bottom: 14px; }
+.rp-verdicts { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 8px; }
+.rp-verdicts li { padding: 10px 14px 10px 40px; border-radius: 10px; background: #fcefed; position: relative; font-size: 15px; color: var(--r-muted); break-inside: avoid; }
+.rp-verdicts li::before { content: "\\2715"; position: absolute; left: 14px; top: 10px; color: var(--r-bad); font-weight: 700; }
+.rp-verdicts b { color: var(--r-ink); font-size: 16px; margin-right: 4px; }
+.rp-good-line { margin-top: 12px; }
+.rp-sec th { width: 34%; } .rp-sec td:first-child { width: 70px; } .rp-sec td:last-child { font-size: 13px; }
 .rp-bottom { margin: 16px 0 0; padding: 14px 16px; border-left: 4px solid var(--r-bad); background: #fcefed; border-radius: 0 10px 10px 0; font-size: 15px; max-width: 64ch; }
 .rp-card th, .rp-card td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--r-line); vertical-align: middle; }
 .rp-card th { font-weight: 600; width: 38%; } .rp-card td:last-child { color: var(--r-muted); }
@@ -1638,6 +1777,7 @@ function openReport(l) {
   $("rvEdit").setAttribute("aria-pressed", "false");
   if (a.state === "done" && l.website && !a.desktopTried && !(a.issues || []).includes("down") && !state.example) {
     fetchDesktopShot(l).then(() => { if (reportLead === l) $("reportDoc").innerHTML = reportHtml(l); });
+    fetchObservatory(l).then(() => { if (reportLead === l && l.audit.observatory) $("reportDoc").innerHTML = reportHtml(l); });
   }
   $("reportView").hidden = false;
   document.body.classList.add("report-open");
@@ -1724,10 +1864,10 @@ const REVIEW_RE = /testimonial|reviews?\b|what (our )?(clients|customers|patient
 const FORM_RE = /wpcf7|wpforms|gform_|ninja-forms|formidable|elementor-form|calendly|acuityscheduling|setmore|simplybook|booksy|opentable|resy\.com|zocdoc|square\.site|vagaro|fresha/i;
 const GENERIC_HEADING = /^(welcome|home|about|contact|get in touch|our team|meet|why|testimonial|review|faq|hours|location|find us|follow|news|blog|copyright|menu|call|book|privacy|cookie|subscribe|newsletter|quick links|useful links|social)/i;
 
-async function fetchWithTimeout(url, ms) {
+async function fetchWithTimeout(url, ms, init = {}) {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), ms);
-  try { return await fetch(url, { signal: ctl.signal }); } finally { clearTimeout(t); }
+  try { return await fetch(url, { ...init, signal: ctl.signal }); } finally { clearTimeout(t); }
 }
 
 async function fetchSiteContent(url) {
@@ -2080,6 +2220,10 @@ function applyDesignIssues(l) {
   const stock = [...new Set([...(a.stock || []), ...(c.stock || [])])];
   if (stock.length) { a.stockList = stock; add("stock_photos"); }
   if (a.screens >= 12) add("long_page");
+  if (a.vulns?.length) { add("vuln_libs"); a.issues = a.issues.filter(x => x !== "old_jquery"); }
+  if (a.wpVersion && wpYear(a.wpVersion) <= CURRENT_YEAR - 2) add("outdated_cms");
+  // A template is only a problem when the site also looks generic.
+  if (a.template && ["default_fonts", "stock_photos", "looks_dated", "weak_headline", "dated_markup"].some(x => a.issues.includes(x))) add("template_site");
 }
 
 // What a website needs to turn visitors into customers, and whether this one has it.

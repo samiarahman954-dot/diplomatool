@@ -74,6 +74,16 @@ Dam, package ba guarantee tool e nai. Protiti client er dam alada, tai oigulo em
 - **Google er nijer "good" standard e bichar:** speed 90 er niche hole "Slower than Google's standard"
   (Google nije 50-89 ke "needs improvement" bole), accessibility/SEO/best practices 90 er niche, page
   laphano 0.1 er beshi, chobi optimise na (Google koto KB bachano jay bole), brand font nai.
+- **Verdict, point by point** (report er shurute, proman thakle tobei):
+  "Your website looks old." / "The design is generic." / "It isn't a modern website." / "It's hard to use on a
+  phone." / "It's slow." / "It has security problems." / "It doesn't turn visitors into customers."
+- **What's working:** sorbochcho 3 ta bhalo jinish ek line e, baki shob problem er dike focus.
+- **What a modern website has, and yours doesn't:** shudhu ja nai seta dekhay ("missing 12 of 19").
+- **Generic design:** Divi, Avada, Astra, Elementor, Wix, Squarespace, GoDaddy builder ityadi template dhore;
+  sathe standard font/stock photo/purono look thakle "A generic, template look".
+- **Security check:** HTTPS, certificate, insecure content, CVE number soho vulnerable library (jQuery, Bootstrap,
+  jQuery UI, Moment, Lodash, Handlebars, AngularJS), purono WordPress, Mozilla Observatory er security
+  header grade (A+ to F), page er code e error. "Fails 5 of 7 basic security checks".
 - **Competitor ranking:** ek search e 4+ site check hole, ar ei site nicher ordhek e thakle intro e:
   "I checked 12 dentist websites in Austin; on Google's mobile speed test yours ranks 10 of 12."
 - **Design notes:** report e "My notes on the design" section. Nije likhun, ba **Download screenshots** +
