@@ -37,7 +37,7 @@ Dam, package ba guarantee tool e nai. Protiti client er dam alada, tai oigulo em
    lekha porte koshto, page laaphay, purono copyright), sathe customer ana jinish gulo (Call/Book button,
    tap-to-call, form, review).
 2. **Email** > "First email": 3 ta ashol problem + free report er offer (link/attachment chara).
-3. Reply dile **Report** > **Save as PDF**, "Send report" email er sathe pathan. Report ta ekjon designer er
+3. Reply dile **Report** khulun, tarpor **Email this report** (PDF nijei attach hoy) ba **Save as PDF**. Report ta ekjon designer er
    review er moto lekha, kono speed table ba score er bhir nai:
    - shuru: "I looked at your site the way a new customer would..." (faster competitor thakle tar tulona)
    - **What a new customer sees:** oder homepage er phone screenshot, problem er jaygay laal box ar number
@@ -54,6 +54,21 @@ Dam, package ba guarantee tool e nai. Protiti client er dam alada, tai oigulo em
    [Claude](https://claude.ai/new) e paste korun, screenshot attach korun. Prompt e oder site er pura lekha,
    chobi, logo, brand color, map er tottho ar shob problem thake. Claude shesh e "main changes" er list dey,
    seta "Send sample redesign" email e boshan.
+
+**Report er notun jinish:**
+- **Your website at a glance:** 6 ta bhag (design, phone, speed, trust, customer ana, Google/share) e Poor /
+  Needs work / Good, client ek nojore bujhe.
+- **Looks like a website from around 2016:** site er code theke boyosh dhore (purono jQuery, Bootstrap 3,
+  Font Awesome 4, Internet Explorer 8 er code, Flash, purono WordPress theme/version, purono copyright).
+  Eta report er 1 number problem, karon "patch" kore eta thik hoy na, redesign lage.
+- Stock photo, map/directions nai, opening hours nai, Facebook/WhatsApp e share korle chobi ashe na.
+- **Computer er screenshot** o (phone er pashe).
+- **Design notes:** report e "My notes on the design" section. Nije likhun, ba **Download screenshots** +
+  **Copy design review prompt** diye Claude ke dekhan, Claude er uttor paste korun. Eta e "font/colour/layout
+  purono" er moto chokhe dekha jinish ashe, ja code theke dhora jay na.
+- **Edit text:** report er je kono lekha click kore bodlan, tarpor Save as PDF.
+- Google er phone screenshot dhushor/faka ashle (loading screen ba video thakle hoy) tool seta baad dey.
+  Tokhon phone e nijer screenshot niye **Add your own screenshot** chapun (lomba chobi = phone, choura = computer).
 
 ### Jader website nai: design pathan
 
@@ -94,6 +109,22 @@ hole bidesher number e button "SMS (international)" / "Call (international)" dek
 kore: international SMS e taka beshi kate, landline e jay na, ar foreign number er SMS ke onekei spam bhabe.
 Call korte chaile oi desher local number soho calling app (jemon OpenPhone, JustCall, Zadarma) shosta ar
 beshi manush dhore.
+
+### Email edit kore sorasori pathano
+
+Card er **Email** (ba Messages e **Edit & send**, ba report e **Email this report**) chaple email window khule:
+To, Subject ar pura lekha nijer moto bodlan. Bodlano lekha oi business ar oi email er jonno mone thake
+(**Reset to template** e ager lekha ferot). Tarpor:
+
+- **Send from my Gmail:** tool thekei apnar Gmail diye chole jay, "Send report" e website review ta **PDF
+  hoye attach** hoy. Prothombar Google sign-in chay. Ekbar setup lagbe (Settings > Send from Gmail):
+  1. Google Cloud e (Maps key er project ei) **Gmail API** chalu korun.
+  2. **OAuth consent screen:** External, Testing e rakhun, **Test users** e nijer Gmail din.
+  3. **Credentials > Create credentials > OAuth client ID > Web application**. Authorized JavaScript
+     origins e `https://raw.githack.com` ar `https://rawcdn.githack.com` din.
+  4. Client ID ta Settings e paste korun. (Client ID gopon kichu na, kintu key gulor moto code e rakhini.)
+- **Open in Gmail:** setup chara, Gmail e bodlano lekha soho notun email khule.
+- Din e 30 tar beshi pathale tool shotorko kore, karon ek Gmail theke beshi cold email gele spam e jay.
 
 Contact button e pathale status nijei agay (First email > Contacted, Follow-up > Followed up, Send report >
 Replied, Send sample > Sample sent). Kon message jabe, seta **Messages** e tab diye bodlan.
