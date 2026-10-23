@@ -279,7 +279,7 @@ body.report-open { overflow: hidden; }
     </section>
     <section>
       <h2>Contact nai?</h2>
-      <p>Business gulo Google Maps theke ashe, phone, website ar rating soho. Kono business er phone/email na thakle card er <b>Google Maps</b> button e oder listing khulun (WhatsApp, website, social link thake), ba <b>Find on Facebook</b> e page khuje Messenger e message korun.</p>
+      <p>Business gulo Google Maps theke ashe, phone, website ar rating soho. Kono business er phone/email na thakle card er <b>Google Maps</b> button e oder listing khulun (WhatsApp, website, social link thake), ba <b>Find on Facebook</b> e page khuje Messenger e message korun. Protiti card e <b>Best way</b> (sobuj button) bole dey oi desh e kon upay e reply beshi ashe: Gulf, Asia, Africa, Europe e WhatsApp; US, Canada, Australia te email, Messenger ba call. Nijer BD SIM theke bidesh e SMS ba call korle tool age shotorko kore, karon eta dami ar spam mone hoy.</p>
     </section>
     <section>
       <h2>Follow-up mone rakha</h2>
@@ -1870,6 +1870,43 @@ function messengerLink(fb) {
   } catch { return ""; }
 }
 
+// Where small businesses answer strangers on WhatsApp: the Gulf, South and Southeast Asia, Africa and
+// most of Western Europe. In North America, Australia, New Zealand and the Nordics it's rare, so
+// email, Messenger and calls work better there.
+const WHATSAPP_FIRST = new Set(["971", "974", "966", "965", "968", "973", "60", "65", "852", "27", "254", "234", "880", "91",
+  "34", "39", "351", "31", "49", "41", "43", "32", "33", "353", "44", "356"]);
+const COUNTRY_OF_CODE = Object.fromEntries(Object.entries(CALLING_CODES).reverse().map(([n, c]) => [c, n]));
+function countryName(cc) { return cc === "1" ? "the US and Canada" : cc === "44" ? "the UK" : cc === "971" ? "the UAE" : COUNTRY_OF_CODE[cc] || ""; }
+
+function leadCallingCode(l) {
+  const intl = intlPhone(l.whatsapp || l.phone);
+  return (intl && Object.keys(COUNTRY_OF_CODE).filter(c => intl.startsWith(c)).sort((x, y) => y.length - x.length)[0]) || countryCode();
+}
+
+// Your own country, from this computer's time zone, to warn before an international SMS or call.
+const TZ_CALLING_CODES = { "Asia/Dhaka": "880", "Asia/Kolkata": "91", "Asia/Calcutta": "91", "Asia/Karachi": "92", "Asia/Kathmandu": "977", "Asia/Colombo": "94" };
+function senderCallingCode() {
+  try { return TZ_CALLING_CODES[Intl.DateTimeFormat().resolvedOptions().timeZone] || ""; } catch { return ""; }
+}
+
+// The contact route most likely to get a reply, given the country and what the listing has.
+function bestRoute(l) {
+  const cc = leadCallingCode(l);
+  const where = countryName(cc);
+  const waFirst = WHATSAPP_FIRST.has(cc);
+  const wa = intlPhone(l.whatsapp || l.phone);
+  const landline = wa && !l.whatsapp && phoneKind(wa) === "landline";
+  if (l.whatsapp && wa) return ["whatsapp", "The listing says this number is on WhatsApp."];
+  if (waFirst && wa && !landline) return ["whatsapp", `Most businesses in ${where || "this country"} answer on WhatsApp.`];
+  const why = landline ? "This number looks like a landline, which can't get WhatsApp or SMS"
+    : wa && !waFirst ? `Few businesses in ${where || "this country"} use WhatsApp with people they don't know` : "";
+  if (l.email) return ["email", `${why ? `${why}, so email them` : "Email them"}: owners read it, and it can carry the report.`];
+  if (messengerLink(l.facebook)) return ["messenger", `${why ? `${why}. ` : ""}No email, but small businesses read their Facebook page messages.`];
+  if (l.content?.contactUrl) return ["form", `${why ? `${why}. ` : ""}No email, but their contact form goes to their inbox.`];
+  if (intlPhone(l.phone)) return ["call", `${why ? `${why}. ` : ""}No email: a short call gets a better answer than a text.`];
+  return ["", ""];
+}
+
 function instagramLink(ig) {
   if (!ig) return "";
   const m = String(ig).match(/instagram\.com\/([\w.]+)/i) || String(ig).match(/^@?([\w.]+)$/);
@@ -1894,10 +1931,11 @@ function contactRowHtml(l, kind) {
   const id = esc(l.id);
   const d = draft(l, kind);
   const msg = shortMessage(l, kind);
-  const btn = (attrs, label, title = "") => `<a class="btn ghost small" ${attrs} data-id="${id}"${title ? ` title="${esc(title)}"` : ""}>${label}</a>`;
+  const [best, bestWhy] = bestRoute(l);
+  const btn = (attrs, label, title = "", route = "") => `<a class="btn ${route && route === best ? "primary" : "ghost"} small" ${attrs} data-id="${id}"${title ? ` title="${esc(title)}"` : ""}>${label}</a>`;
   const out = [];
   if (l.email) {
-    out.push(btn(`href="${esc(gmailLink(l.email, d.subject, d.body))}" target="_blank" rel="noopener" data-act="send" data-copy=""`, "Gmail", "Open a Gmail draft with this email filled in"));
+    out.push(btn(`href="${esc(gmailLink(l.email, d.subject, d.body))}" target="_blank" rel="noopener" data-act="send" data-copy=""`, "Gmail", "Open a Gmail draft with this email filled in", "email"));
     out.push(btn(`href="mailto:${esc(l.email)}?subject=${encodeURIComponent(d.subject)}&amp;body=${encodeURIComponent(d.body)}" data-act="send" data-copy=""`, "Mail app", "Open your email app with this email filled in"));
     out.push(`<button type="button" class="ghost small" data-act="copyaddr" data-id="${id}">Copy address</button>`);
   }
@@ -1909,21 +1947,27 @@ function contactRowHtml(l, kind) {
       : kindOf === "landline" ? "This looks like a landline, which usually isn't on WhatsApp. If it isn't, WhatsApp will say so: use SMS or a call instead."
       : kindOf === "mobile" ? "Mobile number. If it isn't on WhatsApp, WhatsApp will say so."
       : "If this number isn't on WhatsApp, WhatsApp will say so.";
-    out.push(btn(`href="https://wa.me/${wa}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener" data-act="send" data-copy=""`, label, title));
+    out.push(btn(`href="https://wa.me/${wa}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener" data-act="send" data-copy=""`, label, title, "whatsapp"));
   }
   const tel = intlPhone(l.phone);
   if (tel) {
-    out.push(btn(`href="sms:+${tel}?&amp;body=${encodeURIComponent(msg)}" data-act="send" data-copy=""`, "SMS", "Opens your phone's messages app with the text filled in"));
-    out.push(btn(`href="tel:+${tel}" data-act="send" data-copy=""`, "Call"));
+    const from = senderCallingCode();
+    const abroad = Boolean(from && !tel.startsWith(from));
+    const smsWarn = "This goes from your own SIM as an international SMS: it costs extra, never reaches a landline, and a text from a foreign number often looks like spam. Email, Messenger or WhatsApp get more replies. Send it anyway?";
+    const callWarn = "This is an international call from your own SIM, which costs a lot per minute. A calling app with a local number for their country is much cheaper and gets answered more. Call anyway?";
+    out.push(btn(`href="sms:+${tel}?&amp;body=${encodeURIComponent(msg)}" data-act="send" data-copy=""${abroad ? ` data-warn="${esc(smsWarn)}"` : ""}`, abroad ? "SMS (international)" : "SMS",
+      abroad ? "International SMS from your SIM: costs extra and often looks like spam" : "Opens your phone's messages app with the text filled in"));
+    out.push(btn(`href="tel:+${tel}" data-act="send" data-copy=""${abroad ? ` data-warn="${esc(callWarn)}"` : ""}`, abroad ? "Call (international)" : "Call",
+      abroad ? "International call from your SIM: expensive. A calling app with a local number is cheaper." : "", "call"));
   } else if (l.phone) {
     out.push(btn(`href="tel:${esc(l.phone.replace(/[^\d+]/g, ""))}" data-act="send" data-copy=""`, "Call"));
   }
   const fb = messengerLink(l.facebook);
-  if (fb) out.push(btn(`href="${esc(fb)}" target="_blank" rel="noopener" data-act="send" data-copy="msg"`, "Messenger", "Copies the message, then opens their Facebook page chat. Paste it in."));
+  if (fb) out.push(btn(`href="${esc(fb)}" target="_blank" rel="noopener" data-act="send" data-copy="msg"`, "Messenger", "Copies the message, then opens their Facebook page chat. Paste it in.", "messenger"));
   const ig = instagramLink(l.instagram);
   if (ig) out.push(btn(`href="${esc(ig)}" target="_blank" rel="noopener" data-act="send" data-copy="msg"`, "Instagram DM", "Copies the message, then opens an Instagram chat. Paste it in."));
   const form = l.content?.contactUrl;
-  if (form) out.push(btn(`href="${esc(form)}" target="_blank" rel="noopener" data-act="send" data-copy="msg"`, "Contact form", "Copies the message, then opens their contact page. Paste it into the form."));
+  if (form) out.push(btn(`href="${esc(form)}" target="_blank" rel="noopener" data-act="send" data-copy="msg"`, "Contact form", "Copies the message, then opens their contact page. Paste it into the form.", "form"));
   if (msg && (wa || tel || fb || ig || form)) out.push(`<button type="button" class="ghost small" data-act="copymsg" data-id="${id}">Copy message</button>`);
   // Ways to find them when the listing has nothing, or as a backup.
   const where = `${l.name} ${l.address || cityLabel(state.city || "")}`;
@@ -1932,7 +1976,8 @@ function contactRowHtml(l, kind) {
   if (needsContact(l) && mapsKey() && !state.example) out.push(`<button type="button" class="ghost small" data-act="gfill" data-id="${id}">Find contact on Google</button>`);
   const label = KINDS_SITE.concat(KINDS_NOSITE).find(([k]) => k === kind)?.[1] || "First email";
   const direct = Boolean(l.email || l.phone || l.facebook || l.instagram || l.content?.contactUrl);
-  return `<div class="card-contact"><span class="label">Contact</span><div class="actions">${out.join("")}</div><span class="contact-note">${direct
+  const ROUTE_NAMES = { whatsapp: "WhatsApp", email: "Email", messenger: "Messenger", form: "Contact form", call: "Call" };
+  return `<div class="card-contact"><span class="label">Contact</span><div class="actions">${out.join("")}</div><span class="contact-note">${best ? `<b>Best way: ${ROUTE_NAMES[best]}.</b> ${esc(bestWhy)} ` : ""}${direct
     ? `Sends: ${esc(label)}. Change it under Messages.`
     : `No phone or email yet. Open their Google Maps listing or Facebook page to find one${needsContact(l) && mapsKey() && !state.example ? ", or press Find contact on Google" : ""}.`}</span></div>`;
 }
@@ -2314,6 +2359,7 @@ function boot() {
     if (!l) return;
     const kind = kindsFor(l).some(([k]) => k === state.kind[l.id]) ? state.kind[l.id] : "first";
     if (btn.dataset.act === "send") {
+      if (btn.dataset.warn && !confirm(btn.dataset.warn)) { e.preventDefault(); return; }
       // The link opens as usual; this copies the text where the app can't take it, and moves the status on.
       const notes = [];
       if (btn.dataset.copy === "msg") { copyPlain(shortMessage(l, kind)); notes.push("Message copied: paste it in"); }

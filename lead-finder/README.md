@@ -81,6 +81,20 @@ API te dey). WhatsApp chaple number e WhatsApp na thakle WhatsApp nijei bole dey
 Unknown number theke beshi WhatsApp message pathale WhatsApp number ban korte pare, tai din e alpo kichu,
 personalized message pathan.
 
+**Best way:** protiti card e ekta button sobuj thake, oi business ke reach korar sobcheye bhalo upay:
+
+- UAE, Saudi, Qatar, Malaysia, Singapore, UK, Europe (Spain, Italy, Germany, Netherlands...), Africa, BD, India:
+  mobile number hole **WhatsApp**.
+- US, Canada, Australia, New Zealand, Nordic desh: WhatsApp kom chole, tai **email**, na thakle **Messenger**,
+  **contact form** ba **call**.
+- Landline number hole WhatsApp/SMS jay na, tai email ba call.
+
+**Nijer SIM theke bidesh e SMS/call:** computer er time zone Bangladesh (ba India, Pakistan, Nepal, Sri Lanka)
+hole bidesher number e button "SMS (international)" / "Call (international)" dekhay ar chapar age shotorko
+kore: international SMS e taka beshi kate, landline e jay na, ar foreign number er SMS ke onekei spam bhabe.
+Call korte chaile oi desher local number soho calling app (jemon OpenPhone, JustCall, Zadarma) shosta ar
+beshi manush dhore.
+
 Contact button e pathale status nijei agay (First email > Contacted, Follow-up > Followed up, Send report >
 Replied, Send sample > Sample sent). Kon message jabe, seta **Messages** e tab diye bodlan.
 
