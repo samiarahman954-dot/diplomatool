@@ -63,6 +63,13 @@ Dam, package ba guarantee tool e nai. Protiti client er dam alada, tai oigulo em
   Eta report er 1 number problem, karon "patch" kore eta thik hoy na, redesign lage.
 - Stock photo, map/directions nai, opening hours nai, Facebook/WhatsApp e share korle chobi ashe na.
 - **Computer er screenshot** o (phone er pashe).
+- **"In short" box:** report er shurutei ek line e pura case.
+- **How your site compares with a modern website:** 15 ta jinish ja ekhon customer ra ekta business
+  website e ashha kore (phone-first, 2.5 second e load, Call/Book button, booking form, review, ashol chobi,
+  map/hours, share preview…), ✓/✕ diye, "Yours has 4 of 15". Eta e "website modern na" er proman.
+- **Why patching won't be enough:** Google rating diye "manush apnake khoje, kintu website reputation er
+  biruddhe kaj kore", tarpor "Patching vs new website" table.
+- Phone e homepage koto screen lomba (12+ hole problem).
 - **Design notes:** report e "My notes on the design" section. Nije likhun, ba **Download screenshots** +
   **Copy design review prompt** diye Claude ke dekhan, Claude er uttor paste korun. Eta e "font/colour/layout
   purono" er moto chokhe dekha jinish ashe, ja code theke dhora jay na.

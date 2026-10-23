@@ -384,8 +384,8 @@ body.report-open { overflow: hidden; }
 const PSI = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed";
 const CURRENT_YEAR = new Date().getFullYear();
 // Bump when the website check learns something new, so older results get re-checked.
-const AUDIT_VERSION = 3;
-const APP_VERSION = "2026-10-23b";
+const AUDIT_VERSION = 4;
+const APP_VERSION = "2026-10-23c";
 
 // [key, label, OpenStreetMap tags (used by the Python version)], grouped for the dropdown.
 const CATEGORY_GROUPS = [
@@ -667,6 +667,8 @@ async function checkSite(url, key) {
   // Boxes for the report's annotated screenshot, in full-page screenshot pixels.
   const fps = lr.fullPageScreenshot || {};
   a.shotSize = fps.screenshot?.width ? { w: fps.screenshot.width, h: fps.screenshot.height } : null;
+  // How many phone screens of scrolling the homepage takes.
+  a.screens = a.shotSize ? Math.round(a.shotSize.h / (a.shotSize.w * 2)) : null;
   const rectOf = (n) => {
     const r = n && ((n.lhId && fps.nodes?.[n.lhId]) || n.boundingRect);
     return r && r.width > 4 && r.height > 4 ? { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) } : null;
@@ -959,7 +961,12 @@ Object.assign(ISSUES, {
     impact: () => "Links shared on Facebook or WhatsApp show no image, which looks unprofessional and gets fewer clicks.",
     fix: () => "A proper preview image and title for shared links." },
 });
-Object.assign(ISSUE_GROUP, { looks_dated: "design", stock_photos: "design", no_directions: "conversion", no_hours: "conversion", no_social_preview: "google" });
+ISSUES.long_page = { points: 5, sev: "important",
+  email: (a) => `the homepage is about ${a.screens} phone screens long, so most visitors never reach the important parts`,
+  title: (a) => `${a.screens} screens of scrolling on a phone`,
+  impact: () => "Most visitors never scroll that far, so the important parts get missed.",
+  fix: () => "A focused homepage with the essentials in the first two screens." };
+Object.assign(ISSUE_GROUP, { long_page: "design", looks_dated: "design", stock_photos: "design", no_directions: "conversion", no_hours: "conversion", no_social_preview: "google" });
 FOUNDATION.push("looks_dated");
 
 // What a customer experiences, in the report's design review: what I saw on their site, why it
@@ -1065,6 +1072,10 @@ const DESIGN_COPY = {
     seen: (a, c, l) => `Your opening hours aren't on your homepage${l?.hours ? ", even though they're on your Google listing" : ""}.`,
     why: () => "People check whether you're open before they call or visit. If they can't see it quickly, they try someone else.",
     after: "Opening hours visible at the top and in the footer" },
+  long_page: {
+    seen: (a) => `On a phone, your homepage is about ${a.screens} screens long.`,
+    why: () => "Most visitors only look at the first screen or two. Everything below that, however good, is effectively invisible, and a long page with no clear structure feels like hard work.",
+    after: "A focused homepage: what you do, why you, and how to book, in the first two screens" },
   no_social_preview: {
     seen: () => "When someone shares your website on Facebook or WhatsApp, the link shows up without a picture.",
     why: () => "Word of mouth now happens in chats. A link without a picture looks like spam and gets far fewer clicks.",
@@ -1084,6 +1095,7 @@ function needsRedesign(l) {
   if (!l.website) return true;
   const is = l.audit?.issues || [];
   if (is.includes("down")) return true;
+  if (l.audit?.state === "done" && modernGap(l).missing >= 5) return true;
   const designAndSales = is.filter(c => ["design", "conversion"].includes(ISSUE_GROUP[c])).length;
   return redesignReasons(l).length > 0 || designAndSales >= 3 || is.length >= 6;
 }
@@ -1232,7 +1244,7 @@ function annotatedShot(l, numbers) {
 
 // A plain-language grade for each part of the site, for the top of the report.
 const SCORECARD = [
-  ["First impression and design", ["looks_dated", "dated_markup", "weak_headline", "stock_photos", "stretched_images", "blurry_images", "slider", "busy_menu", "wall_of_text", "outdated_copyright", "low_contrast"]],
+  ["First impression and design", ["looks_dated", "dated_markup", "long_page", "weak_headline", "stock_photos", "stretched_images", "blurry_images", "slider", "busy_menu", "wall_of_text", "outdated_copyright", "low_contrast"]],
   ["Works on a phone", ["no_viewport", "small_fonts", "small_targets", "layout_shift"]],
   ["Speed", ["psi_low", "heavy_page"]],
   ["Trust and security", ["down", "ssl_broken", "no_https", "old_jquery", "no_reviews"]],
@@ -1252,6 +1264,35 @@ function scorecard(l) {
     const [grade, cls] = weight >= 3 ? ["Poor", "bad"] : weight > 0 ? ["Needs work", "mid"] : ["Good", "good"];
     return { area, grade, cls, why: found.slice(0, 2).map(c => ISSUES[c].title(a)).join("; ") || "No problems found" };
   });
+}
+
+// What customers now expect from a small business website, and whether this one has it.
+// null = couldn't tell (the page text couldn't be read), and those rows are left out.
+function modernChecks(l) {
+  const a = l.audit || {}, is = new Set(a.issues || []), read = l.content?.words >= 150;
+  const no = (...codes) => !codes.some(c => is.has(c));
+  const txt = (...codes) => (codes.some(c => is.has(c)) ? false : read ? true : null);
+  return [
+    ["Designed for phones first", no("no_viewport", "small_fonts")],
+    ["Main content shows within 2.5 seconds on a phone", a.lcp == null ? null : a.lcp <= 2.5],
+    ["Secure, with no browser warnings", no("no_https", "ssl_broken")],
+    ["Current design and up-to-date technology", no("looks_dated", "dated_markup", "old_jquery")],
+    ["A headline that says what you do and where", txt("weak_headline", "no_location")],
+    ["A clear Call or Book button at the top", txt("no_cta")],
+    ["Tap-to-call phone number", txt("no_tel")],
+    ["Online booking or an enquiry form", txt("no_form")],
+    ["Customer reviews on the homepage", txt("no_reviews")],
+    ["Real photos of the business, not stock", is.has("stock_photos") ? false : read || a.stock ? true : null],
+    ["Map, directions and opening hours", txt("no_directions", "no_hours")],
+    ["Sharp photos and a stable page that doesn't jump", no("blurry_images", "stretched_images", "layout_shift")],
+    ["Easy to read and tap (contrast, text and button size)", no("low_contrast", "small_targets", "small_fonts")],
+    ["Focused homepage, not endless scrolling", txt("wall_of_text", "busy_menu") === false || is.has("long_page") ? false : txt()],
+    ["Looks right when shared on Facebook or WhatsApp", txt("no_social_preview")],
+  ].filter(([, ok]) => ok === true || ok === false);
+}
+function modernGap(l) {
+  const checks = modernChecks(l);
+  return { checks, have: checks.filter(([, ok]) => ok).length, missing: checks.filter(([, ok]) => !ok).length };
 }
 
 // Your own design notes (written yourself or with Claude), as a list when lines start with "-".
@@ -1337,6 +1378,14 @@ function reportHtml(l) {
 
   if (l.notes?.trim()) parts.push(`<section class="rp-notes"><h2>My notes on the design</h2>${notesHtml(l.notes)}</section>`);
 
+  const gap = modernGap(l);
+  if (!down && gap.checks.length >= 6) {
+    const trade = (CATEGORIES[state.category]?.[0] || "local business").toLowerCase().replace(/s$/, "");
+    parts.push(`<section><div class="rp-keep"><h2>How your site compares with a modern website</h2>
+      <p class="rp-cap">What customers now expect from a ${esc(trade)}'s website. Yours has <b>${gap.have} of ${gap.checks.length}</b>.</p>
+      <ul class="rp-conv">${gap.checks.map(([t, ok]) => `<li class="${ok ? "ok" : "no"}"><span>${ok ? "\u2713" : "\u2715"}</span>${esc(t)}</li>`).join("")}</ul></div></section>`);
+  }
+
   if (rest.length || others.length) {
     parts.push(`<section><h2>Also holding the site back</h2>${rest.length ? `<ul class="rp-also">${rest.map(code =>
       `<li><b>${esc(ISSUES[code].title(a))}.</b> ${esc(DESIGN_COPY[code].seen(a, c, l))}</li>`).join("")}</ul>` : ""}
@@ -1346,10 +1395,21 @@ function reportHtml(l) {
   if (seen.length || others.length) {
     if (redesign) {
       const reasons = redesignReasons(l);
+      const total = seen.length + others.length;
+      const cost = l.reviews >= 5 && l.rating != null
+        ? `You have ${l.rating.toFixed(1)} stars from ${l.reviews} reviews on Google, so people are actively looking you up. Many of them tap “Website” on your Google listing before they call. That visit is their first real impression of your business, and right now the website works against the reputation you've built.`
+        : "Most people look at a business's website before they call, book or visit. That visit is their first real impression, and right now the website is working against you rather than for you.";
       parts.push(`<section class="rp-offer"><h2>Why patching won't be enough</h2>
+        <p>${esc(cost)}</p>
         <p>${reasons.length
-          ? "Several of these problems come from how the site was originally built, so fixing them one at a time would cost almost as much as starting fresh, and it would still look like an older website. A redesign fixes all of them at once."
-          : "Together these problems add up to a website that looks and works older than your business is. A redesign fixes all of them at once."}</p>
+          ? `This review found ${total} problems, and several come from how the site was originally built. Fixing them one at a time would cost almost as much as starting fresh, and the site would still look like an older website. A redesign fixes all of them at once.`
+          : `This review found ${total} problems. Each one could be patched, but together they add up to a website that looks and works older than your business is. Patching keeps the old look and layout; a redesign fixes everything at once and gives you a site that matches the quality of your work.`}</p>
+        <div class="rp-table-wrap"><table class="rp-card rp-vs"><thead><tr><th></th><th>Patching the current site</th><th>A new website</th></tr></thead><tbody>
+          <tr><th>Look and first impression</th><td>Stays the same</td><td>Modern, built around your business</td></tr>
+          <tr><th>The ${total} problems</th><td>Fixed one by one, as separate jobs</td><td>All fixed at once</td></tr>
+          <tr><th>On phones</th><td>${is.has("no_viewport") ? "Still a desktop layout squeezed onto a phone" : "Small improvements"}</td><td>Designed for phones first</td></tr>
+          <tr><th>Bringing in customers</th><td>Same layout and same results</td><td>Clear Call and Book buttons, reviews and photos where people decide</td></tr>
+        </tbody></table></div>
         ${top.length ? `<div class="rp-table-wrap"><table class="rp-ba-table"><thead><tr><th>Now</th><th>After the redesign</th></tr></thead><tbody>${top.map(code =>
           `<tr><td>${esc(ISSUES[code].title(a))}</td><td>${esc(DESIGN_COPY[code].after)}</td></tr>`).join("")}${rest.length + others.length ? `<tr><td>The ${rest.length + others.length} smaller issues</td><td>Fixed as part of the redesign</td></tr>` : ""}</tbody></table></div>` : ""}
       </section>`);
@@ -1450,6 +1510,9 @@ const REPORT_CSS = `
 .rp-offer p { margin: 0 0 12px; max-width: 64ch; }
 .rp-ba-table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .rp-card { width: 100%; border-collapse: collapse; font-size: 14px; }
+.rp-vs th, .rp-vs td { font-size: 13px; } .rp-vs thead th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--r-muted); }
+.rp-vs td:nth-child(2) { color: #b3261e; } .rp-vs td:nth-child(3) { color: var(--r-good); font-weight: 600; }
+.rp-offer .rp-table-wrap { margin-bottom: 14px; }
 .rp-bottom { margin: 16px 0 0; padding: 14px 16px; border-left: 4px solid var(--r-bad); background: #fcefed; border-radius: 0 10px 10px 0; font-size: 15px; max-width: 64ch; }
 .rp-card th, .rp-card td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--r-line); vertical-align: middle; }
 .rp-card th { font-weight: 600; width: 38%; } .rp-card td:last-child { color: var(--r-muted); }
@@ -1470,6 +1533,7 @@ const REPORT_CSS = `
 .rp-conv .ok span { background: var(--r-good); } .rp-conv .no span { background: var(--r-bad); }
 @media (max-width: 640px) {
   .rp-conv { grid-template-columns: minmax(0, 1fr); }
+  .rp-card.rp-vs tr { display: table-row; } .rp-card.rp-vs td:last-child { padding-top: 10px; }
   .rp-card th { width: auto; } .rp-card tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; } .rp-card td:last-child { grid-column: 1 / -1; padding-top: 0; }
   .rp-glance { grid-template-columns: minmax(0, 1fr); } .rp-glance .rp-phone { max-width: 230px; }
   .rp { padding: 24px 18px; border-radius: 10px; }
@@ -1947,6 +2011,7 @@ function applyDesignIssues(l) {
   }
   const stock = [...new Set([...(a.stock || []), ...(c.stock || [])])];
   if (stock.length) { a.stockList = stock; add("stock_photos"); }
+  if (a.screens >= 12) add("long_page");
 }
 
 // What a website needs to turn visitors into customers, and whether this one has it.
