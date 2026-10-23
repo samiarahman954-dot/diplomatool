@@ -193,6 +193,13 @@ body.report-open { overflow: hidden; }
         <label for="category">Business type</label>
         <select id="category"></select>
       </div>
+      <div class="field">
+        <label for="source">Search on</label>
+        <select id="source">
+          <option value="osm">OpenStreetMap (free)</option>
+          <option value="google">Google Maps (more businesses, needs API key)</option>
+        </select>
+      </div>
       <div class="row2">
         <div class="field">
           <label for="limit">Max results</label>
@@ -214,6 +221,11 @@ body.report-open { overflow: hidden; }
             <input type="password" id="psiKey" placeholder="Paste your key once">
             <p class="hint">Used for the website speed test. Without a key Google allows only a few checks:
               <a href="https://developers.google.com/speed/docs/insights/v5/get-started#APIKey" target="_blank" rel="noopener">get a free key</a>. It stays in this browser.</p>
+          </div>
+          <div class="field">
+            <label for="mapsKey">Google Maps API key (optional)</label>
+            <input type="password" id="mapsKey" placeholder="Paste your key once">
+            <p class="hint">Lets you search Google Maps and fill in missing phone numbers and websites. Enable “Maps JavaScript API” and “Places API (New)” for the key. Google includes a monthly free allowance; set a daily limit in Google Cloud so you're never charged by surprise. It stays in this browser.</p>
           </div>
           <div class="field">
             <label for="signature">Email signature (optional)</label>
@@ -244,6 +256,7 @@ body.report-open { overflow: hidden; }
           <button type="button" class="chip" data-filter="email" aria-pressed="false">Has email<i></i></button>
         </div>
         <div class="actions">
+          <button type="button" class="ghost small" id="fillBtn" hidden>Fill missing contacts from Google</button>
           <button type="button" class="ghost small" id="checkAllBtn" hidden>Check websites</button>
           <button type="button" class="ghost small" id="csvBtn">Download CSV</button>
         </div>
@@ -270,6 +283,10 @@ body.report-open { overflow: hidden; }
         <li><b>Email</b> e "First email" pathan: free design er offer.</li>
         <li>Reply dile design er screenshot ba link "Send design" email e pathan.</li>
       </ol>
+    </section>
+    <section>
+      <h2>Contact nai?</h2>
+      <p>Settings e <b>Google Maps API key</b> din. Tarpor "Search on: Google Maps" e onek beshi business ar tader phone/website paben, ba <b>Fill missing contacts from Google</b> chapun. Key chara o card er <b>Google Maps</b> ar <b>Find on Facebook</b> button e listing khule phone, WhatsApp ba Messenger pete paren.</p>
     </section>
     <section>
       <h2>Follow-up mone rakha</h2>
@@ -512,7 +529,7 @@ const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch {} },
 };
-const state = { leads: [], filter: "all", city: "", category: "", example: true, checking: false, stop: false, running: null, searchSeq: 0, open: new Set(), kind: {}, statuses: {} };
+const state = { leads: [], filter: "all", city: "", category: "", example: true, checking: false, stop: false, running: null, searchSeq: 0, open: new Set(), kind: {}, statuses: {}, filling: false };
 
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 function normUrl(u) { u = (u || "").trim(); if (!u) return ""; return /^https?:\/\//i.test(u) ? u : "http://" + u; }
@@ -573,6 +590,7 @@ function toLead(el) {
     hours: t.opening_hours || "",
     map: `https://www.openstreetmap.org/${el.type}/${el.id}`,
     chain: Boolean(t.brand || t["brand:wikidata"]),
+    lat: el.lat ?? el.center?.lat ?? null, lon: el.lon ?? el.center?.lon ?? null,
     audit: null,
   };
 }
@@ -902,7 +920,7 @@ const DESIGN_COPY = {
     why: () => "Many people prefer not to call, especially in the evening. Without a form, they contact a competitor who has one.",
     after: "A short enquiry or booking form" },
   no_reviews: {
-    seen: () => "Your homepage doesn't show any customer reviews or testimonials.",
+    seen: (a, c, l) => l?.reviews >= 5 && l.rating != null ? `You have ${l.rating.toFixed(1)} stars from ${l.reviews} reviews on Google, but your homepage doesn't show a single one.` : "Your homepage doesn't show any customer reviews or testimonials.",
     why: () => "Most people read reviews before choosing a local business. Showing them on your site builds trust at the moment people decide.",
     after: "Your best Google reviews on the homepage" },
   dated_markup: {
@@ -1000,7 +1018,7 @@ function draft(l, kind = "first") {
   if (!l.website) {
     return finish({
       first: [`A website for ${l.name}?`,
-`I came across ${l.name} while looking at ${what}${where}, and noticed you don't have a website yet.
+`I came across ${l.name} while looking at ${what}${where}, and noticed you don't have a website yet.${l.reviews >= 5 && l.rating != null ? ` That surprised me, because your customers clearly rate you: ${l.rating.toFixed(1)} stars from ${l.reviews} reviews on Google.` : ""}
 
 Most people search Google before they call or visit, and without a website they usually end up choosing a competitor who has one.
 
@@ -1523,6 +1541,8 @@ function businessFacts(l) {
     l.hours && `- Opening hours: ${prettyHours(l.hours)}`,
     l.facebook && `- Facebook page: ${l.facebook}`,
     l.website && `- Current website: ${normUrl(l.website)}`,
+    l.reviews && l.rating != null && `- Google rating: ${l.rating?.toFixed(1)} stars from ${l.reviews} reviews (use it as a trust signal; don't invent review text)`,
+    l.gmaps && `- Google Maps listing: ${l.gmaps}`,
     l.audit?.platform && `- Current website is built with: ${l.audit.platform}`,
   ].filter(Boolean).join("\n");
 }
@@ -1691,6 +1711,137 @@ function statusNote(l) {
   return `${STATUS_LABEL[st.s]} ${when}${due}`;
 }
 
+// ---------------- Google Maps (Places) ----------------
+// Optional, with the user's own Maps API key: a fuller business list than OpenStreetMap, and phone
+// numbers, websites and ratings for leads the map listing left blank.
+const PLACE_FIELDS = ["id", "displayName", "formattedAddress", "nationalPhoneNumber", "internationalPhoneNumber", "websiteURI",
+  "googleMapsURI", "rating", "userRatingCount", "businessStatus", "regularOpeningHours", "location"];
+let mapsPromise = null;
+let mapsAuthFailed = false;
+
+function mapsKey() { return $("mapsKey").value.trim(); }
+
+function loadGoogleMaps() {
+  if (window.google?.maps?.importLibrary) return Promise.resolve();
+  const key = mapsKey();
+  if (!key) return Promise.reject(new Error("Add your Google Maps API key under Settings first."));
+  mapsPromise ??= new Promise((resolve, reject) => {
+    // Google calls this when it rejects the key (wrong key, API not enabled, or not allowed on this website).
+    window.gm_authFailure = () => { mapsAuthFailed = true; setStatus("Google rejected the Maps API key. Check that “Maps JavaScript API” and “Places API (New)” are enabled and that the key allows this website, then reload the page.", true); };
+    window.__lfMapsReady = () => resolve();
+    const sc = document.createElement("script");
+    sc.src = `https://maps.googleapis.com/maps/api/js?${new URLSearchParams({ key, v: "weekly", loading: "async", callback: "__lfMapsReady" })}`;
+    sc.async = true;
+    sc.onerror = () => { mapsPromise = null; reject(new Error("Couldn't load Google Maps. Check your internet connection and try again.")); };
+    document.head.appendChild(sc);
+  });
+  return mapsPromise;
+}
+
+async function placesApi() {
+  await loadGoogleMaps();
+  if (mapsAuthFailed) throw new Error("Google rejected the Maps API key. Fix it under Settings and reload the page.");
+  return (await google.maps.importLibrary("places")).Place;
+}
+
+function mapsErrorText(e) {
+  const m = String(e?.message || e);
+  if (/PERMISSION_DENIED|not authorized|API_KEY|REQUEST_DENIED|has not been used|disabled/i.test(m)) return `Google refused the search: enable “Places API (New)” for your key in Google Cloud, and allow this website. (${m.slice(0, 120)})`;
+  if (/OVER_QUERY_LIMIT|RESOURCE_EXHAUSTED|quota/i.test(m)) return "Your Google Maps quota is used up for now. Try again later or raise the limit in Google Cloud.";
+  return m;
+}
+
+// Social pages Google lists as the "website" are contact routes, not websites to review.
+function splitWebsite(url) {
+  const u = url || "";
+  if (/facebook\.com/i.test(u)) return { website: "", facebook: u };
+  if (/instagram\.com/i.test(u)) return { website: "", instagram: u };
+  return { website: u };
+}
+
+function placeToLead(p) {
+  return {
+    id: `g/${p.id}`,
+    name: p.displayName || "",
+    phone: p.internationalPhoneNumber || p.nationalPhoneNumber || "",
+    email: "", address: p.formattedAddress || "", facebook: "", instagram: "", whatsapp: "",
+    ...splitWebsite(p.websiteURI),
+    hours: (p.regularOpeningHours?.weekdayDescriptions || []).join("; "),
+    map: p.googleMapsURI || "", gmaps: p.googleMapsURI || "",
+    rating: p.rating ?? null, reviews: p.userRatingCount ?? null,
+    lat: typeof p.location?.lat === "function" ? p.location.lat() : null,
+    lon: typeof p.location?.lng === "function" ? p.location.lng() : null,
+    chain: false, closed: p.businessStatus === "CLOSED_PERMANENTLY", gChecked: true, audit: null,
+  };
+}
+
+// Text Search returns at most 20 places, so a bigger search splits the city into a grid and
+// searches each square.
+async function searchGoogle(place, category, limit, city, onProgress) {
+  const Place = await placesApi();
+  const [s, n, w, e] = place.boundingbox.map(Number);
+  const grid = limit <= 20 ? 1 : limit <= 80 ? 2 : 3;
+  const query = `${CATEGORIES[category][0]} in ${cityLabel(city)}`;
+  const found = new Map();
+  for (let i = 0; i < grid; i++) {
+    for (let j = 0; j < grid; j++) {
+      if (found.size >= limit) break;
+      onProgress?.(i * grid + j + 1, grid * grid);
+      const cell = { south: s + (n - s) * i / grid, north: s + (n - s) * (i + 1) / grid, west: w + (e - w) * j / grid, east: w + (e - w) * (j + 1) / grid };
+      const { places } = await Place.searchByText({ textQuery: query, fields: PLACE_FIELDS, maxResultCount: 20, locationRestriction: cell });
+      for (const p of places || []) if (!found.has(p.id)) found.set(p.id, p);
+    }
+  }
+  return [...found.values()].slice(0, limit).map(placeToLead).filter(l => l.name && !l.closed);
+}
+
+function sameBusiness(a, b) {
+  const words = (s) => s.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").split(" ").filter(x => x.length > 2 && !/^(the|and|ltd|llc|inc|clinic|dental|dentist|limited)$/.test(x));
+  const wa = words(a), wb = new Set(words(b));
+  return wa.length === 0 ? a.toLowerCase() === b.toLowerCase() : wa.some(x => wb.has(x));
+}
+
+// Looks each lead up on Google and fills in what the map listing left blank.
+async function fillFromGoogle(targets) {
+  if (state.checking || state.filling || !targets.length) return;
+  let Place;
+  try { Place = await placesApi(); } catch (e) { setStatus(mapsErrorText(e), true); return; }
+  state.filling = true;
+  render();
+  let done = 0, filled = 0, newSites = 0;
+  try {
+    for (const l of targets) {
+      setStatus(`Looking up contact details on Google: ${done} of ${targets.length}…`);
+      const req = { textQuery: `${l.name}, ${l.address || cityLabel(state.city)}`, fields: PLACE_FIELDS, maxResultCount: 1 };
+      if (l.lat != null) req.locationBias = { center: { lat: l.lat, lng: l.lon }, radius: 3000 };
+      const { places } = await Place.searchByText(req);
+      const p = places?.[0];
+      if (p && sameBusiness(l.name, p.displayName || "")) {
+        const g = placeToLead(p);
+        const before = Boolean(l.phone || l.website);
+        if (!l.phone && g.phone) l.phone = g.phone;
+        if (!l.website && g.website) { l.website = g.website; l.audit = null; newSites++; }
+        if (!l.facebook && g.facebook) l.facebook = g.facebook;
+        if (!l.instagram && g.instagram) l.instagram = g.instagram;
+        if (!l.hours && g.hours) l.hours = g.hours;
+        Object.assign(l, { gmaps: g.gmaps || l.gmaps, rating: g.rating ?? l.rating, reviews: g.reviews ?? l.reviews });
+        if (!before && (l.phone || l.website)) filled++;
+      }
+      l.gChecked = true;
+      done++;
+      render();
+    }
+    setStatus(`Checked ${done} ${done === 1 ? "business" : "businesses"} on Google: found contact details for ${filled}${newSites ? `, and ${newSites} turned out to have a website. Press Check websites to review them` : ""}.`);
+  } catch (e) {
+    setStatus(mapsErrorText(e), true);
+  } finally {
+    state.filling = false;
+    render();
+  }
+}
+
+function needsContact(l) { return !l.phone && !l.email && !l.gChecked; }
+
 // ---------------- Reaching the business ----------------
 // Country calling codes for the cities in the list, used to turn local numbers into the
 // international format WhatsApp and SMS links need.
@@ -1828,10 +1979,16 @@ function contactRowHtml(l, kind) {
   const form = l.content?.contactUrl;
   if (form) out.push(btn(`href="${esc(form)}" target="_blank" rel="noopener" data-act="send" data-copy="msg"`, "Contact form", "Copies the message, then opens their contact page. Paste it into the form."));
   if (msg && (wa || tel || fb || ig || form)) out.push(`<button type="button" class="ghost small" data-act="copymsg" data-id="${id}">Copy message</button>`);
+  // Ways to find them when the listing has nothing, or as a backup.
+  const where = `${l.name} ${l.address || cityLabel(state.city || "")}`;
+  out.push(`<a class="btn ghost small" href="${esc(l.gmaps || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(where)}`)}" target="_blank" rel="noopener" title="Their Google Maps listing often shows a phone number, website, WhatsApp or social links">Google Maps</a>`);
+  if (!l.facebook) out.push(`<a class="btn ghost small" href="https://www.facebook.com/search/pages/?q=${encodeURIComponent(where)}" target="_blank" rel="noopener" title="Many small businesses only have a Facebook page">Find on Facebook</a>`);
+  if (needsContact(l) && mapsKey() && !state.example) out.push(`<button type="button" class="ghost small" data-act="gfill" data-id="${id}">Find contact on Google</button>`);
   const label = KINDS_SITE.concat(KINDS_NOSITE).find(([k]) => k === kind)?.[1] || "First email";
-  return out.length
-    ? `<div class="card-contact"><span class="label">Contact</span><div class="actions">${out.join("")}</div><span class="contact-note">Sends: ${esc(label)}. Change it under Messages.</span></div>`
-    : `<div class="card-contact"><span class="label">Contact</span><span class="contact-note">No email or phone on the map. Try Find email.</span></div>`;
+  const direct = Boolean(l.email || l.phone || l.facebook || l.instagram || l.content?.contactUrl);
+  return `<div class="card-contact"><span class="label">Contact</span><div class="actions">${out.join("")}</div><span class="contact-note">${direct
+    ? `Sends: ${esc(label)}. Change it under Messages.`
+    : `No phone or email yet. Open their Google Maps listing or Facebook page to find one${needsContact(l) && mapsKey() && !state.example ? ", or press Find contact on Google" : ""}.`}</span></div>`;
 }
 
 let toastTimer = 0;
@@ -1881,6 +2038,7 @@ function cardHtml(l) {
     l.address && `<span>${esc(l.address)}</span>`,
     l.audit?.platform && `<span>${esc(l.audit.platform)}</span>`,
     l.audit?.perf != null && `<span>PageSpeed ${l.audit.perf}</span>`,
+    l.rating != null && `<span>★ ${l.rating.toFixed(1)}${l.reviews ? ` (${l.reviews} Google reviews)` : ""}</span>`,
   ].filter(Boolean).join("");
   const href = safeHref(l.website);
   const contact = [
@@ -1933,7 +2091,7 @@ function cardHtml(l) {
       <span class="kind-tag ${l.website ? "site" : "nosite"}">${l.website ? "Has website" : "No website"}</span>
     </div>
     ${meta ? `<p class="meta">${meta}</p>` : ""}
-    ${contact ? `<p class="meta">${contact}</p>` : `<p class="meta">No contact details on the map</p>`}
+    ${contact ? `<p class="meta">${contact}</p>` : `<p class="meta">No phone or email found yet</p>`}
     <div class="card-body">${body}</div>
     <div class="card-foot">${foot}</div>
     ${ready ? contactRowHtml(l, kind) : ""}
@@ -1969,6 +2127,9 @@ function render() {
   document.querySelectorAll(".chip").forEach(c => { const n = c.querySelector("i"); if (n) n.textContent = counts[c.dataset.filter] ?? ""; });
   const unchecked = L.some(l => l.website && (!l.audit || l.audit.state === "error"));
   $("checkAllBtn").hidden = state.checking || !unchecked || state.example;
+  const missing = L.filter(needsContact).length;
+  $("fillBtn").hidden = !missing || !mapsKey() || state.example || state.filling || state.checking;
+  $("fillBtn").textContent = `Fill missing contacts from Google (${missing})`;
   if (!state.example) {
     // Screenshots and page text are too big for browser storage; they stay in memory until the page closes.
     const lite = (a) => (!a || a.state === "running" ? null : { ...a, shot: "", fullShot: "", film: [] });
@@ -2005,13 +2166,23 @@ async function search(ev) {
     setStatus(`Finding ${cityLabel(city)} on the map…`);
     const place = await geocode(city);
     if (seq !== state.searchSeq) return;
-    setStatus(`Searching ${CATEGORIES[category][0].toLowerCase()} in ${place.display_name}…`);
-    const els = await runOverpass(overpassQuery(place, CATEGORIES[category][1], limit));
+    const google = $("source").value === "google";
+    const what = CATEGORIES[category][0].toLowerCase();
+    setStatus(`Searching ${what} in ${place.display_name}${google ? " on Google Maps" : ""}…`);
+    let found;
+    if (google) {
+      found = await searchGoogle(place, category, limit, city, (n, total) => { if (total > 1) setStatus(`Searching ${what} on Google Maps: area ${n} of ${total}…`); });
+      // Google has no brand tags; a name that appears several times in one city is a chain.
+      const counts = {};
+      found.forEach(l => { const k = l.name.toLowerCase(); counts[k] = (counts[k] || 0) + 1; });
+      found.forEach(l => { l.chain = counts[l.name.toLowerCase()] > 1; });
+    } else {
+      found = (await runOverpass(overpassQuery(place, CATEGORIES[category][1], limit))).map(toLead);
+    }
     if (seq !== state.searchSeq) return;
     const seen = new Set();
     const leads = [];
-    for (const el of els) {
-      const l = toLead(el);
+    for (const l of found) {
       if (!l || (l.chain && $("skipChains").checked)) continue;
       const key = `${l.name.toLowerCase()}|${domainOf(l.website)}`;
       if (seen.has(key) || (!l.website && !l.phone && !l.address)) continue;
@@ -2021,13 +2192,14 @@ async function search(ev) {
     state.open.clear();
     document.querySelectorAll(".chip").forEach(c => c.setAttribute("aria-pressed", String(c.dataset.filter === "all")));
     const withSite = leads.filter(l => l.website).length;
+    const noContact = leads.filter(needsContact).length;
     setStatus(leads.length
-      ? `Found ${leads.length} businesses, ${withSite} with a website.`
-      : `No ${CATEGORIES[category][0].toLowerCase()} found in ${cityLabel(city)} on OpenStreetMap. Try a bigger city or another business type.`);
+      ? `Found ${leads.length} businesses, ${withSite} with a website.${noContact ? ` ${noContact} ${noContact === 1 ? "has" : "have"} no phone or email${mapsKey() ? ": press Fill missing contacts from Google" : ": add a Google Maps key in Settings to fill them in"}.` : ""}`
+      : `No ${what} found in ${cityLabel(city)} on ${google ? "Google Maps" : "OpenStreetMap"}. Try ${google ? "" : "Google Maps, "}a bigger city or another business type.`);
     render();
     if (withSite && $("autoCheck").checked) checkAll();
   } catch (e) {
-    if (seq === state.searchSeq) setStatus(e.message, true);
+    if (seq === state.searchSeq) setStatus(mapsErrorText(e), true);
   } finally {
     if (seq === state.searchSeq) $("searchBtn").disabled = false;
   }
@@ -2112,10 +2284,10 @@ async function copyDraft(l, btn, kind) {
 
 function csvCell(v) { v = String(v ?? ""); return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v; }
 function downloadCsv() {
-  const rows = [["score","name","website","email","phone","address","facebook","platform","pagespeed","status","problems","email_subject","email_body","map"]];
+  const rows = [["score","name","website","email","phone","address","facebook","google_rating","google_reviews","platform","pagespeed","status","problems","email_subject","email_body","map"]];
   for (const l of sorted(state.leads)) {
     const d = l.score !== null ? draft(l) : { subject: "", body: "" };
-    rows.push([l.score ?? "", l.name, l.website, l.email, l.phone, l.address, l.facebook, l.audit?.platform || "", l.audit?.perf ?? "", STATUS_LABEL[statusOf(l).s], l.findings.join(" | "), d.subject, d.body, l.map]);
+    rows.push([l.score ?? "", l.name, l.website, l.email, l.phone, l.address, l.facebook, l.rating ?? "", l.reviews ?? "", l.audit?.platform || "", l.audit?.perf ?? "", STATUS_LABEL[statusOf(l).s], l.findings.join(" | "), d.subject, d.body, l.map]);
   }
   downloadFile(`leads-${state.category || "example"}-${slugify((state.city || "sample").split(",")[0])}.csv`,
     "﻿" + rows.map(r => r.map(csvCell).join(",")).join("\r\n"), "text/csv;charset=utf-8");
@@ -2166,12 +2338,13 @@ function boot() {
   style.textContent = REPORT_CSS;
   document.head.appendChild(style);
   state.statuses = loadStatuses();
-  for (const id of ["psiKey", "signature"]) {
+  for (const id of ["psiKey", "mapsKey", "signature"]) {
     const saved = store.get(`lf:${id}`);
     if (saved !== null) $(id).value = saved;
     $(id).addEventListener("input", () => {
       store.set(`lf:${id}`, $(id).value);
       if (id === "signature") { render(); if (reportLead) $("reportDoc").innerHTML = reportHtml(reportLead); }
+      if (id === "mapsKey") render();
     });
   }
   let last = null;
@@ -2184,6 +2357,10 @@ function boot() {
   }
   $("form").addEventListener("submit", search);
   $("checkAllBtn").addEventListener("click", checkAll);
+  $("fillBtn").addEventListener("click", () => fillFromGoogle(state.leads.filter(needsContact)));
+  const savedSource = store.get("lf:source");
+  $("source").value = savedSource === "google" || savedSource === "osm" ? savedSource : (mapsKey() ? "google" : "osm");
+  $("source").addEventListener("change", () => { store.set("lf:source", $("source").value); if (selectedCity()) search(); });
   $("stopBtn").addEventListener("click", () => { state.stop = true; setStatus("Stopping after the current checks finish…"); });
   $("csvBtn").addEventListener("click", downloadCsv);
   document.querySelectorAll(".chip").forEach(c => c.addEventListener("click", () => {
@@ -2214,6 +2391,7 @@ function boot() {
     else if (btn.dataset.act === "kind") { state.kind[l.id] = btn.dataset.kind; render(); }
     else if (btn.dataset.act === "report") openReport(l);
     else if (btn.dataset.act === "prompt") openPrompt(l);
+    else if (btn.dataset.act === "gfill") fillFromGoogle([l]);
   });
   $("list").addEventListener("change", (e) => {
     const sel = e.target.closest("select[data-act=status]");

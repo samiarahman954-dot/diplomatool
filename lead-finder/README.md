@@ -18,10 +18,15 @@ Boro chain brand (McDonald's, Starbucks) baad dey, karon ora freelancer hire kor
 https://raw.githack.com/samiarahman954-dot/diplomatool/ccr-3bce4458-ck8crm/lead-finder/index.html
 
 List theke city (160+ shohor) ar business type (100+ dhoron) select korun, search nijei shuru hoy.
-Kono install lagbe na, phone eo chole. **Settings** e shudhu duita jinish:
+Kono install lagbe na, phone eo chole. **Settings** e:
 
 - **Google PageSpeed API key:** website speed test er jonno
   ([free key](https://developers.google.com/speed/docs/insights/v5/get-started#APIKey)). Browser mone rakhe.
+- **Google Maps API key (optional):** Google Maps theke business khoja ar missing phone/website bhora.
+  Google Cloud e key tar jonno **Maps JavaScript API** ar **Places API (New)** chalu korun. Key ta
+  **Application restrictions > Websites** e `https://raw.githack.com/samiarahman954-dot/*` diye restrict
+  korun, ar Quotas e daily limit din, jate keu key churi korleo bill na hoy. Key code e nai, shudhu apnar
+  browser e thake.
 - **Email signature (optional):** shob email ar report er shesh e boshe.
 
 Dam, package ba guarantee tool e nai. Protiti client er dam alada, tai oigulo email e nijer moto likhben.
@@ -78,6 +83,21 @@ personalized message pathan.
 
 Contact button e pathale status nijei agay (First email > Contacted, Follow-up > Followed up, Send report >
 Replied, Send sample > Sample sent). Kon message jabe, seta **Messages** e tab diye bodlan.
+
+### Contact nai emon business
+
+- **Search on: Google Maps** (Maps key lage): OpenStreetMap er cheye onek beshi business, beshir bhag e
+  phone number, website, opening hours ar Google rating soho. Boro search e tool shohor ke kotok bhag e
+  bhag kore khoje (Google proti search e 20 tar beshi dey na).
+- **Fill missing contacts from Google:** OpenStreetMap er jei business er phone/email nai, tader Google e
+  khuje phone, website, Facebook/Instagram ar rating boshay. Naam na mille boshay na (bhul business er
+  number na ashe). Website pawa gele **Check websites** chapun.
+- Key chara o protiti card e **Google Maps** (oder listing, sekhane phone/WhatsApp/website thake) ar
+  **Find on Facebook** (onek choto business er shudhu Facebook page thake, Messenger e message korun).
+- Google rating (★ 4.6, 120 reviews) card e dekhay. Website nai emon business er first email e ar report e
+  eta use hoy ("customers rate you 4.6 stars, but your homepage shows none").
+
+Google proti mash e kichu free use dey; tarpor proti search e dam ase. Tai Quotas e limit rakhun.
 
 ### Follow-up mone rakha
 
@@ -187,7 +207,8 @@ Protibar naam likhte na chaile environment variable set korte paren:
 
 ## Data source
 
-Business er list ase [OpenStreetMap](https://www.openstreetmap.org) theke (free, kono API key lage na).
+Business er list ase [OpenStreetMap](https://www.openstreetmap.org) theke (free, kono API key lage na),
+ba web version e Google Maps theke (nijer Maps API key diye).
 Boro shohore (US, UK, Europe, Australia) data bhalo. Kono jaygay kom business pele Google Maps theke
 website gulo copy kore `audit` mode use korun.
 
