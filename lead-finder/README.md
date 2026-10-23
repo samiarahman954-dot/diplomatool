@@ -71,6 +71,11 @@ Dam, package ba guarantee tool e nai. Protiti client er dam alada, tai oigulo em
 - **Why patching won't be enough:** Google rating diye "manush apnake khoje, kintu website reputation er
   biruddhe kaj kore", tarpor "Patching vs new website" table.
 - Phone e homepage koto screen lomba (12+ hole problem).
+- **Google er nijer "good" standard e bichar:** speed 90 er niche hole "Slower than Google's standard"
+  (Google nije 50-89 ke "needs improvement" bole), accessibility/SEO/best practices 90 er niche, page
+  laphano 0.1 er beshi, chobi optimise na (Google koto KB bachano jay bole), brand font nai.
+- **Competitor ranking:** ek search e 4+ site check hole, ar ei site nicher ordhek e thakle intro e:
+  "I checked 12 dentist websites in Austin; on Google's mobile speed test yours ranks 10 of 12."
 - **Design notes:** report e "My notes on the design" section. Nije likhun, ba **Download screenshots** +
   **Copy design review prompt** diye Claude ke dekhan, Claude er uttor paste korun. Eta e "font/colour/layout
   purono" er moto chokhe dekha jinish ashe, ja code theke dhora jay na.

@@ -385,8 +385,8 @@ body.report-open { overflow: hidden; }
 const PSI = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed";
 const CURRENT_YEAR = new Date().getFullYear();
 // Bump when the website check learns something new, so older results get re-checked.
-const AUDIT_VERSION = 4;
-const APP_VERSION = "2026-10-23d";
+const AUDIT_VERSION = 5;
+const APP_VERSION = "2026-10-23e";
 
 // [key, label, OpenStreetMap tags (used by the Python version)], grouped for the dropdown.
 const CATEGORY_GROUPS = [
@@ -658,13 +658,20 @@ async function checkSite(url, key) {
   if (sc("document-title") === 0) a.issues.push("no_title");
   if (sc("meta-description") === 0) a.issues.push("no_meta_desc");
   if (sc("font-size") === 0) a.issues.push("small_fonts");
-  if (a.a11y !== null && a.a11y < 70) a.issues.push("a11y_low");
+  if (a.a11y !== null && a.a11y < 90) a.issues.push("a11y_low");
+  // Google's "good" line is 90+. Between 50 and 89 Google itself calls the site "needs improvement".
+  if (a.perf !== null && a.perf >= 50 && a.perf < 90) a.issues.push("psi_mid");
+  if (a.seo !== null && a.seo < 90) a.issues.push("seo_low");
+  if (a.bp !== null && a.bp < 90) a.issues.push("bp_low");
+  const imgs = A["modern-image-formats"];
+  const imgKB = Math.round((imgs?.details?.overallSavingsBytes || 0) / 1024);
+  if (imgs && imgs.score !== null && imgs.score < 0.9 && imgKB >= 100) { a.imgSavingsKB = imgKB; a.issues.push("images_unoptimized"); }
   if (a.bytes !== null && a.bytes > 4e6) a.issues.push("heavy_page");
   if (sc("target-size") === 0) a.issues.push("small_targets");
   if (sc("color-contrast") === 0) a.issues.push("low_contrast");
   if (sc("image-aspect-ratio") === 0) a.issues.push("stretched_images");
   if (sc("image-size-responsive") === 0) a.issues.push("blurry_images");
-  if (a.metrics.cls !== null && a.metrics.cls > 0.25) a.issues.push("layout_shift");
+  if (a.metrics.cls !== null && a.metrics.cls > 0.1) a.issues.push("layout_shift");
   // Boxes for the report's annotated screenshot, in full-page screenshot pixels.
   const fps = lr.fullPageScreenshot || {};
   a.shotSize = fps.screenshot?.width ? { w: fps.screenshot.width, h: fps.screenshot.height } : null;
@@ -697,6 +704,9 @@ async function checkSite(url, key) {
   if (wpv && wpYear(wpv[1]) <= CURRENT_YEAR - 4 && !a.eraClues.some(e => /^WordPress \d/.test(e.what))) a.eraClues.push({ what: `WordPress ${wpv[1]}, a version from ${wpYear(wpv[1])}`, year: wpYear(wpv[1]), strong: false });
   if (sc("doctype") === 0) a.eraClues.push({ what: "a page structure from before 2010 (no doctype)", year: 2008, strong: true });
   a.stock = [...new Set(urls.filter(u => STOCK_RE.test(u) && /\.(jpe?g|png|webp)/.test(u)).map(u => decodeURIComponent(u.split("/").pop().split("?")[0]).slice(0, 60)))].slice(0, 3);
+  // No font files at all: the site shows in the phone's standard fonts.
+  a.customFonts = urls.some(u => /\.(woff2?|ttf|otf|eot)(\?|#|$)|fonts\.googleapis|fonts\.gstatic|use\.typekit|fonts\.bunny|fast\.fonts/.test(u));
+  if (urls.length > 5 && !a.customFonts) a.issues.push("default_fonts");
   a.mapEmbed = urls.some(u => /google\.[a-z.]+\/maps|maps\.googleapis|maps\.gstatic|api\.mapbox|openstreetmap/.test(u));
   a.v = AUDIT_VERSION;
   return a;
@@ -962,6 +972,34 @@ Object.assign(ISSUES, {
     impact: () => "Links shared on Facebook or WhatsApp show no image, which looks unprofessional and gets fewer clicks.",
     fix: () => "A proper preview image and title for shared links." },
 });
+Object.assign(ISSUES, {
+  psi_mid: { points: 10, sev: "important",
+    email: (a) => `Google rates the mobile speed ${a.perf}/100, below its own "good" mark of 90`,
+    title: () => "Slower than Google's standard",
+    impact: (a) => `Google scores your mobile speed ${a.perf}/100 and puts it in its “needs improvement” range (90+ is good).`,
+    fix: () => "Optimise images, scripts and hosting until the site scores 90+." },
+  seo_low: { points: 6, sev: "important",
+    email: (a) => `Google's own search check scores the homepage ${a.seo}/100`,
+    title: () => "Fails some of Google's search checks",
+    impact: (a) => `Google's search-readiness check scores your homepage ${a.seo}/100 (90+ is good).`,
+    fix: () => "Fix everything Google's check flags: titles, descriptions, links, structure." },
+  bp_low: { points: 4, sev: "minor",
+    email: (a) => `the site fails some of Google's best-practice checks (${a.bp}/100)`,
+    title: () => "fails some of Google's best-practice checks",
+    impact: (a) => `Google's best-practice check scores the site ${a.bp}/100.`,
+    fix: () => "Fix the errors and outdated code Google flags." },
+  images_unoptimized: { points: 5, sev: "important",
+    email: (a) => `the photos aren't optimised for the web (Google estimates ${a.imgSavingsKB} KB could be saved)`,
+    title: () => "Photos not optimised for phones",
+    impact: (a) => `Google estimates your photos could be ${a.imgSavingsKB} KB smaller with modern formats.`,
+    fix: () => "Modern image formats, sized for each screen." },
+  default_fonts: { points: 5, sev: "important",
+    email: () => "the site uses only the phone's standard fonts, so it looks generic rather than designed",
+    title: () => "No brand typography",
+    impact: () => "The site shows in the device's standard fonts, which makes it look generic.",
+    fix: () => "A typeface chosen for your brand." },
+});
+Object.assign(ISSUE_GROUP, { psi_mid: "speed", images_unoptimized: "speed", seo_low: "google", bp_low: "trust", default_fonts: "design" });
 ISSUES.long_page = { points: 5, sev: "important",
   email: (a) => `the homepage is about ${a.screens} phone screens long, so most visitors never reach the important parts`,
   title: (a) => `${a.screens} screens of scrolling on a phone`,
@@ -1073,6 +1111,26 @@ const DESIGN_COPY = {
     seen: (a, c, l) => `Your opening hours aren't on your homepage${l?.hours ? ", even though they're on your Google listing" : ""}.`,
     why: () => "People check whether you're open before they call or visit. If they can't see it quickly, they try someone else.",
     after: "Opening hours visible at the top and in the footer" },
+  a11y_low: {
+    seen: (a) => `Google's accessibility check scores your site ${a.a11y}/100 (90 and above is good): faint text, small buttons or links and images without descriptions.`,
+    why: () => "Older visitors and people with weaker eyesight struggle to read and use the site, and they're a big share of customers for most local businesses. Accessibility rules also increasingly apply to business websites in the US and EU.",
+    after: "Easy for everyone to read and use" },
+  psi_mid: {
+    seen: (a) => `Google scores your homepage ${a.perf}/100 for speed on a phone. Google counts 90 and above as good, so it rates your site “needs improvement”${a.lcp ? `; the main content takes ${a.lcp.toFixed(1)} seconds to appear` : ""}.${a.field === "SLOW" || a.field === "AVERAGE" ? ` Chrome's data from real visitors rates their experience on your site as ${a.field.toLowerCase()}.` : ""}`,
+    why: () => "Google's research found that as a page's load time goes from one second to three, the chance a visitor leaves rises by 32%. Speed is also part of how Google ranks sites.",
+    after: "Scores 90+ on Google's speed test" },
+  seo_low: {
+    seen: (a) => `Google's own search-readiness check scores your homepage ${a.seo}/100. A well-built site scores 90 or more.`,
+    why: () => `Each problem Google flags makes it a little harder for people searching for a ${(CATEGORIES[state.category]?.[0] || "business").toLowerCase().replace(/s$/, "")} in ${cityShort()} to find you rather than a competitor.`,
+    after: "Set up properly for Google from day one" },
+  images_unoptimized: {
+    seen: (a) => `Your photos aren't saved in modern web formats. Google estimates they could be ${a.imgSavingsKB >= 1024 ? `${(a.imgSavingsKB / 1024).toFixed(1)} MB` : `${a.imgSavingsKB} KB`} smaller without looking any different.`,
+    why: () => "Visitors on mobile data wait for those extra megabytes before they see your page, and many don't wait.",
+    after: "Sharp photos that load instantly" },
+  default_fonts: {
+    seen: () => "Your site doesn't use any brand fonts, so it shows in the phone's standard fonts.",
+    why: () => "Typography is a big part of what makes a site look designed and trustworthy. Standard fonts make a business look generic, next to competitors whose sites look made for them.",
+    after: "Typography chosen to fit your brand" },
   long_page: {
     seen: (a) => `On a phone, your homepage is about ${a.screens} screens long.`,
     why: () => "Most visitors only look at the first screen or two. Everything below that, however good, is effectively invisible, and a long page with no clear structure feels like hard work.",
@@ -1245,12 +1303,12 @@ function annotatedShot(l, numbers) {
 
 // A plain-language grade for each part of the site, for the top of the report.
 const SCORECARD = [
-  ["First impression and design", ["looks_dated", "dated_markup", "long_page", "weak_headline", "stock_photos", "stretched_images", "blurry_images", "slider", "busy_menu", "wall_of_text", "outdated_copyright", "low_contrast"]],
+  ["First impression and design", ["looks_dated", "dated_markup", "default_fonts", "long_page", "weak_headline", "stock_photos", "stretched_images", "blurry_images", "slider", "busy_menu", "wall_of_text", "outdated_copyright", "low_contrast"]],
   ["Works on a phone", ["no_viewport", "small_fonts", "small_targets", "layout_shift"]],
-  ["Speed", ["psi_low", "heavy_page"]],
-  ["Trust and security", ["down", "ssl_broken", "no_https", "old_jquery", "no_reviews"]],
+  ["Speed", ["psi_low", "psi_mid", "heavy_page", "images_unoptimized"]],
+  ["Trust and security", ["down", "ssl_broken", "no_https", "old_jquery", "no_reviews", "bp_low", "a11y_low"]],
   ["Turns visitors into customers", ["no_cta", "no_tel", "no_form", "no_location", "no_directions", "no_hours"]],
-  ["Looks good on Google and when shared", ["no_title", "no_meta_desc", "no_social_preview"]],
+  ["Looks good on Google and when shared", ["no_title", "no_meta_desc", "seo_low", "no_social_preview"]],
 ];
 const SEV_WEIGHT = { critical: 3, important: 2, minor: 1 };
 // Checks that need the page's text. When it couldn't be read, "no problems" means "not checked".
@@ -1276,6 +1334,9 @@ function modernChecks(l) {
   return [
     ["Designed for phones first", no("no_viewport", "small_fonts")],
     ["Main content shows within 2.5 seconds on a phone", a.lcp == null ? null : a.lcp <= 2.5],
+    ["Scores 90+ on all four of Google's quality checks", [a.perf, a.a11y, a.bp, a.seo].some(v => v == null) ? null : [a.perf, a.a11y, a.bp, a.seo].every(v => v >= 90)],
+    ["Brand typography, not standard fonts", a.customFonts == null ? null : a.customFonts],
+    ["Photos optimised for phones", no("images_unoptimized", "heavy_page")],
     ["Secure, with no browser warnings", no("no_https", "ssl_broken")],
     ["Current design and up-to-date technology", no("looks_dated", "dated_markup", "old_jquery")],
     ["A headline that says what you do and where", txt("weak_headline", "no_location")],
@@ -1330,12 +1391,18 @@ function reportHtml(l) {
     </div>
   </header>`);
 
+  // Where they stand among the businesses checked in this search.
+  const peers = state.leads.filter(x => x.website && x.audit?.state === "done" && x.audit.perf != null && !(x.audit.issues || []).includes("down"));
+  const rank = a.perf != null && peers.length >= 4 ? peers.filter(x => x.audit.perf > a.perf).length + 1 : 0;
+  const rankLine = rank > peers.length / 2
+    ? ` I checked ${peers.length} ${(CATEGORIES[state.category]?.[0] || "business").toLowerCase()} websites in ${cityShort()}; on Google's mobile speed test yours ranks ${rank} of ${peers.length}.`
+    : "";
   const faster = state.leads.filter(x => x !== l && x.website && x.audit?.state === "done" && x.audit.lcp && a.lcp && x.audit.lcp < a.lcp / 2)
     .sort((x, y) => x.audit.lcp - y.audit.lcp)[0];
   const intro = down
     ? `I tried to open ${domain} the way a new customer would, and it didn't load. Here's what that means for your business, and how to fix it.`
     : seen.length
-      ? `I looked at ${domain} the way a new customer would: on a phone, for the first time. Several things put visitors off before they ever call or book. Here are the biggest ones, what they cost you, and how a redesign fixes them.${faster ? ` For comparison, ${faster.name}, another ${(CATEGORIES[state.category]?.[0] || "business").toLowerCase().replace(/s$/, "")} in ${cityShort()}, shows its page in ${faster.audit.lcp.toFixed(1)} seconds; yours takes ${a.lcp.toFixed(1)}.` : ""}`
+      ? `I looked at ${domain} the way a new customer would: on a phone, for the first time. Several things put visitors off before they ever call or book. Here are the biggest ones, what they cost you, and how a redesign fixes them.${rankLine}${faster ? ` For comparison, ${faster.name}, another ${(CATEGORIES[state.category]?.[0] || "business").toLowerCase().replace(/s$/, "")} in ${cityShort()}, shows its page in ${faster.audit.lcp.toFixed(1)} seconds; yours takes ${a.lcp.toFixed(1)}.` : ""}`
       : `I looked at ${domain} the way a new customer would: on a phone, for the first time. It does the basics well.`;
   parts.push(`<p class="rp-verdict">${esc(intro)}</p>`);
   // The whole case in one sentence, before the detail.
@@ -1344,7 +1411,7 @@ function reportHtml(l) {
   const summary = [
     is.has("looks_dated") ? `it looks like a website from around ${a.era}` : has("dated_markup", "outdated_copyright", "stock_photos") && "it looks out of date",
     has("no_viewport", "small_fonts", "small_targets", "layout_shift") && "it's awkward to use on a phone",
-    has("psi_low", "heavy_page") && "it's slow to load",
+    has("psi_low", "heavy_page") ? "it's slow to load" : has("psi_mid") && "it's slower than Google's standard",
     has("no_cta", "no_tel", "no_form") && "it doesn't make it easy to call or book",
     has("no_https", "ssl_broken") && "browsers warn visitors it isn't secure",
     is.has("no_reviews") && l.reviews >= 5 && `it hides your ${l.reviews} Google reviews`,
