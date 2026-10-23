@@ -1972,7 +1972,9 @@ function contactRowHtml(l, kind) {
   // Ways to find them when the listing has nothing, or as a backup.
   const where = `${l.name} ${l.address || cityLabel(state.city || "")}`;
   out.push(`<a class="btn ghost small" href="${esc(l.gmaps || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(where)}`)}" target="_blank" rel="noopener" title="Their Google Maps listing often shows a phone number, website, WhatsApp or social links">Google Maps</a>`);
-  if (!l.facebook) out.push(`<a class="btn ghost small" href="https://www.facebook.com/search/pages/?q=${encodeURIComponent(where)}" target="_blank" rel="noopener" title="Many small businesses only have a Facebook page">Find on Facebook</a>`);
+  // A Google search of facebook.com finds the page whether or not you're logged in to Facebook.
+  const fbQuery = `site:facebook.com "${l.name.replace(/"/g, "")}" ${state.city ? cityShort() : ""}`.trim();
+  if (!l.facebook) out.push(`<a class="btn ghost small" href="https://www.google.com/search?q=${encodeURIComponent(fbQuery)}" target="_blank" rel="noopener" title="Searches Facebook pages with this business name. Many small businesses only have a Facebook page: open it and message them on Messenger.">Find on Facebook</a>`);
   if (needsContact(l) && mapsKey() && !state.example) out.push(`<button type="button" class="ghost small" data-act="gfill" data-id="${id}">Find contact on Google</button>`);
   const label = KINDS_SITE.concat(KINDS_NOSITE).find(([k]) => k === kind)?.[1] || "First email";
   const direct = Boolean(l.email || l.phone || l.facebook || l.instagram || l.content?.contactUrl);
