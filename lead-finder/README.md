@@ -142,7 +142,11 @@ To, Subject ar pura lekha nijer moto bodlan. Bodlano lekha oi business ar oi ema
   3. **Credentials > Create credentials > OAuth client ID > Web application**. Authorized JavaScript
      origins e `https://raw.githack.com` ar `https://rawcdn.githack.com` din.
   4. Client ID ta Settings e paste korun. (Client ID gopon kichu na, kintu key gulor moto code e rakhini.)
-- **Open in Gmail:** setup chara, Gmail e bodlano lekha soho notun email khule.
+- **Prothom email e report:** website check kora thakle "First email" e report PDF attach thake (window e
+  **Attach the website report as a PDF** tik). Lekha o seta onujayi: "I've attached a short free report…",
+  ar shesh e free sample redesign er offer. Tik tulle ager moto "Would you like me to send it over?" hoye jay.
+- **Open in Gmail:** setup chara, Gmail e bodlano lekha soho notun email khule. Gmail link e file attach
+  kora jay na, tai **Download report PDF** chepe file ta namiye Gmail e paperclip diye attach korun.
 - Din e 30 tar beshi pathale tool shotorko kore, karon ek Gmail theke beshi cold email gele spam e jay.
 
 Contact button e pathale status nijei agay (First email > Contacted, Follow-up > Followed up, Send report >

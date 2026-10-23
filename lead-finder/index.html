@@ -354,10 +354,11 @@ body.report-open { overflow: hidden; }
     <div class="field"><label for="cmTo">To</label><input type="email" id="cmTo" autocomplete="off" spellcheck="false" placeholder="Their email: look on the contact page of their website"></div>
     <div class="field"><label for="cmSubject">Subject</label><input type="text" id="cmSubject"></div>
     <div class="field"><label for="cmBody">Message</label><textarea id="cmBody" rows="14"></textarea></div>
-    <label class="check" id="cmAttachRow" hidden><input type="checkbox" id="cmAttach" checked> Attach the website review as a PDF</label>
+    <label class="check" id="cmAttachRow" hidden><input type="checkbox" id="cmAttach" checked> Attach the website report as a PDF</label>
     <p id="cmNote" aria-live="polite"></p>
     <div class="actions">
       <button type="button" class="primary small" id="cmSend">Send from my Gmail</button>
+      <button type="button" class="ghost small" id="cmPdf" hidden>Download report PDF</button>
       <a class="btn ghost small" id="cmGmail" target="_blank" rel="noopener">Open in Gmail</a>
       <button type="button" class="ghost small" id="cmCopy">Copy</button>
       <button type="button" class="ghost small" id="cmReset">Reset to template</button>
@@ -386,7 +387,7 @@ const PSI = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed";
 const CURRENT_YEAR = new Date().getFullYear();
 // Bump when the website check learns something new, so older results get re-checked.
 const AUDIT_VERSION = 7;
-const APP_VERSION = "2026-10-23h";
+const APP_VERSION = "2026-10-23i";
 
 // [key, label, OpenStreetMap tags (used by the Python version)], grouped for the dropdown.
 const CATEGORY_GROUPS = [
@@ -1278,7 +1279,7 @@ const KINDS_NOSITE = [["first", "First email"], ["followup", "Follow-up"], ["las
 function kindsFor(l) { return l.website ? KINDS_SITE : KINDS_NOSITE; }
 function kindHint(l, kind) {
   return {
-    first: "Send this first. No attachment or link, so it lands in the inbox, not spam.",
+    first: withReport(l) ? "Send this first, with the report attached as a PDF." : "Send this first. No attachment or link, so it lands in the inbox, not spam.",
     followup: "Send 3 days later if they haven't replied.",
     last: "Send about 7 days after the first email, then stop.",
     report: "Send when they reply. Send from my Gmail attaches the report as a PDF; with Open in Gmail, save the report as a PDF and attach it yourself.",
@@ -1287,6 +1288,10 @@ function kindHint(l, kind) {
       : "Send when they reply. Make the design with Website prompt, then attach screenshots or a link.",
   }[kind];
 }
+
+// Whether the first email carries the report as a PDF (on unless you untick it in the email window).
+function reportReady(l) { return Boolean(l.website && l.audit?.state === "done" && !(l.audit.issues || []).includes("down")); }
+function withReport(l) { return reportReady(l) && l.attachReport !== false; }
 
 // Your own edits from the email window win over the template.
 function draft(l, kind = "first") {
@@ -1330,6 +1335,26 @@ If you like the direction, I can turn it into your live website. I'm happy to go
   const domain = domainOf(l.website);
   const bullets = l.findings.slice(0, 3).map(f => `- ${cap(f)}`).join("\n");
   const top = l.findings[0] || "a few things that are probably costing you customers";
+  if (withReport(l) && ["first", "followup", "last"].includes(kind)) {
+    return finish({
+      first: [`A free review of ${l.name}'s website`,
+`I came across ${l.name} while looking at ${what}${where} and had a look at your website (${domain}). A few things stood out that are probably stopping visitors from becoming customers:
+
+${bullets}
+
+I'm a web designer who helps local businesses get more calls and bookings from their website. I've attached a short free report on your site: what a new customer sees, each problem explained in plain English, and what would fix it.
+
+If you'd like, I can also make you a free sample redesign of your homepage, using your own content and photos, so you can see the difference before deciding anything. Just reply "yes".`],
+      followup: [`Re: A free review of ${l.name}'s website`,
+`Just following up on the report I sent about ${domain}. The biggest issue I found: ${top}.
+
+My offer of a free sample redesign of your homepage still stands. Just reply "yes" and I'll make it.`],
+      last: [`Re: A free review of ${l.name}'s website`,
+`I don't want to fill your inbox, so this is my last note. If the website isn't a priority right now, no problem at all.
+
+If it becomes one, just reply and I'll make you the free sample redesign.`],
+    }[kind]);
+  }
   return finish({
     first: [`Quick note about ${l.name}'s website`,
 `I came across ${l.name} while looking at ${what}${where} and had a look at your website (${domain}). A few things stood out that are probably stopping visitors from becoming customers:
@@ -2688,14 +2713,20 @@ function fillCompose() {
   $("cmHint").textContent = kindHint(l, kind);
   $("cmSubject").value = d.subject;
   $("cmBody").value = d.body;
-  $("cmAttachRow").hidden = !(kind === "report" && l.website && l.audit?.state === "done");
+  const canAttach = reportReady(l) && (kind === "first" || kind === "report");
+  $("cmAttachRow").hidden = !canAttach;
+  $("cmAttach").checked = kind === "first" ? withReport(l) : true;
+  const attaching = canAttach && $("cmAttach").checked;
   $("cmReset").hidden = !l.drafts?.[kind];
   const [, n] = sentToday();
   $("cmSend").hidden = !gmailClientId();
+  $("cmPdf").hidden = !attaching || Boolean(gmailClientId());
   $("cmNote").classList.remove("error");
   $("cmNote").textContent = gmailClientId()
-    ? `${n ? `${n} sent from here today. ` : ""}Keep it to about 30 a day so Gmail doesn't flag you as spam.`
-    : "To send straight from here, add your Gmail OAuth Client ID under Settings. Until then, use Open in Gmail.";
+    ? `${n ? `${n} sent from here today. ` : ""}${attaching ? "The report goes as a PDF attachment. " : ""}Keep it to about 30 a day so Gmail doesn't flag you as spam.`
+    : attaching
+      ? "Gmail links can't carry attachments: press Download report PDF, then Open in Gmail and attach the file with the paperclip. (Or add your Gmail OAuth Client ID under Settings and Send attaches it for you.)"
+      : "To send straight from here, add your Gmail OAuth Client ID under Settings. Until then, use Open in Gmail.";
   updateComposeLink();
 }
 
@@ -3398,6 +3429,28 @@ function boot() {
   $("cmReset").addEventListener("click", () => { if (composeLead?.drafts) delete composeLead.drafts[composeKind]; fillCompose(); });
   $("cmCopy").addEventListener("click", () => copyPlain(`Subject: ${$("cmSubject").value}\n\n${$("cmBody").value}`).then(ok => toast(ok ? "Email copied." : "Couldn't copy.")));
   $("cmSend").addEventListener("click", sendCompose);
+  $("cmAttach").addEventListener("change", () => {
+    const l = composeLead;
+    if (!l) return;
+    if (composeKind === "first") {
+      l.attachReport = $("cmAttach").checked;
+      const edited = ["first", "followup", "last"].some(k => l.drafts?.[k]);
+      fillCompose();
+      if (edited) $("cmNote").textContent = "You've edited this email, so update the sentence about the report yourself.";
+    } else fillCompose();
+  });
+  $("cmPdf").addEventListener("click", async () => {
+    const l = composeLead, b = $("cmPdf");
+    if (!l) return;
+    b.disabled = true; b.textContent = "Making the PDF…";
+    try {
+      const pdf = await reportPdf(l);
+      const bytes = Uint8Array.from(atob(pdf.base64), c => c.charCodeAt(0));
+      downloadFile(pdf.name, bytes, "application/pdf");
+      toast("PDF downloaded. Attach it in Gmail with the paperclip.");
+    } catch (e) { $("cmNote").textContent = e.message || "Couldn't make the PDF. Open the report and use Save as PDF."; }
+    b.disabled = false; b.textContent = "Download report PDF";
+  });
   $("cmGmail").addEventListener("click", () => { const l = composeLead; if (l && !state.example && advanceStatus(l, composeKind)) toast(`Marked as ${STATUS_LABEL[statusOf(l).s]}.`); });
   $("rvPdf").addEventListener("click", () => window.print());
   $("rvHtml").addEventListener("click", () => reportLead && downloadReportHtml(reportLead));
