@@ -385,8 +385,8 @@ body.report-open { overflow: hidden; }
 const PSI = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed";
 const CURRENT_YEAR = new Date().getFullYear();
 // Bump when the website check learns something new, so older results get re-checked.
-const AUDIT_VERSION = 6;
-const APP_VERSION = "2026-10-23f";
+const AUDIT_VERSION = 7;
+const APP_VERSION = "2026-10-23g";
 
 // [key, label, OpenStreetMap tags (used by the Python version)], grouped for the dropdown.
 const CATEGORY_GROUPS = [
@@ -651,7 +651,13 @@ async function checkSite(url, key) {
   if (!a.jquery) { for (const u of urls) { const m = u.match(/jquery[.-]?(\d+\.\d+(?:\.\d+)?)|jquery[^?]*\.js\?ver=(\d+\.\d+(?:\.\d+)?)/); if (m) { a.jquery = m[1] || m[2]; break; } } }
 
   if (sc("http-status-code") === 0) return { issues: ["down"], why: "it returns an error page" };
-  if (sc("is-on-https") === 0) a.issues.push("no_https");
+  // Lighthouse's HTTPS audit also fails when a single image or script loads over http, even on a
+  // site with a valid certificate. Only the page's own address decides "Not Secure".
+  const insecure = (A["is-on-https"]?.details?.items || []).map(i => String(i.url || ""));
+  const finalUrl = lr.finalDisplayedUrl || lr.finalUrl || lr.mainDocumentUrl || "";
+  a.pageHttps = finalUrl ? /^https:/i.test(finalUrl)
+    : !insecure.some(u => /^http:\/\//i.test(u) && domainOf(u) === domainOf(url) && !/\.(png|jpe?g|gif|webp|svg|ico|css|js|woff2?|ttf)(\?|$)/i.test(u));
+  if (!a.pageHttps) a.issues.push("no_https");
   if (sc("viewport") === 0) a.issues.push("no_viewport");
   if (a.perf !== null && a.perf < 50) a.issues.push("psi_low");
   if (a.jquery && parseInt(a.jquery, 10) < 3) a.issues.push("old_jquery");
@@ -698,7 +704,7 @@ async function checkSite(url, key) {
   a.eraClues = eraSignals(urls.join("\n"));
   // Security: libraries with published vulnerabilities, insecure content, console errors.
   a.vulns = knownVulns(libs.concat(a.jquery && !libs.some(x => /^jquery$/i.test(x.name)) ? [{ name: "jQuery", version: a.jquery }] : []));
-  a.mixed = sc("is-on-https") === 0 ? (A["is-on-https"]?.details?.items || []).length : 0;
+  a.mixed = a.pageHttps ? insecure.length : 0;
   a.consoleErrors = (A["errors-in-console"]?.details?.items || []).length;
   a.template = templateOf(urls);
   const bs = libs.find(x => /^bootstrap$/i.test(x.name) && x.version);
