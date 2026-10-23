@@ -1,0 +1,407 @@
+:root {
+  --bg: #f4ecdc;
+  --bg-2: #efe3cc;
+  --ink: #2b2118;
+  --ink-soft: #6b5a48;
+  --paper: #fffaf0;
+  --paper-line: #e8dcc4;
+  --envelope: #e9d5b0;
+  --envelope-edge: #c9ae80;
+  --accent: #b23a2e;
+  --accent-ink: #fff;
+  --ok: #2e7d32;
+  --border: #d9c7a6;
+  --shadow: 0 1px 2px rgb(60 40 20 / 0.08), 0 6px 18px rgb(60 40 20 / 0.08);
+  --font: "Hind Siliguri", system-ui, sans-serif;
+  --hand: "Tiro Bangla", "Caveat", serif;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1d1915;
+    --bg-2: #25201a;
+    --ink: #f1e7d6;
+    --ink-soft: #b9a88f;
+    --paper: #2c261f;
+    --paper-line: #3b332a;
+    --envelope: #4a3d2c;
+    --envelope-edge: #6d5940;
+    --accent: #e0675a;
+    --accent-ink: #1d1915;
+    --ok: #81c784;
+    --border: #4a4034;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 18px rgb(0 0 0 / 0.3);
+    color-scheme: dark;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+a {
+  color: var(--accent);
+}
+
+.wrap {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 16px 64px;
+}
+
+/* Header */
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 0;
+  gap: 12px;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 1.4rem;
+}
+.brand small {
+  font-weight: 400;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+.lang {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 4px 12px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.banner {
+  background: var(--bg-2);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+  margin-bottom: 16px;
+}
+
+/* Cards and forms */
+.card {
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: var(--shadow);
+  margin-bottom: 20px;
+}
+h1,
+h2,
+h3 {
+  line-height: 1.25;
+  margin: 0 0 12px;
+}
+h1 {
+  font-size: 1.9rem;
+}
+h2 {
+  font-size: 1.25rem;
+}
+.muted {
+  color: var(--ink-soft);
+}
+.small {
+  font-size: 0.88rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 560px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+label {
+  display: block;
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+  margin-bottom: 4px;
+}
+input,
+select,
+textarea {
+  width: 100%;
+  font: inherit;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+fieldset {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px 14px;
+  margin: 0 0 16px;
+}
+legend {
+  padding: 0 6px;
+  font-weight: 600;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font: inherit;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 9px 18px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+  cursor: pointer;
+  text-decoration: none;
+}
+.btn.ghost {
+  background: transparent;
+  color: var(--accent);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.error {
+  color: var(--accent);
+  font-size: 0.92rem;
+  margin: 8px 0 0;
+}
+
+/* Letter paper */
+.paper {
+  background: repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 31px,
+      var(--paper-line) 31px,
+      var(--paper-line) 32px
+    ),
+    var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  /* Top padding is one line tall so text sits on the ruled lines, not through them. */
+  padding: 32px 20px 16px;
+  background-attachment: local;
+  font-family: var(--hand);
+  font-size: 1.1rem;
+  line-height: 32px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+textarea.paper {
+  min-height: 260px;
+  resize: vertical;
+}
+
+/* Stamps */
+.stamp {
+  --c: var(--accent);
+  width: 58px;
+  height: 68px;
+  flex: none;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #fffdf7;
+  border: 3px dotted var(--c);
+  outline: 4px solid #fffdf7;
+  color: var(--c);
+  font-size: 0.62rem;
+  line-height: 1.1;
+  text-align: center;
+}
+.stamp span {
+  font-size: 1.7rem;
+  line-height: 1.2;
+}
+.stamps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 6px;
+}
+.stamps button {
+  background: none;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  padding: 4px;
+  cursor: pointer;
+}
+.stamps button[aria-pressed="true"] {
+  border-color: var(--ink);
+}
+
+/* Envelopes in a mailbox */
+.envelopes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+.envelope {
+  position: relative;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: var(--ink);
+  background: linear-gradient(160deg, var(--envelope), var(--bg-2));
+  border: 1px solid var(--envelope-edge);
+  border-radius: 10px;
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+.envelope:hover:not(:disabled) {
+  transform: translateY(-2px) rotate(-0.3deg);
+}
+.envelope:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+.envelope .meta {
+  flex: 1;
+  min-width: 0;
+}
+.envelope .who {
+  font-weight: 600;
+}
+.envelope .preview {
+  font-family: var(--hand);
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.postmark {
+  flex: none;
+  width: 76px;
+  height: 76px;
+  border: 2px solid var(--ink-soft);
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.66rem;
+  line-height: 1.15;
+  color: var(--ink-soft);
+  text-align: center;
+  transform: rotate(-12deg);
+  opacity: 0.8;
+}
+.badge {
+  display: inline-block;
+  font-size: 0.78rem;
+  border-radius: 999px;
+  padding: 1px 10px;
+  border: 1px solid var(--border);
+  background: var(--paper);
+  margin-top: 4px;
+}
+.badge.transit {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+@media (max-width: 480px) {
+  .postmark {
+    display: none;
+  }
+}
+
+/* Address block like on an envelope */
+.address {
+  font-family: var(--hand);
+  font-size: 1.15rem;
+  line-height: 1.5;
+  border-left: 3px solid var(--accent);
+  padding-left: 12px;
+}
+
+/* Modal */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgb(20 14 8 / 0.55);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px 16px;
+  overflow-y: auto;
+  z-index: 10;
+}
+.modal {
+  width: 100%;
+  max-width: 640px;
+  animation: unfold 0.35s ease-out;
+}
+@keyframes unfold {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scaleY(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .modal {
+    animation: none;
+  }
+  .envelope {
+    transition: none;
+  }
+}
+
+.sent {
+  text-align: center;
+}
+.sent .big {
+  font-size: 3rem;
+}
