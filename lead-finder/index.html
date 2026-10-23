@@ -193,13 +193,6 @@ body.report-open { overflow: hidden; }
         <label for="category">Business type</label>
         <select id="category"></select>
       </div>
-      <div class="field">
-        <label for="source">Search on</label>
-        <select id="source">
-          <option value="osm">OpenStreetMap (free)</option>
-          <option value="google">Google Maps (more businesses, needs API key)</option>
-        </select>
-      </div>
       <div class="row2">
         <div class="field">
           <label for="limit">Max results</label>
@@ -217,15 +210,15 @@ body.report-open { overflow: hidden; }
         <summary>Settings</summary>
         <div class="inner">
           <div class="field">
+            <label for="mapsKey">Google Maps API key</label>
+            <input type="password" id="mapsKey" placeholder="Paste your key once">
+            <p class="hint">Needed to search for businesses. In Google Cloud, enable “Maps JavaScript API” and “Places API (New)” for the key, and set a daily limit so you're never charged by surprise (Google includes a monthly free allowance). It stays in this browser.</p>
+          </div>
+          <div class="field">
             <label for="psiKey">Google PageSpeed API key</label>
             <input type="password" id="psiKey" placeholder="Paste your key once">
             <p class="hint">Used for the website speed test. Without a key Google allows only a few checks:
               <a href="https://developers.google.com/speed/docs/insights/v5/get-started#APIKey" target="_blank" rel="noopener">get a free key</a>. It stays in this browser.</p>
-          </div>
-          <div class="field">
-            <label for="mapsKey">Google Maps API key (optional)</label>
-            <input type="password" id="mapsKey" placeholder="Paste your key once">
-            <p class="hint">Lets you search Google Maps and fill in missing phone numbers and websites. Enable “Maps JavaScript API” and “Places API (New)” for the key. Google includes a monthly free allowance; set a daily limit in Google Cloud so you're never charged by surprise. It stays in this browser.</p>
           </div>
           <div class="field">
             <label for="signature">Email signature (optional)</label>
@@ -286,7 +279,7 @@ body.report-open { overflow: hidden; }
     </section>
     <section>
       <h2>Contact nai?</h2>
-      <p>Settings e <b>Google Maps API key</b> din. Tarpor "Search on: Google Maps" e onek beshi business ar tader phone/website paben, ba <b>Fill missing contacts from Google</b> chapun. Key chara o card er <b>Google Maps</b> ar <b>Find on Facebook</b> button e listing khule phone, WhatsApp ba Messenger pete paren.</p>
+      <p>Business gulo Google Maps theke ashe, phone, website ar rating soho. Kono business er phone/email na thakle card er <b>Google Maps</b> button e oder listing khulun (WhatsApp, website, social link thake), ba <b>Find on Facebook</b> e page khuje Messenger e message korun.</p>
     </section>
     <section>
       <h2>Follow-up mone rakha</h2>
@@ -303,7 +296,7 @@ body.report-open { overflow: hidden; }
       </div>
     </section>
   </div>
-  <footer>Business data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>. Website checks by Google PageSpeed Insights.</footer>
+  <footer>Business data from Google Maps. Website checks by Google PageSpeed Insights.</footer>
 </div>
 
 <div id="reportView" role="dialog" aria-modal="true" aria-label="Client report" hidden>
@@ -340,12 +333,10 @@ body.report-open { overflow: hidden; }
 
 <script>
 "use strict";
-const NOMINATIM = "https://nominatim.openstreetmap.org/search";
-const OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter", "https://overpass.private.coffee/api/interpreter"];
 const PSI = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed";
 const CURRENT_YEAR = new Date().getFullYear();
 
-// [key, label, OpenStreetMap tags], grouped for the dropdown.
+// [key, label, OpenStreetMap tags (used by the Python version)], grouped for the dropdown.
 const CATEGORY_GROUPS = [
   ["Health & medical", [
     ["dentist", "Dentists", [["amenity","dentist"],["healthcare","dentist"]]],
@@ -537,62 +528,17 @@ function domainOf(u) { try { return new URL(normUrl(u)).hostname.replace(/^www\.
 function safeHref(u) { const n = normUrl(u); return /^https?:\/\//i.test(n) ? n : ""; }
 
 // ---------------- Finding businesses ----------------
+// The city's area on Google Maps, so the business search stays inside it.
 async function geocode(city) {
-  const cacheKey = `lf:geo:${city.toLowerCase()}`;
+  const cacheKey = `lf:gplace:${city.toLowerCase()}`;
   try { const hit = JSON.parse(store.get(cacheKey) || "null"); if (hit) return hit; } catch {}
-  const place = await geocodeFresh(city);
-  store.set(cacheKey, JSON.stringify({ osm_type: place.osm_type, osm_id: place.osm_id, boundingbox: place.boundingbox, display_name: place.display_name }));
+  const Place = await placesApi();
+  const { places } = await Place.searchByText({ textQuery: city, fields: ["formattedAddress", "viewport"], maxResultCount: 1 });
+  const v = places?.[0]?.viewport;
+  if (!v) throw new Error(`Couldn't find "${city}" on Google Maps. Add the country, for example "Austin, Texas, USA".`);
+  const place = { display_name: places[0].formattedAddress || city, bounds: typeof v.toJSON === "function" ? v.toJSON() : v };
+  store.set(cacheKey, JSON.stringify(place));
   return place;
-}
-
-async function geocodeFresh(city) {
-  const r = await fetch(`${NOMINATIM}?${new URLSearchParams({ q: city, format: "jsonv2", limit: "1" })}`);
-  if (!r.ok) throw new Error(`The map search failed (HTTP ${r.status}). Try again in a minute.`);
-  const j = await r.json();
-  if (!j.length) throw new Error(`Couldn't find "${city}". Add the country, for example "Austin, Texas, USA".`);
-  return j[0];
-}
-
-function overpassQuery(place, tags, limit) {
-  let area = "", scope;
-  if (place.osm_type === "relation") { area = `area(id:${3600000000 + Number(place.osm_id)})->.a;`; scope = "(area.a)"; }
-  else { const [s, n, w, e] = place.boundingbox; scope = `(${s},${w},${n},${e})`; }
-  const sel = tags.map(([k, v]) => `  nwr["${k}"="${v}"]["name"]${scope};`).join("\n");
-  return `[out:json][timeout:120];\n${area}\n(\n${sel}\n);\nout tags center ${limit};`;
-}
-
-async function runOverpass(query) {
-  let last;
-  for (const url of OVERPASS) {
-    try {
-      const r = await fetch(url, { method: "POST", body: new URLSearchParams({ data: query }) });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return (await r.json()).elements || [];
-    } catch (e) { last = e; }
-  }
-  throw new Error(`The map servers are busy (${last?.message}). Wait a minute and try again.`);
-}
-
-function toLead(el) {
-  const t = el.tags || {};
-  if (!t.name) return null;
-  const street = [t["addr:housenumber"], t["addr:street"]].filter(Boolean).join(" ");
-  return {
-    id: `${el.type}/${el.id}`,
-    name: t.name,
-    website: t.website || t["contact:website"] || t.url || "",
-    phone: t.phone || t["contact:phone"] || t["contact:mobile"] || "",
-    email: t.email || t["contact:email"] || "",
-    address: [street, t["addr:city"], t["addr:postcode"]].filter(Boolean).join(", "),
-    facebook: t["contact:facebook"] || t.facebook || "",
-    instagram: t["contact:instagram"] || t.instagram || "",
-    whatsapp: t["contact:whatsapp"] || "",
-    hours: t.opening_hours || "",
-    map: `https://www.openstreetmap.org/${el.type}/${el.id}`,
-    chain: Boolean(t.brand || t["brand:wikidata"]),
-    lat: el.lat ?? el.center?.lat ?? null, lon: el.lon ?? el.center?.lon ?? null,
-    audit: null,
-  };
 }
 
 // ---------------- Website check (Google PageSpeed) ----------------
@@ -1712,8 +1658,8 @@ function statusNote(l) {
 }
 
 // ---------------- Google Maps (Places) ----------------
-// Optional, with the user's own Maps API key: a fuller business list than OpenStreetMap, and phone
-// numbers, websites and ratings for leads the map listing left blank.
+// Business search with the user's own Maps API key. Also fills in leads from older searches that
+// have no phone or email.
 const PLACE_FIELDS = ["id", "displayName", "formattedAddress", "nationalPhoneNumber", "internationalPhoneNumber", "websiteURI",
   "googleMapsURI", "rating", "userRatingCount", "businessStatus", "regularOpeningHours", "location"];
 let mapsPromise = null;
@@ -1779,8 +1725,8 @@ function placeToLead(p) {
 // searches each square.
 async function searchGoogle(place, category, limit, city, onProgress) {
   const Place = await placesApi();
-  const [s, n, w, e] = place.boundingbox.map(Number);
-  const grid = limit <= 20 ? 1 : limit <= 80 ? 2 : 3;
+  const { south: s, north: n, west: w, east: e } = place.bounds;
+  const grid = limit <= 20 ? 1 : Math.min(5, Math.ceil(Math.sqrt(limit / 10)));
   const query = `${CATEGORIES[category][0]} in ${cityLabel(city)}`;
   const found = new Map();
   for (let i = 0; i < grid; i++) {
@@ -2157,28 +2103,23 @@ async function search(ev) {
   const category = $("category").value;
   const limit = Math.max(10, Math.min(500, parseInt($("limit").value, 10) || 60));
   if (!city) { setStatus("Type a city name first, then press Find leads.", true); $("cityOther").focus(); return; }
+  if (!mapsKey()) { setStatus("Add your Google Maps API key under Settings to search.", true); $("settings").open = true; $("mapsKey").focus(); return; }
   const seq = ++state.searchSeq;
   if (state.checking) { state.stop = true; setStatus("Stopping the current website checks…"); await state.running; }
   if (seq !== state.searchSeq) return;  // a newer search started while we waited
   $("searchBtn").disabled = true;
   store.set("lf:city", city); store.set("lf:category", category);
   try {
-    setStatus(`Finding ${cityLabel(city)} on the map…`);
+    setStatus(`Finding ${cityLabel(city)} on Google Maps…`);
     const place = await geocode(city);
     if (seq !== state.searchSeq) return;
-    const google = $("source").value === "google";
     const what = CATEGORIES[category][0].toLowerCase();
-    setStatus(`Searching ${what} in ${place.display_name}${google ? " on Google Maps" : ""}…`);
-    let found;
-    if (google) {
-      found = await searchGoogle(place, category, limit, city, (n, total) => { if (total > 1) setStatus(`Searching ${what} on Google Maps: area ${n} of ${total}…`); });
-      // Google has no brand tags; a name that appears several times in one city is a chain.
-      const counts = {};
-      found.forEach(l => { const k = l.name.toLowerCase(); counts[k] = (counts[k] || 0) + 1; });
-      found.forEach(l => { l.chain = counts[l.name.toLowerCase()] > 1; });
-    } else {
-      found = (await runOverpass(overpassQuery(place, CATEGORIES[category][1], limit))).map(toLead);
-    }
+    setStatus(`Searching ${what} in ${place.display_name} on Google Maps…`);
+    const found = await searchGoogle(place, category, limit, city, (n, total) => { if (total > 1) setStatus(`Searching ${what} on Google Maps: area ${n} of ${total}…`); });
+    // Google has no brand tags; a name that appears several times in one city is a chain.
+    const counts = {};
+    found.forEach(l => { const k = l.name.toLowerCase(); counts[k] = (counts[k] || 0) + 1; });
+    found.forEach(l => { l.chain = counts[l.name.toLowerCase()] > 1; });
     if (seq !== state.searchSeq) return;
     const seen = new Set();
     const leads = [];
@@ -2192,10 +2133,10 @@ async function search(ev) {
     state.open.clear();
     document.querySelectorAll(".chip").forEach(c => c.setAttribute("aria-pressed", String(c.dataset.filter === "all")));
     const withSite = leads.filter(l => l.website).length;
-    const noContact = leads.filter(needsContact).length;
+    const noPhone = leads.filter(l => !l.phone).length;
     setStatus(leads.length
-      ? `Found ${leads.length} businesses, ${withSite} with a website.${noContact ? ` ${noContact} ${noContact === 1 ? "has" : "have"} no phone or email${mapsKey() ? ": press Fill missing contacts from Google" : ": add a Google Maps key in Settings to fill them in"}.` : ""}`
-      : `No ${what} found in ${cityLabel(city)} on ${google ? "Google Maps" : "OpenStreetMap"}. Try ${google ? "" : "Google Maps, "}a bigger city or another business type.`);
+      ? `Found ${leads.length} businesses, ${withSite} with a website.${noPhone ? ` ${noPhone} ${noPhone === 1 ? "has" : "have"} no phone on Google: use their Google Maps or Facebook button to reach them.` : ""}`
+      : `No ${what} found in ${cityLabel(city)} on Google Maps. Try a bigger city or another business type.`);
     render();
     if (withSite && $("autoCheck").checked) checkAll();
   } catch (e) {
@@ -2358,9 +2299,7 @@ function boot() {
   $("form").addEventListener("submit", search);
   $("checkAllBtn").addEventListener("click", checkAll);
   $("fillBtn").addEventListener("click", () => fillFromGoogle(state.leads.filter(needsContact)));
-  const savedSource = store.get("lf:source");
-  $("source").value = savedSource === "google" || savedSource === "osm" ? savedSource : (mapsKey() ? "google" : "osm");
-  $("source").addEventListener("change", () => { store.set("lf:source", $("source").value); if (selectedCity()) search(); });
+  if (!mapsKey()) { $("settings").open = true; if (state.example) setStatus("Add your Google Maps API key under Settings, then pick a city and a business type."); }
   $("stopBtn").addEventListener("click", () => { state.stop = true; setStatus("Stopping after the current checks finish…"); });
   $("csvBtn").addEventListener("click", downloadCsv);
   document.querySelectorAll(".chip").forEach(c => c.addEventListener("click", () => {
