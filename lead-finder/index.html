@@ -211,6 +211,7 @@ body.report-open { overflow: hidden; }
         <div class="field">
           <span class="label">Options</span>
           <label class="check"><input type="checkbox" id="skipChains" checked> Skip chains</label>
+          <label class="check"><input type="checkbox" id="onlySites" checked> Only with a website</label>
         </div>
       </div>
       <label class="check"><input type="checkbox" id="autoCheck" checked> Check websites after search</label>
@@ -385,7 +386,7 @@ const PSI = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed";
 const CURRENT_YEAR = new Date().getFullYear();
 // Bump when the website check learns something new, so older results get re-checked.
 const AUDIT_VERSION = 4;
-const APP_VERSION = "2026-10-23c";
+const APP_VERSION = "2026-10-23d";
 
 // [key, label, OpenStreetMap tags (used by the Python version)], grouped for the dropdown.
 const CATEGORY_GROUPS = [
@@ -2864,6 +2865,9 @@ function cardHtml(l) {
 
 function render() {
   state.leads.forEach(scoreLead);
+  const hideNoSite = $("onlySites").checked && !state.example;
+  document.querySelector('.chip[data-filter="nosite"]').hidden = hideNoSite;
+  if (hideNoSite && state.filter === "nosite") state.filter = "all";
   const list = sorted(visible());
   $("list").innerHTML = list.length ? list.map(cardHtml).join("") :
     `<div class="empty">${state.leads.length ? "No leads match this filter." : "No businesses yet. Run a search to see leads here."}</div>`;
@@ -2930,7 +2934,9 @@ async function search(ev) {
     if (seq !== state.searchSeq) return;
     const what = CATEGORIES[category][0].toLowerCase();
     setStatus(`Searching ${what} in ${place.display_name} on Google Maps…`);
-    const found = await searchGoogle(place, category, limit, city, (n, total) => { if (total > 1) setStatus(`Searching ${what} on Google Maps: area ${n} of ${total}…`); });
+    const onlySites = $("onlySites").checked;
+    // Ask for more when businesses without a website are dropped, so the list still fills up.
+    const found = await searchGoogle(place, category, onlySites ? Math.min(500, Math.round(limit * 1.5)) : limit, city, (n, total) => { if (total > 1) setStatus(`Searching ${what} on Google Maps: area ${n} of ${total}…`); });
     // Google has no brand tags; a name that appears several times in one city is a chain.
     const counts = {};
     found.forEach(l => { const k = l.name.toLowerCase(); counts[k] = (counts[k] || 0) + 1; });
@@ -2938,8 +2944,11 @@ async function search(ev) {
     if (seq !== state.searchSeq) return;
     const seen = new Set();
     const leads = [];
+    let noSite = 0;
     for (const l of found) {
       if (!l || (l.chain && $("skipChains").checked)) continue;
+      if (onlySites && !l.website) { noSite++; continue; }
+      if (leads.length >= limit) break;
       const key = `${l.name.toLowerCase()}|${domainOf(l.website)}`;
       if (seen.has(key) || (!l.website && !l.phone && !l.address)) continue;
       seen.add(key); leads.push(l);
@@ -2950,7 +2959,7 @@ async function search(ev) {
     const withSite = leads.filter(l => l.website).length;
     const noPhone = leads.filter(l => !l.phone).length;
     setStatus(leads.length
-      ? `Found ${leads.length} businesses, ${withSite} with a website.${noPhone ? ` ${noPhone} ${noPhone === 1 ? "has" : "have"} no phone on Google: use their Google Maps or Facebook button to reach them.` : ""}`
+      ? `Found ${leads.length} ${leads.length === 1 ? "business" : "businesses"}${onlySites ? " with a website" : `, ${withSite} with a website`}.${onlySites && noSite ? ` Left out ${noSite} without a website.` : ""}${noPhone ? ` ${noPhone} ${noPhone === 1 ? "has" : "have"} no phone on Google: use their Google Maps or Facebook button to reach them.` : ""}`
       : `No ${what} found in ${cityLabel(city)} on Google Maps. Try a bigger city or another business type.`);
     render();
     if (withSite && $("autoCheck").checked) checkAll();
@@ -3110,13 +3119,20 @@ function boot() {
   try { last = JSON.parse(store.get("lf:last") || "null"); } catch {}
   if (last && last.leads && last.leads.length) {
     last.leads.forEach(l => { if (l.emailSearch === "running") delete l.emailSearch; });
-    Object.assign(state, { leads: last.leads, city: last.city, category: last.category, example: false });
+    const keep = store.get("lf:onlySites") === "0" ? last.leads : last.leads.filter(l => l.website);
+    Object.assign(state, { leads: keep.length ? keep : last.leads, city: last.city, category: last.category, example: false });
     setStatus(`Showing your last search: ${CATEGORIES[last.category]?.[0] || "businesses"} in ${last.city}.`);
   } else {
     Object.assign(state, { leads: EXAMPLES.map(e => ({ ...e })), city: "Austin, Texas, USA", category: "dentist", example: true });
   }
   $("form").addEventListener("submit", search);
   $("checkAllBtn").addEventListener("click", checkAll);
+  if (store.get("lf:onlySites") === "0") $("onlySites").checked = false;
+  $("onlySites").addEventListener("change", () => {
+    store.set("lf:onlySites", $("onlySites").checked ? "1" : "0");
+    if (!state.example && selectedCity()) search();
+    else render();
+  });
   $("fillBtn").addEventListener("click", () => fillFromGoogle(state.leads.filter(needsContact)));
   $("emailBtn").addEventListener("click", findAllEmails);
   if (!mapsKey()) { $("settings").open = true; if (state.example) setStatus("Add your Google Maps API key under Settings, then pick a city and a business type."); }

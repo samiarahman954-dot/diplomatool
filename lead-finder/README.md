@@ -10,7 +10,8 @@ Client khojar tool. Kono shohor ar business type dile (jemon "Austin er dentist"
 5. Protiti business er jonno oder nijer problem diye **personalized email** likhe dey
 6. Shob kichu **HTML report** (browser e khulben) ar **CSV** (Excel / Google Sheets) e save kore
 
-Website nai kintu phone number ache, emon business o list e ashe. Era "website banano" kaj er client.
+Default e shudhu **website ache emon business** ashe (form e **Only with a website**), karon website
+nai emon business er beshir bhag e email/contact pawa jay na. Tik tule dile tarao ashe.
 Boro chain brand (McDonald's, Starbucks) baad dey, karon ora freelancer hire kore na.
 
 ## Web version (install chara, browser e)
