@@ -312,7 +312,7 @@ body.report-open { overflow: hidden; }
       </div>
     </section>
   </div>
-  <footer>Business data from Google Maps. Website checks by Google PageSpeed Insights.</footer>
+  <footer>Business data from Google Maps. Website checks by Google PageSpeed Insights. <span id="appVersion"></span></footer>
 </div>
 
 <div id="reportView" role="dialog" aria-modal="true" aria-label="Client report" hidden>
@@ -383,6 +383,9 @@ body.report-open { overflow: hidden; }
 "use strict";
 const PSI = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed";
 const CURRENT_YEAR = new Date().getFullYear();
+// Bump when the website check learns something new, so older results get re-checked.
+const AUDIT_VERSION = 3;
+const APP_VERSION = "2026-10-23b";
 
 // [key, label, OpenStreetMap tags (used by the Python version)], grouped for the dropdown.
 const CATEGORY_GROUPS = [
@@ -679,6 +682,20 @@ async function checkSite(url, key) {
     ...marksFor("largest-contentful-paint-element", "psi_low").slice(0, 1),
   ];
   if (urls.length && !urls.some(u => ANALYTICS.some(m => u.includes(m)))) a.issues.push("no_analytics");
+  // Design clues from the files the page loads, so the review works even when the page itself
+  // can't be read through a proxy.
+  const libs = (A["js-libraries"]?.details?.items || []).map(i => ({ name: String(i.name || ""), version: String(i.version || "") }));
+  a.eraClues = eraSignals(urls.join("\n"));
+  const bs = libs.find(x => /^bootstrap$/i.test(x.name) && x.version);
+  if (bs && /^[23]\./.test(bs.version) && !a.eraClues.some(e => /Bootstrap/.test(e.what))) a.eraClues.push({ what: `Bootstrap ${bs.version.split(".")[0]}`, year: bs.version.startsWith("2") ? 2013 : 2016, strong: bs.version.startsWith("2") });
+  const mz = libs.find(x => /^modernizr$/i.test(x.name) && /^[12]\./.test(x.version));
+  if (mz) a.eraClues.push({ what: `Modernizr ${mz.version}`, year: 2014, strong: false });
+  const wpv = urls.map(u => u.match(/wp-includes\/(?!js\/jquery)[^?]+\?ver=(\d+\.\d+)/)).find(Boolean);
+  if (wpv && wpYear(wpv[1]) <= CURRENT_YEAR - 4 && !a.eraClues.some(e => /^WordPress \d/.test(e.what))) a.eraClues.push({ what: `WordPress ${wpv[1]}, a version from ${wpYear(wpv[1])}`, year: wpYear(wpv[1]), strong: false });
+  if (sc("doctype") === 0) a.eraClues.push({ what: "a page structure from before 2010 (no doctype)", year: 2008, strong: true });
+  a.stock = [...new Set(urls.filter(u => STOCK_RE.test(u) && /\.(jpe?g|png|webp)/.test(u)).map(u => decodeURIComponent(u.split("/").pop().split("?")[0]).slice(0, 60)))].slice(0, 3);
+  a.mapEmbed = urls.some(u => /google\.[a-z.]+\/maps|maps\.googleapis|maps\.gstatic|api\.mapbox|openstreetmap/.test(u));
+  a.v = AUDIT_VERSION;
   return a;
 }
 
@@ -1033,11 +1050,11 @@ const DESIGN_COPY = {
     why: () => "On a phone that's a lot of scrolling. Most visitors scan, so the key information gets buried.",
     after: "Short, scannable sections with the key points first" },
   looks_dated: {
-    seen: (a, c) => { const list = (c?.era || []).map(e => e.what); return `Your site is built with tools that were current around ${a.era}${list.length ? `: ${list.slice(0, 3).join(", ").replace(/, ([^,]*)$/, " and $1")}` : ""}${a.copyrightYear ? `, and the footer says © ${a.copyrightYear}` : ""}. Website design has moved on a lot since then, and visitors can tell.`; },
+    seen: (a, c) => { const list = a.eraList || (c?.era || []).map(e => e.what); return `Your site is built with tools that were current around ${a.era}${list.length ? `: ${list.slice(0, 3).join(", ").replace(/, ([^,]*)$/, " and $1")}` : ""}${a.copyrightYear ? `, and the footer says © ${a.copyrightYear}` : ""}. Website design has moved on a lot since then, and visitors can tell.`; },
     why: () => "People compare you with other businesses in a few seconds. A site that looks years old makes the business look behind the times too, even when your work is modern, and they choose the competitor whose site looks current.",
     after: "A modern design that matches the quality of your work" },
   stock_photos: {
-    seen: (a, c) => `Some of your photos are stock photos${c?.stock?.[0] ? ` (for example “${c.stock[0]}”)` : ""}, not photos of your own team or premises.`,
+    seen: (a, c) => { const f = a.stockList?.[0] || c?.stock?.[0]; return `Some of your photos are stock photos${f ? ` (for example “${f}”)` : ""}, not photos of your own team or premises.`; },
     why: () => "Customers recognise stock photos, and they've seen the same ones on other sites. Real photos of you and your place are what build trust before a first visit.",
     after: "Real photos of your team, premises and work" },
   no_directions: {
@@ -1223,11 +1240,15 @@ const SCORECARD = [
   ["Looks good on Google and when shared", ["no_title", "no_meta_desc", "no_social_preview"]],
 ];
 const SEV_WEIGHT = { critical: 3, important: 2, minor: 1 };
+// Checks that need the page's text. When it couldn't be read, "no problems" means "not checked".
+const NEEDS_TEXT = new Set(["no_cta", "no_tel", "no_form", "no_location", "no_directions", "no_hours", "no_social_preview", "weak_headline", "busy_menu", "wall_of_text", "slider", "no_reviews", "outdated_copyright"]);
 function scorecard(l) {
   const a = l.audit || {}, is = new Set(a.issues || []);
+  const read = l.content?.words >= 150;
   return SCORECARD.map(([area, codes]) => {
     const found = codes.filter(c => is.has(c) && ISSUES[c]);
     const weight = found.reduce((s, c) => s + SEV_WEIGHT[ISSUES[c].sev], 0);
+    if (!weight && !read && codes.every(c => NEEDS_TEXT.has(c))) return { area, grade: "Not checked", cls: "ink", why: "Couldn't read the page text for this part" };
     const [grade, cls] = weight >= 3 ? ["Poor", "bad"] : weight > 0 ? ["Needs work", "mid"] : ["Good", "good"];
     return { area, grade, cls, why: found.slice(0, 2).map(c => ISSUES[c].title(a)).join("; ") || "No problems found" };
   });
@@ -1275,6 +1296,20 @@ function reportHtml(l) {
       ? `I looked at ${domain} the way a new customer would: on a phone, for the first time. Several things put visitors off before they ever call or book. Here are the biggest ones, what they cost you, and how a redesign fixes them.${faster ? ` For comparison, ${faster.name}, another ${(CATEGORIES[state.category]?.[0] || "business").toLowerCase().replace(/s$/, "")} in ${cityShort()}, shows its page in ${faster.audit.lcp.toFixed(1)} seconds; yours takes ${a.lcp.toFixed(1)}.` : ""}`
       : `I looked at ${domain} the way a new customer would: on a phone, for the first time. It does the basics well.`;
   parts.push(`<p class="rp-verdict">${esc(intro)}</p>`);
+  // The whole case in one sentence, before the detail.
+  const is = new Set(a.issues || []);
+  const has = (...codes) => codes.some(x => is.has(x));
+  const summary = [
+    is.has("looks_dated") ? `it looks like a website from around ${a.era}` : has("dated_markup", "outdated_copyright", "stock_photos") && "it looks out of date",
+    has("no_viewport", "small_fonts", "small_targets", "layout_shift") && "it's awkward to use on a phone",
+    has("psi_low", "heavy_page") && "it's slow to load",
+    has("no_cta", "no_tel", "no_form") && "it doesn't make it easy to call or book",
+    has("no_https", "ssl_broken") && "browsers warn visitors it isn't secure",
+    is.has("no_reviews") && l.reviews >= 5 && `it hides your ${l.reviews} Google reviews`,
+  ].filter(Boolean);
+  if (!down && summary.length >= 2) {
+    parts.push(`<p class="rp-bottom"><b>In short:</b> ${esc(summary.slice(0, -1).join(", "))} and ${esc(summary[summary.length - 1])}. Each of these loses you customers on its own; together they're why a new website will do more for you than fixing them one by one.</p>`);
+  }
 
   if (!down && (seen.length || others.length)) {
     parts.push(`<section><h2>Your website at a glance</h2><div class="rp-table-wrap"><table class="rp-card"><tbody>${scorecard(l).map(r =>
@@ -1415,6 +1450,7 @@ const REPORT_CSS = `
 .rp-offer p { margin: 0 0 12px; max-width: 64ch; }
 .rp-ba-table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .rp-card { width: 100%; border-collapse: collapse; font-size: 14px; }
+.rp-bottom { margin: 16px 0 0; padding: 14px 16px; border-left: 4px solid var(--r-bad); background: #fcefed; border-radius: 0 10px 10px 0; font-size: 15px; max-width: 64ch; }
 .rp-card th, .rp-card td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--r-line); vertical-align: middle; }
 .rp-card th { font-weight: 600; width: 38%; } .rp-card td:last-child { color: var(--r-muted); }
 .rp-grade-pill { display: inline-block; white-space: nowrap; color: #fff; font: 700 11px/1 "Figtree", sans-serif; text-transform: uppercase; letter-spacing: 0.05em; padding: 6px 9px; border-radius: 999px; }
@@ -1456,8 +1492,10 @@ function openReport(l) {
   $("reportDoc").innerHTML = reportHtml(l);
   const a = l.audit || {};
   const needsShots = a.state === "done" && !(a.issues || []).includes("down") && !a.shot && !a.fullShot && !a.shotBlank && !a.customShot;
-  $("rvRecheck").hidden = !needsShots || state.example;
-  $("rvNote").textContent = needsShots
+  $("rvRecheck").hidden = !(needsShots || auditStale(l)) || state.example;
+  $("rvRecheck").textContent = auditStale(l) ? "Re-check for the full review" : "Re-check for screenshots";
+  $("rvNote").textContent = auditStale(l) ? "This site was checked with an older version of the tool, so the newer design checks are missing. Press Re-check for the full review (10–40 seconds)."
+    : needsShots
     ? (state.example ? "Example report. Real reports include a screenshot of the client's site." : "Screenshots aren't kept after you close the page. Press Re-check to add them back.")
     : a.shotBlank && !a.customShot ? "Google's phone screenshot came out blank (the site shows a loading screen or video first). Take one on your phone and press Add your own screenshot."
     : "Save as PDF, then attach it to the \u201csend report\u201d email.";
@@ -1546,6 +1584,7 @@ function downloadReportHtml(l) {
 const CONTENT_PROXIES = [
   (u) => [`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`, "html"],
   (u) => [`https://corsproxy.io/?url=${encodeURIComponent(u)}`, "html"],
+  (u) => [`https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(u)}`, "html"],
   (u) => [`https://r.jina.ai/${u}`, "text"],
 ];
 const CTA_RE = /\b(book (now|online|today|an? (appointment|table|visit|call|consultation))|schedule (now|online|an? \w+)|get (a |your )?(free )?(quote|estimate|valuation|consultation)|request (an? )?(appointment|quote|callback)|call (us )?(now|today)|reserve( a table)?|order (now|online)|start (your )?free trial|enquire now|contact us today)\b/i;
@@ -1880,22 +1919,34 @@ function applyContentIssues(l) {
   if (c.words > 1500) add("wall_of_text");
   if (c.hasSlider) add("slider");
   if (c.dated) add("dated_markup");
+  if (c.hasMap === false && !a.mapEmbed && l.address) add("no_directions");
+  if (c.hasHours === false && l.hours) add("no_hours");
+  if (c.hasOgImage === false) add("no_social_preview");
+}
+
+// Design problems that don't need the page text: build-era clues and stock photos from the files
+// the page loads, plus the page text's clues when it could be read.
+function applyDesignIssues(l) {
+  const a = l.audit, c = l.content || {};
+  if (!a || a.state !== "done" || (a.issues || []).includes("down")) return;
+  const add = (code) => { if (!a.issues.includes(code)) a.issues.push(code); };
   // Built with old tools: one strong clue, or two weaker ones, all at least six years old.
-  const era = c.era || [];
+  const era = [...(a.eraClues || []), ...(c.era || [])].filter((e, i, arr) => arr.findIndex(x => x.what === e.what) === i);
   const jq = a.jquery ? (/^1\.(\d+)/.test(a.jquery) ? (+a.jquery.split(".")[1] >= 12 ? 2016 : +a.jquery.split(".")[1] >= 9 ? 2014 : 2012) : /^2\./.test(a.jquery) ? 2016 : 0) : 0;
   const clues = era.concat(jq ? [{ what: `jQuery ${a.jquery}`, year: jq, strong: false }] : []);
   const old = clues.filter(e => e.year <= CURRENT_YEAR - 6);
   if (old.some(e => e.strong) || old.length >= 2 || (old.length && c.year && c.year <= CURRENT_YEAR - 5)) {
-    c.era = old;
-    a.era = Math.max(...old.map(e => e.year));
+    a.eraList = old.map(e => e.what);
+    // An old WordPress version says the site wasn't updated, not when it was designed.
+    const design = old.filter(e => !/^WordPress \d/.test(e.what));
+    a.era = Math.max(...(design.length ? design : old).map(e => e.year));
+    if (c.year && c.year <= CURRENT_YEAR - 2) a.copyrightYear = c.year;
     add("looks_dated");
     // The dated look covers these, and its text mentions the old copyright year.
     a.issues = a.issues.filter(x => x !== "dated_markup" && x !== "outdated_copyright");
   }
-  if (c.stock?.length) add("stock_photos");
-  if (c.hasMap === false && l.address) add("no_directions");
-  if (c.hasHours === false && l.hours) add("no_hours");
-  if (c.hasOgImage === false) add("no_social_preview");
+  const stock = [...new Set([...(a.stock || []), ...(c.stock || [])])];
+  if (stock.length) { a.stockList = stock; add("stock_photos"); }
 }
 
 // What a website needs to turn visitors into customers, and whether this one has it.
@@ -2033,7 +2084,7 @@ function openPrompt(l) {
   if (site && !state.example && !l.content?.text && !(l.audit?.issues || []).includes("down")) {
     $("pvNote").textContent = `Reading ${domainOf(l.website)} to add their text to the prompt…`;
     fetchSiteContent(l.website).catch(() => null).then((c) => {
-      if (c) { l.content = c; applyContentIssues(l); }
+      if (c) { l.content = c; applyContentIssues(l); applyDesignIssues(l); }
       if (promptLead === l) { $("pvNote").textContent = c ? "" : "Couldn't read their website text. The prompt asks Claude to use the screenshot instead."; refreshPrompt(); }
     });
   }
@@ -2649,6 +2700,9 @@ async function copyPlain(text) {
 }
 
 // ---------------- Rendering ----------------
+// Checked by an older version of the tool, so the review is missing newer checks.
+function auditStale(l) { return l.audit?.state === "done" && l.audit.v !== AUDIT_VERSION && !state.example; }
+
 function level(l) { return l.score === null ? (l.audit?.state === "running" ? "running" : "unchecked") : l.score >= 60 ? "hot" : l.score >= 30 ? "warm" : "cold"; }
 
 function visible() {
@@ -2703,6 +2757,7 @@ function cardHtml(l) {
     ready && `<button type="button" class="${l.website ? "ghost" : "primary"} small" data-act="draft" data-id="${id}" aria-expanded="${open}">${open ? "Hide messages" : "Messages"}</button>`,
     ready && `<button type="button" class="ghost small" data-act="prompt" data-id="${id}">${l.website ? "Redesign prompt" : "Website prompt"}</button>`,
     href && (lv === "unchecked" || l.audit?.state === "error") && !state.checking && `<button type="button" class="ghost small" data-act="check" data-id="${id}">Check website</button>`,
+    href && auditStale(l) && !state.checking && `<button type="button" class="primary small" data-act="check" data-id="${id}" title="Checked with an older version of the tool. Re-check for the full design review.">Re-check for full review</button>`,
     !l.email && !state.example && l.emailSearch !== "none" && `<button type="button" class="ghost small" data-act="findemail" data-id="${id}"${l.emailSearch === "running" ? " disabled" : ""} title="Looks on their website, contact page, Facebook page and in web search results">${l.emailSearch === "running" ? "Finding email…" : "Find email"}</button>`,
     !l.email && (l.emailSearch === "none" || state.example) && `<a class="btn ghost small" href="${esc(search)}" target="_blank" rel="noopener" title="No email on their website or Facebook page. Try Google yourself.">No email found: search Google</a>`,
     l.map && `<a class="btn ghost small" href="${esc(l.map)}" target="_blank" rel="noopener">Map</a>`,
@@ -2763,7 +2818,7 @@ function render() {
   ].join("") : "";
   const counts = { all: L.length, site: withSite, nosite: L.length - withSite, hot, due, email: L.filter(l => l.email).length };
   document.querySelectorAll(".chip").forEach(c => { const n = c.querySelector("i"); if (n) n.textContent = counts[c.dataset.filter] ?? ""; });
-  const unchecked = L.some(l => l.website && (!l.audit || l.audit.state === "error"));
+  const unchecked = L.some(l => l.website && (!l.audit || l.audit.state === "error" || auditStale(l)));
   $("checkAllBtn").hidden = state.checking || !unchecked || state.example;
   const missing = L.filter(needsContact).length;
   $("fillBtn").hidden = !missing || !mapsKey() || state.example || state.filling || state.checking;
@@ -2868,6 +2923,7 @@ async function checkLeads(targets) {
           setStatus(`Reading ${domainOf(l.website)}…`);
           l.content = await fetchSiteContent(l.website).catch(() => null);
           applyContentIssues(l);
+          applyDesignIssues(l);
         }
       } catch (e) {
         l.audit = null;
@@ -2897,7 +2953,7 @@ async function checkLeads(targets) {
 
 function checkAll() {
   if (state.checking) return;
-  const targets = state.leads.filter(l => l.website && (!l.audit || l.audit.state === "error"));
+  const targets = state.leads.filter(l => l.website && (!l.audit || l.audit.state === "error" || auditStale(l)));
   if (targets.length) startChecks(targets);
 }
 
@@ -2950,6 +3006,7 @@ const EXAMPLES = [
 ];
 
 function boot() {
+  $("appVersion").textContent = `Version ${APP_VERSION}.`;
   const sel = $("category");
   sel.innerHTML = CATEGORY_GROUPS.map(([group, items]) =>
     `<optgroup label="${esc(group)}">${items.map(([k, label]) => `<option value="${k}">${esc(label)}</option>`).join("")}</optgroup>`).join("");
