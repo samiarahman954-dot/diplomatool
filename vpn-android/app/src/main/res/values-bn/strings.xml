@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="connect">কানেক্ট</string>
+    <string name="disconnect">ডিসকানেক্ট</string>
+    <string name="status_connected">কানেক্টেড</string>
+    <string name="status_disconnected">কানেক্ট করা নেই</string>
+    <string name="status_working">অপেক্ষা করুন…</string>
+    <string name="server_label">সার্ভার: %1$s</string>
+    <string name="server_none">নেই</string>
+    <string name="config_hint">WireGuard কনফিগ</string>
+    <string name="import_file">.conf ইমপোর্ট</string>
+    <string name="save">সেভ</string>
+    <string name="config_saved">কনফিগ সেভ হয়েছে</string>
+    <string name="config_imported">কনফিগ ইমপোর্ট হয়েছে</string>
+    <string name="permission_denied">VPN অনুমতি দেওয়া হয়নি</string>
+    <string name="error_empty_config">আগে একটি WireGuard কনফিগ পেস্ট বা ইমপোর্ট করুন</string>
+    <string name="error_bad_config">কনফিগ সঠিক নয়: %1$s</string>
+    <string name="error_import">ফাইলটি পড়া যায়নি</string>
+    <string name="help">আপনার VPN সার্ভার বা প্রোভাইডারের WireGuard কনফিগ ([Interface] + [Peer]) এখানে পেস্ট করুন অথবা .conf ফাইল ইমপোর্ট করুন, তারপর কানেক্ট চাপুন।</string>
+</resources>

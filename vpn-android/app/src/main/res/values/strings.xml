@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Secure VPN</string>
+    <string name="connect">Connect</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="status_connected">Connected</string>
+    <string name="status_disconnected">Not connected</string>
+    <string name="status_working">Please wait…</string>
+    <string name="server_label">Server: %1$s</string>
+    <string name="server_none">none</string>
+    <string name="traffic">↓ %1$s   ↑ %2$s</string>
+    <string name="config_hint">WireGuard config</string>
+    <string name="import_file">Import .conf</string>
+    <string name="save">Save</string>
+    <string name="config_saved">Config saved</string>
+    <string name="config_imported">Config imported</string>
+    <string name="permission_denied">VPN permission was not granted</string>
+    <string name="error_empty_config">Paste or import a WireGuard config first</string>
+    <string name="error_bad_config">Invalid config: %1$s</string>
+    <string name="error_import">Could not read that file</string>
+    <string name="help">Paste a WireGuard config ([Interface] + [Peer]) from your VPN server or provider, or import a .conf file, then tap Connect.</string>
+</resources>

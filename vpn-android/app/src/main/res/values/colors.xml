@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="brand">#2563EB</color>
+    <color name="connected">#16A34A</color>
+    <color name="disconnected">#64748B</color>
+    <color name="launcher_bg">#0F172A</color>
+</resources>
