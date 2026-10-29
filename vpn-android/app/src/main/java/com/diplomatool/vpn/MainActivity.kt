@@ -1,190 +1,209 @@
 package com.diplomatool.vpn
 
-import android.app.Activity
+import android.Manifest
+import android.animation.AnimatorSet
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.res.ColorStateList
-import android.net.Uri
 import android.net.VpnService
+import android.os.Build
 import android.os.Bundle
+import android.text.format.DateUtils
 import android.text.format.Formatter
-import android.widget.Toast
+import android.view.View
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.diplomatool.vpn.VpnManager.Status
 import com.diplomatool.vpn.databinding.ActivityMainBinding
-import com.wireguard.android.backend.Tunnel
-import com.wireguard.config.Config
+import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.io.ByteArrayInputStream
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
-    private lateinit var store: ConfigStore
-    private var busy = false
+    private var pulse: AnimatorSet? = null
+    private var lastRx = -1L
+    private var lastTx = -1L
 
     private val vpnPermission =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-            if (result.resultCode == Activity.RESULT_OK) {
-                startTunnel()
-            } else {
-                toast(R.string.permission_denied)
-            }
+            if (result.resultCode == RESULT_OK) connectSelected() else snack(getString(R.string.permission_denied))
         }
 
-    private val importFile =
-        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-            if (uri != null) importConfig(uri)
-        }
+    private val notificationPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        store = ConfigStore(this)
 
-        binding.configInput.setText(store.configText)
-
-        binding.importButton.setOnClickListener {
-            importFile.launch(arrayOf("*/*"))
-        }
-        binding.saveButton.setOnClickListener {
-            if (parseConfig() != null) {
-                store.configText = currentConfigText()
-                toast(R.string.config_saved)
-            }
-        }
+        binding.settingsButton.setOnClickListener { startActivity(Intent(this, SettingsActivity::class.java)) }
+        binding.serverCard.setOnClickListener { startActivity(Intent(this, ServersActivity::class.java)) }
         binding.connectButton.setOnClickListener { onConnectClicked() }
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                VpnManager.refresh(this@MainActivity)
-                launch { VpnManager.state.collect { render(it) } }
+                VpnManager.refresh()
+                launch { VpnManager.status.collect { renderStatus(it) } }
+                launch { ServerRepository.selected.collect { renderServer(it) } }
+                launch {
+                    VpnManager.error.collect { message ->
+                        if (message != null) {
+                            snack(message)
+                            VpnManager.clearError()
+                        }
+                    }
+                }
                 launch {
                     while (true) {
-                        renderTraffic(VpnManager.traffic(this@MainActivity))
+                        tick()
                         delay(1000)
                     }
                 }
             }
         }
+
+        if (savedInstanceState == null) {
+            askNotificationPermission()
+            lifecycleScope.launch {
+                ServerRepository.refresh()
+                VpnManager.refresh()
+                if (Prefs.autoConnect && VpnManager.status.value == Status.DISCONNECTED &&
+                    VpnService.prepare(this@MainActivity) == null
+                ) connectSelected()
+            }
+        }
     }
 
     private fun onConnectClicked() {
-        if (busy) return
-        if (VpnManager.state.value == Tunnel.State.UP) {
-            runBusy { VpnManager.disconnect(this) }
-            return
-        }
-        if (parseConfig() == null) return
-        val permissionIntent = VpnService.prepare(this)
-        if (permissionIntent != null) {
-            vpnPermission.launch(permissionIntent)
-        } else {
-            startTunnel()
-        }
-    }
-
-    private fun startTunnel() {
-        val config = parseConfig() ?: return
-        store.configText = currentConfigText()
-        runBusy { VpnManager.connect(this, config) }
-    }
-
-    private fun runBusy(action: suspend () -> Unit) {
-        busy = true
-        binding.connectButton.isEnabled = false
-        binding.statusText.setText(R.string.status_working)
-        lifecycleScope.launch {
-            try {
-                action()
-            } catch (e: Exception) {
-                showError(e.message ?: e.javaClass.simpleName)
-            } finally {
-                busy = false
-                binding.connectButton.isEnabled = true
-                render(VpnManager.state.value)
+        when (VpnManager.status.value) {
+            Status.CONNECTED -> VpnManager.disconnectAsync()
+            Status.CONNECTING -> Unit
+            Status.DISCONNECTED -> {
+                if (ServerRepository.selected() == null) {
+                    snack(getString(R.string.no_server_selected))
+                    startActivity(Intent(this, ServersActivity::class.java))
+                    return
+                }
+                val permissionIntent = VpnService.prepare(this)
+                if (permissionIntent != null) vpnPermission.launch(permissionIntent) else connectSelected()
             }
         }
     }
 
-    private fun currentConfigText(): String = binding.configInput.text?.toString().orEmpty().trim()
+    private fun connectSelected() {
+        ServerRepository.selected()?.let { VpnManager.connectAsync(it) }
+    }
 
-    private fun parseConfig(): Config? {
-        val text = currentConfigText()
-        if (text.isEmpty()) {
-            showError(getString(R.string.error_empty_config))
-            return null
+    private fun renderStatus(status: Status) {
+        val colorRes = when (status) {
+            Status.CONNECTED -> R.color.connected
+            Status.CONNECTING -> R.color.connecting
+            Status.DISCONNECTED -> R.color.primary
         }
-        return try {
-            Config.parse(ByteArrayInputStream(text.toByteArray())).also {
-                binding.configLayout.error = null
+        val tint = ColorStateList.valueOf(ContextCompat.getColor(this, colorRes))
+        binding.connectButton.backgroundTintList = tint
+        binding.glowRing.backgroundTintList = tint
+        binding.pulseRing.backgroundTintList = tint
+        binding.glowRing.alpha = if (status == Status.CONNECTED) 0.25f else 0.12f
+        binding.statusTitle.setText(
+            when (status) {
+                Status.CONNECTED -> R.string.status_connected
+                Status.CONNECTING -> R.string.status_connecting
+                Status.DISCONNECTED -> R.string.status_disconnected
             }
-        } catch (e: Exception) {
-            showError(getString(R.string.error_bad_config, e.message ?: e.javaClass.simpleName))
-            null
-        }
-    }
-
-    private fun importConfig(uri: Uri) {
-        val text = runCatching {
-            contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
-        }.getOrNull()
-        if (text.isNullOrBlank()) {
-            toast(R.string.error_import)
-            return
-        }
-        binding.configInput.setText(text.trim())
-        if (parseConfig() != null) {
-            store.configText = currentConfigText()
-            toast(R.string.config_imported)
-        }
-    }
-
-    private fun render(state: Tunnel.State) {
-        if (busy) return
-        val connected = state == Tunnel.State.UP
-        binding.statusText.setText(if (connected) R.string.status_connected else R.string.status_disconnected)
-        binding.connectButton.setText(if (connected) R.string.disconnect else R.string.connect)
-        val color = ContextCompat.getColor(this, if (connected) R.color.connected else R.color.disconnected)
-        binding.connectButton.backgroundTintList = ColorStateList.valueOf(color)
-        binding.statusDot.backgroundTintList = ColorStateList.valueOf(color)
-        binding.configInput.isEnabled = !connected
-        binding.importButton.isEnabled = !connected
-        binding.saveButton.isEnabled = !connected
-        binding.serverText.text = serverLabel()
-        if (!connected) renderTraffic(null)
-    }
-
-    private fun serverLabel(): String {
-        val endpoint = runCatching {
-            Config.parse(ByteArrayInputStream(currentConfigText().toByteArray()))
-                .peers.firstOrNull()?.endpoint?.orElse(null)?.host
-        }.getOrNull()
-        return getString(R.string.server_label, endpoint ?: getString(R.string.server_none))
-    }
-
-    private fun renderTraffic(traffic: Pair<Long, Long>?) {
-        binding.trafficText.text = if (traffic == null) {
-            ""
-        } else {
-            getString(
-                R.string.traffic,
-                Formatter.formatShortFileSize(this, traffic.first),
-                Formatter.formatShortFileSize(this, traffic.second),
+        )
+        binding.statusTitle.setTextColor(tint)
+        if (status != Status.CONNECTED) {
+            binding.statusSubtitle.setText(
+                if (status == Status.CONNECTING) R.string.status_wait else R.string.tap_to_connect
             )
+            resetTraffic()
+        }
+        setPulsing(status == Status.CONNECTING)
+    }
+
+    private fun renderServer(server: Server?) {
+        if (server == null) {
+            binding.serverFlag.text = countryFlag("")
+            binding.serverName.setText(R.string.select_server)
+            binding.serverCity.text = ""
+        } else {
+            binding.serverFlag.text = server.flag
+            binding.serverName.text = server.name
+            binding.serverCity.text = server.city
         }
     }
 
-    private fun showError(message: String) {
-        binding.configLayout.error = message
-        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+    private suspend fun tick() {
+        if (VpnManager.status.value != Status.CONNECTED) return
+        val elapsed = (System.currentTimeMillis() - VpnManager.connectedAt).coerceAtLeast(0) / 1000
+        binding.statusSubtitle.text = DateUtils.formatElapsedTime(elapsed)
+        val (rx, tx) = VpnManager.traffic() ?: return
+        if (lastRx >= 0) {
+            binding.downloadSpeed.text = speed(rx - lastRx)
+            binding.uploadSpeed.text = speed(tx - lastTx)
+        }
+        lastRx = rx
+        lastTx = tx
+        binding.downloadTotal.text = getString(R.string.total, Formatter.formatShortFileSize(this, rx))
+        binding.uploadTotal.text = getString(R.string.total, Formatter.formatShortFileSize(this, tx))
     }
 
-    private fun toast(resId: Int) {
-        Toast.makeText(this, resId, Toast.LENGTH_SHORT).show()
+    private fun resetTraffic() {
+        lastRx = -1
+        lastTx = -1
+        binding.downloadSpeed.text = speed(0)
+        binding.uploadSpeed.text = speed(0)
+        binding.downloadTotal.text = getString(R.string.total, Formatter.formatShortFileSize(this, 0))
+        binding.uploadTotal.text = getString(R.string.total, Formatter.formatShortFileSize(this, 0))
+    }
+
+    private fun speed(bytesPerSecond: Long) =
+        getString(R.string.speed, Formatter.formatShortFileSize(this, bytesPerSecond.coerceAtLeast(0)))
+
+    private fun setPulsing(on: Boolean) {
+        if (!on) {
+            pulse?.cancel()
+            pulse = null
+            binding.pulseRing.alpha = 0f
+            return
+        }
+        if (pulse != null) return
+        val ring = binding.pulseRing
+        fun repeating(animator: ObjectAnimator) = animator.apply {
+            repeatCount = ValueAnimator.INFINITE
+            repeatMode = ValueAnimator.RESTART
+        }
+        pulse = AnimatorSet().apply {
+            playTogether(
+                repeating(ObjectAnimator.ofFloat(ring, View.SCALE_X, 0.7f, 1f)),
+                repeating(ObjectAnimator.ofFloat(ring, View.SCALE_Y, 0.7f, 1f)),
+                repeating(ObjectAnimator.ofFloat(ring, View.ALPHA, 0.5f, 0f)),
+            )
+            duration = 1400
+            start()
+        }
+    }
+
+    private fun askNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
+    private fun snack(message: String) {
+        Snackbar.make(binding.root, message, Snackbar.LENGTH_LONG).show()
     }
 }

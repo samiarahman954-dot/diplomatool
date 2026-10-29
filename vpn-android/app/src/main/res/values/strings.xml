@@ -1,22 +1,65 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Secure VPN</string>
+
     <string name="connect">Connect</string>
     <string name="disconnect">Disconnect</string>
-    <string name="status_connected">Connected</string>
-    <string name="status_disconnected">Not connected</string>
-    <string name="status_working">Please wait…</string>
-    <string name="server_label">Server: %1$s</string>
-    <string name="server_none">none</string>
-    <string name="traffic">↓ %1$s   ↑ %2$s</string>
-    <string name="config_hint">WireGuard config</string>
-    <string name="import_file">Import .conf</string>
-    <string name="save">Save</string>
-    <string name="config_saved">Config saved</string>
-    <string name="config_imported">Config imported</string>
+    <string name="status_connected">Protected</string>
+    <string name="status_connecting">Connecting…</string>
+    <string name="status_disconnected">Not protected</string>
+    <string name="status_wait">Setting up a secure tunnel</string>
+    <string name="tap_to_connect">Tap to connect</string>
+    <string name="download">Download</string>
+    <string name="upload">Upload</string>
+    <string name="speed">%1$s/s</string>
+    <string name="total">Total %1$s</string>
+    <string name="change">Change</string>
+    <string name="select_server">Select a server</string>
+    <string name="no_server_selected">Choose a server first</string>
     <string name="permission_denied">VPN permission was not granted</string>
-    <string name="error_empty_config">Paste or import a WireGuard config first</string>
+    <string name="error_connect">Connection failed: %1$s</string>
+
+    <string name="servers_title">Servers</string>
+    <string name="all_locations">All locations</string>
+    <string name="my_servers">My servers</string>
+    <string name="search_hint">Search country or city</string>
+    <string name="no_servers">No servers yet.\nPull down to refresh, or add your own server.</string>
+    <string name="refresh_failed">Could not update the server list</string>
+    <string name="ping_ms">%1$d ms</string>
+    <string name="custom_label">Custom</string>
+    <string name="add_server">Add server</string>
+    <string name="scan_qr">Scan QR code</string>
+    <string name="scan_prompt">Scan a WireGuard QR code</string>
+    <string name="import_file">Import .conf file</string>
+    <string name="paste_config">Paste config</string>
+    <string name="server_name">Server name</string>
+    <string name="config_hint">WireGuard config</string>
+    <string name="my_server_default">My server</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="delete">Delete</string>
+    <string name="delete_server_title">Delete %1$s?</string>
+    <string name="server_added">Server added</string>
     <string name="error_bad_config">Invalid config: %1$s</string>
     <string name="error_import">Could not read that file</string>
-    <string name="help">Paste a WireGuard config ([Interface] + [Peer]) from your VPN server or provider, or import a .conf file, then tap Connect.</string>
+
+    <string name="settings">Settings</string>
+    <string name="auto_connect">Auto-connect</string>
+    <string name="auto_connect_summary">Connect automatically when the app opens</string>
+    <string name="dns">DNS</string>
+    <string name="dns_cloudflare">Cloudflare (fastest)</string>
+    <string name="dns_google">Google</string>
+    <string name="dns_quad9">Quad9 (blocks malware)</string>
+    <string name="dns_adguard">AdGuard (blocks ads)</string>
+    <string name="kill_switch">Kill switch</string>
+    <string name="kill_switch_summary">Open Android VPN settings and turn on \"Always-on VPN\" and \"Block connections without VPN\"</string>
+    <string name="kill_switch_unavailable">VPN settings are not available on this device</string>
+    <string name="refresh_servers">Refresh server list</string>
+    <string name="refresh_servers_summary">Download the latest servers</string>
+    <string name="servers_updated">Server list updated</string>
+    <string name="version">Version</string>
+
+    <string name="notif_channel">VPN status</string>
+    <string name="notif_title">Connected to %1$s</string>
+    <string name="notif_text">Your connection is protected</string>
 </resources>

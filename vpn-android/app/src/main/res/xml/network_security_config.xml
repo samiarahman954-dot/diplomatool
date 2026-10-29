@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Server provisioning APIs are reached by plain IP over HTTP. They only hand out
+         tunnel addresses; server keys come from the HTTPS server list. -->
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
