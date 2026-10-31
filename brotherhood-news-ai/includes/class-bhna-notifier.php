@@ -11,7 +11,7 @@ class BHNA_Notifier {
 	const ERROR_THROTTLE = HOUR_IN_SECONDS;
 
 	public static function draft_ready( $post_id, array $item, array $missing ) {
-		$title     = get_the_title( $post_id );
+		$title     = html_entity_decode( get_the_title( $post_id ), ENT_QUOTES, 'UTF-8' );
 		$edit_link = admin_url( 'post.php?post=' . (int) $post_id . '&action=edit' );
 		$warning   = $missing ? 'Revisar datos: no aparecen en el texto reescrito: ' . implode( ', ', $missing ) : '';
 

@@ -81,10 +81,7 @@ class BHNA_Fetcher {
 				continue;
 			}
 
-			$summary = self::clean( $entry->get_description() );
-			if ( function_exists( 'mb_substr' ) ) {
-				$summary = mb_substr( $summary, 0, 1500 );
-			}
+			$summary = self::summary( $entry->get_description() );
 
 			list( $passes, $reason ) = BHNA_Filter::check( $title, $summary, $feed );
 
@@ -125,6 +122,27 @@ class BHNA_Fetcher {
 		}
 
 		return $counts;
+	}
+
+	/** Max length of the summary sent to Claude. Some feeds put the whole article in the description. */
+	const SUMMARY_CHARS = 600;
+
+	/**
+	 * The feed's summary, cut to the first sentences that fit in SUMMARY_CHARS, so the plugin never
+	 * works from a full article even when a feed publishes one (client rule: title + summary only).
+	 */
+	public static function summary( $description ) {
+		$text = self::clean( $description );
+		if ( self::length( $text ) <= self::SUMMARY_CHARS ) {
+			return $text;
+		}
+		$cut  = function_exists( 'mb_substr' ) ? mb_substr( $text, 0, self::SUMMARY_CHARS ) : substr( $text, 0, self::SUMMARY_CHARS );
+		$stop = max( strrpos( $cut, '. ' ), strrpos( $cut, '? ' ), strrpos( $cut, '! ' ) );
+		return $stop > self::SUMMARY_CHARS / 3 ? substr( $cut, 0, $stop + 1 ) : rtrim( $cut ) . '…';
+	}
+
+	private static function length( $text ) {
+		return function_exists( 'mb_strlen' ) ? mb_strlen( $text, 'UTF-8' ) : strlen( $text );
 	}
 
 	public static function clean( $text ) {

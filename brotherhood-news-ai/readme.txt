@@ -1,7 +1,7 @@
 === Brotherhood News AI ===
 Requires at least: 6.0
 Requires PHP: 7.4
-Stable tag: 0.3.0
+Stable tag: 0.3.1
 License: GPLv2 or later
 
 Lee feeds RSS, filtra por palabras clave, reescribe las noticias con la API de Claude (Anthropic) y las guarda como borrador para revisión editorial.

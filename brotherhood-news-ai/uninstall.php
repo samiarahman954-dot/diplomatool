@@ -17,6 +17,6 @@ if ( empty( $bhna_settings['delete_on_uninstall'] ) ) {
 global $wpdb;
 $wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}bhna_items" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 
-foreach ( array( 'bhna_settings', 'bhna_feeds', 'bhna_log', 'bhna_last_run', 'bhna_db_version' ) as $bhna_option ) {
+foreach ( array( 'bhna_settings', 'bhna_feeds', 'bhna_log', 'bhna_last_run', 'bhna_db_version', 'bhna_setup_applied', 'bhna_products_version' ) as $bhna_option ) {
 	delete_option( $bhna_option );
 }

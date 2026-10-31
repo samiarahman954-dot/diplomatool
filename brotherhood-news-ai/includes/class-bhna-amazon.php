@@ -269,11 +269,13 @@ class BHNA_Amazon {
 	/* ------------------------------------------------------------------ */
 
 	public static function filter_content( $content ) {
-		if ( ! BHNA_Settings::get( 'amazon_enabled' ) || ! is_singular( 'post' ) || ! in_the_loop() || ! is_main_query() ) {
+		// Skip excerpts and <head> (SEO plugins build descriptions from the content there).
+		if ( ! BHNA_Settings::get( 'amazon_enabled' ) || ! is_singular( 'post' ) || doing_filter( 'get_the_excerpt' ) || doing_action( 'wp_head' ) ) {
 			return $content;
 		}
+		// Block themes don't always run the loop, so compare with the queried post instead of in_the_loop().
 		$post = get_post();
-		if ( ! $post || get_post_meta( $post->ID, '_bhna_no_products', true ) ) {
+		if ( ! $post || (int) $post->ID !== (int) get_queried_object_id() || get_post_meta( $post->ID, '_bhna_no_products', true ) ) {
 			return $content;
 		}
 

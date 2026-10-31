@@ -144,7 +144,7 @@ class BHNA_Settings {
 		return wp_parse_args(
 			$values,
 			array(
-				'id'          => 'feed_' . wp_generate_password( 8, false, false ),
+				'id'          => 'feed_' . strtolower( wp_generate_password( 8, false, false ) ),
 				'name'        => '',
 				'url'         => '',
 				'country'     => 'es',

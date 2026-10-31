@@ -9,6 +9,9 @@ class BHNA_Processor {
 
 	const LOCK = 'bhna_processing_lock';
 
+	/** Errors that need a settings fix (missing or invalid API key): the news stays queued, the batch stops. */
+	const CONFIG_ERRORS = array( 'bhna_no_key', 'bhna_api_401', 'bhna_api_403' );
+
 	/**
 	 * @return array{done: int, failed: int, retried: int, limit_reached: bool}
 	 */
@@ -24,6 +27,10 @@ class BHNA_Processor {
 		try {
 			BHNA_Items::release_stuck();
 
+			if ( '' === BHNA_Settings::api_key() ) {
+				return $totals; // Nothing can be rewritten yet; news waits in the queue.
+			}
+
 			$remaining = (int) BHNA_Settings::get( 'daily_limit' ) - BHNA_Items::done_today();
 			if ( $remaining <= 0 ) {
 				$totals['limit_reached'] = true;
@@ -37,8 +44,16 @@ class BHNA_Processor {
 				@set_time_limit( 60 + $batch * BHNA_Claude::TIMEOUT ); // phpcs:ignore WordPress.PHP.NoSilencedErrors
 			}
 
-			foreach ( BHNA_Items::claim( $batch ) as $item ) {
+			$claimed = BHNA_Items::claim( $batch );
+			foreach ( $claimed as $index => $item ) {
 				$outcome = self::process_item( $item );
+				if ( 'blocked' === $outcome ) {
+					// Same error would hit every item: put the rest back untouched and stop.
+					foreach ( array_slice( $claimed, $index + 1 ) as $rest ) {
+						BHNA_Items::update( $rest['id'], array( 'status' => BHNA_Items::QUEUED ) );
+					}
+					break;
+				}
 				$totals[ $outcome ]++;
 			}
 		} finally {
@@ -52,7 +67,7 @@ class BHNA_Processor {
 	}
 
 	/**
-	 * @return string done|failed|retried
+	 * @return string done|failed|retried|blocked
 	 */
 	public static function process_item( array $item ) {
 		$feed = BHNA_Settings::feed( $item['feed_id'] );
@@ -102,6 +117,14 @@ class BHNA_Processor {
 	}
 
 	private static function handle_error( array $item, WP_Error $error, $attempts, array $usage = array() ) {
+		if ( in_array( $error->get_error_code(), self::CONFIG_ERRORS, true ) ) {
+			BHNA_Items::update( $item['id'], array( 'status' => BHNA_Items::QUEUED, 'reason' => mb_substr( $error->get_error_message(), 0, 250 ) ) );
+			$message = 'Claude no está disponible: ' . $error->get_error_message() . ' Revisa la clave API en Noticias IA ➔ Ajustes IA. Las noticias siguen en cola.';
+			BHNA_Logger::error( $message );
+			BHNA_Notifier::error_alert( 'config_' . $error->get_error_code(), $message );
+			return 'blocked';
+		}
+
 		$data      = (array) $error->get_error_data();
 		$usage     = array_merge( $data, $usage );
 		$retryable = ! empty( $data['retryable'] ) && $attempts < (int) BHNA_Settings::get( 'max_attempts' );

@@ -165,15 +165,16 @@ class BHNA_Admin {
 		BHNA_UI::card_open( 'Últimos 14 días', 'dashicons-chart-bar', 'Noticias leídas de los feeds y borradores creados por día.' );
 		echo '<div class="bhna-chart">';
 		foreach ( $daily as $day => $row ) {
+			$label = substr( $day, 8, 2 ) . '/' . substr( $day, 5, 2 );
 			printf(
 				'<div class="bhna-chart-col" title="%s: %d leídas, %d borradores, %d fallidas"><div class="bhna-chart-bars"><div class="bhna-chart-bar is-read" style="height:%d%%"></div><div class="bhna-chart-bar is-done" style="height:%d%%"></div></div><div class="bhna-chart-label">%s</div></div>',
-				esc_attr( wp_date( 'd/m', strtotime( $day ) ) ),
+				esc_attr( $label ),
 				(int) $row['read'],
 				(int) $row['done'],
 				(int) $row['failed'],
 				(int) round( 100 * $row['read'] / $max ),
 				(int) round( 100 * $row['done'] / $max ),
-				esc_html( wp_date( 'd/m', strtotime( $day ) ) )
+				esc_html( $label )
 			);
 		}
 		echo '</div><div class="bhna-legend"><span class="is-read">Leídas</span><span class="is-done">Borradores</span></div>';
@@ -284,7 +285,7 @@ class BHNA_Admin {
 		$name    = 'feeds[' . $i . ']';
 		$is_new  = '' === $feed['id'];
 		$classes = 'bhna-feed' . ( $feed['enabled'] ? '' : ' is-disabled' );
-		$country = isset( BHNA_Settings::COUNTRIES[ $feed['country'] ] ) ? BHNA_Settings::COUNTRIES[ $feed['country'] ] : '';
+		$country = array_key_exists( $feed['country'], BHNA_Settings::COUNTRIES ) ? BHNA_Settings::COUNTRIES[ $feed['country'] ] : '';
 		?>
 		<div class="<?php echo esc_attr( $classes ); ?>">
 			<input type="hidden" name="<?php echo esc_attr( $name ); ?>[id]" value="<?php echo esc_attr( $feed['id'] ); ?>">
@@ -667,8 +668,11 @@ class BHNA_Admin {
 				echo '<td>' . self::status_badge( $item['status'], (bool) $item['quality_flag'] ) . '</td>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 				printf( '<td class="bhna-muted">%s</td>', esc_html( $item['reason'] ) );
 				echo '<td style="text-align:right;white-space:nowrap;">';
-				if ( $item['post_id'] ) {
-					printf( '<a class="button button-small" href="%s">Editar borrador</a>', esc_url( get_edit_post_link( $item['post_id'] ) ) );
+				$edit_link = $item['post_id'] ? get_edit_post_link( $item['post_id'] ) : '';
+				if ( $item['post_id'] && ! $edit_link ) {
+					echo BHNA_UI::badge( 'Entrada borrada' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+				} elseif ( $edit_link ) {
+					printf( '<a class="button button-small" href="%s">Editar borrador</a>', esc_url( $edit_link ) );
 				} elseif ( in_array( $item['status'], array( BHNA_Items::FAILED, BHNA_Items::SKIPPED ), true ) ) {
 					echo BHNA_UI::action_button( 'retry_item', BHNA_Items::FAILED === $item['status'] ? 'Reintentar' : 'Procesar igualmente', 'button button-small', '', array( 'item_id' => (int) $item['id'] ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 				}

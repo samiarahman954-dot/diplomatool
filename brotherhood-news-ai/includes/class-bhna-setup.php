@@ -80,7 +80,9 @@ class BHNA_Setup {
 				$feed['include'] = $rec['include'];
 				$changes[]       = sprintf( 'Palabras de cultura añadidas a %s – %s.', $rec['name'], $rec['category'] );
 			}
-			$feed['country'] = $rec['country'];
+			if ( empty( $feed['country'] ) ) {
+				$feed['country'] = $rec['country'];
+			}
 			$feeds[]         = $feed;
 		}
 
