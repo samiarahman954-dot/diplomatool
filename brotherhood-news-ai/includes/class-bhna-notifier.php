@@ -66,7 +66,7 @@ class BHNA_Notifier {
 	/**
 	 * @return true|WP_Error
 	 */
-	public static function telegram( $html, $chat_id = null ) {
+	public static function telegram( $html, $chat_id = null, $preview = false ) {
 		$token   = trim( (string) BHNA_Settings::get( 'telegram_bot_token' ) );
 		$chat_id = null === $chat_id ? trim( (string) BHNA_Settings::get( 'telegram_chat_id' ) ) : $chat_id;
 		if ( '' === $token || '' === $chat_id ) {
@@ -81,7 +81,7 @@ class BHNA_Notifier {
 					'chat_id'                  => $chat_id,
 					'text'                     => $html,
 					'parse_mode'               => 'HTML',
-					'disable_web_page_preview' => 'true',
+					'disable_web_page_preview' => $preview ? 'false' : 'true',
 				),
 			)
 		);

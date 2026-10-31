@@ -56,8 +56,34 @@ class BHNA_Settings {
 			'telegram_chat_id'     => '',
 			'error_alerts'         => 1,
 			'delete_on_uninstall'  => 0,
+
+			// Amazon.
+			'amazon_enabled'       => 0,
+			'amazon_tag_com'       => '',
+			'amazon_tag_es'        => '',
+			'amazon_default_store' => 'com',
+			'amazon_max_products'  => 3,
+			'amazon_position'      => 'end',
+			'amazon_box_title'     => 'Productos recomendados',
+			'amazon_button_text'   => 'Ver en Amazon',
+			'amazon_disclosure'    => 'En calidad de Afiliado de Amazon, obtengo ingresos por las compras adscritas que cumplen los requisitos aplicables.',
+
+			// Social networks.
+			'social_share_all'     => 1,
+			'x_enabled'            => 0,
+			'x_api_key'            => '',
+			'x_api_secret'         => '',
+			'x_access_token'       => '',
+			'x_access_secret'      => '',
+			'x_template'           => "{titulo}\n\n{enlace}",
+			'tg_channel_enabled'   => 0,
+			'tg_channel_id'        => '',
+			'tg_channel_template'  => "<b>{titulo}</b>\n\n{extracto}\n\n{enlace}",
 		);
 	}
+
+	/** Option keys that hold secrets: only replaced when the admin types a new value. */
+	const SECRET_KEYS = array( 'api_key', 'telegram_bot_token', 'x_api_key', 'x_api_secret', 'x_access_token', 'x_access_secret' );
 
 	public static function default_prompt() {
 		return "Eres un redactor profesional de un periódico digital en español.\n\n"

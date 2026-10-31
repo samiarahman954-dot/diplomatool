@@ -1,7 +1,7 @@
 === Brotherhood News AI ===
 Requires at least: 6.0
 Requires PHP: 7.4
-Stable tag: 0.1.0
+Stable tag: 0.2.0
 License: GPLv2 or later
 
 Lee feeds RSS, filtra por palabras clave, reescribe las noticias con la API de Claude (Anthropic) y las guarda como borrador para revisión editorial.
@@ -42,6 +42,27 @@ WP-Cron solo se ejecuta cuando alguien visita la web. Para que el sistema funcio
 1. Crea un bot con @BotFather y copia el token.
 2. Añade el bot al grupo privado de editores.
 3. Obtén el ID del grupo (empieza por -100…) y guárdalo en Ajustes.
+
+== Amazon ==
+
+1. Noticias IA ➔ Ajustes de Amazon: activa el módulo y escribe tu ID de afiliado de Amazon.com (…-20). El de Amazon.es (…-21) puede añadirse más adelante.
+2. Noticias IA ➔ Productos Amazon ➔ Añadir producto: pega el ASIN o el enlace, elige la tienda, una descripción breve, las categorías y palabras clave relacionadas.
+3. Cada artículo muestra automáticamente los productos relacionados con sus categorías o palabras clave. Desde la caja "Amazon y redes sociales" del artículo se pueden elegir productos a mano, cambiar la tienda o desactivar los productos.
+4. Tienda: noticias de España ➔ Amazon.es; EE. UU. y Cuba ➔ Amazon.com. Mientras no haya ID de Amazon.es, se usa Amazon.com para no perder comisiones.
+5. Ofertas: marca un producto como "Oferta" (con etiqueta y fecha de fin opcionales). Se muestran con el shortcode [bhna_ofertas] o con el widget "Ofertas de Amazon". En Ajustes de Amazon hay un botón para crear la página "Ofertas".
+
+Sin la API de Amazon no se muestran precios ni imágenes oficiales (Amazon solo los permite mediante su API). Todos los enlaces llevan rel="sponsored" y el aviso de afiliación.
+Los productos se leen de la base de datos y se guardan en caché: la web no consulta Amazon al cargar las páginas.
+
+== Redes sociales ==
+
+Al publicar un artículo (nunca los borradores) se comparte automáticamente unos segundos después:
+
+* X (Twitter): crea una app en el portal de desarrolladores de X con permisos "Read and write" y copia API Key, API Key Secret, Access Token y Access Token Secret en Noticias IA ➔ Redes sociales. Pulsa "Verificar X". El plan gratuito de X tiene un límite mensual de publicaciones.
+* Canal público de Telegram: añade el mismo bot como administrador del canal, escribe el ID del canal (@canal o -100…) y pulsa "Verificar canal de Telegram".
+* Facebook y LinkedIn quedan preparados en el panel para conectarlos más adelante.
+
+Si una publicación falla se reintenta dos veces (cada 15 minutos) y después se avisa al administrador.
 
 == Notas ==
 
