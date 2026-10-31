@@ -250,3 +250,8 @@
 	.bhna-card-head { flex-wrap: wrap; }
 	.bhna-savebar { padding: 10px 12px; }
 }
+
+/* Language switch */
+.bhna-lang { display: inline-flex; border: 1px solid var(--bhna-border); border-radius: 99px; overflow: hidden; align-self: center; margin-bottom: 14px; }
+.bhna-lang a { padding: 4px 12px; font-size: 12px; font-weight: 600; text-decoration: none; color: var(--bhna-muted); }
+.bhna-lang a.is-active { background: var(--bhna-accent); color: #fff; }

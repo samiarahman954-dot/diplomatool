@@ -1,7 +1,7 @@
 === Brotherhood News AI ===
 Requires at least: 6.0
 Requires PHP: 7.4
-Stable tag: 0.4.0
+Stable tag: 0.5.0
 License: GPLv2 or later
 
 Lee feeds RSS, filtra por palabras clave, reescribe las noticias con la API de Claude (Anthropic) y las guarda como borrador para revisión editorial.
@@ -15,6 +15,10 @@ Lee feeds RSS, filtra por palabras clave, reescribe las noticias con la API de C
 5. Se avisa a los editores por email, Telegram y/o Slack. Si faltan nombres o cifras del original, el aviso y la entrada muestran una advertencia.
 
 Incluye control de duplicados, límite diario, reintentos automáticos, panel con estadísticas y registro.
+
+== Idioma del panel ==
+
+El panel de administración está en español o en inglés: cada usuario elige con el botón ES | EN de la cabecera, sin afectar a los demás. Solo cambia el panel; los artículos, la atribución, el bloque de Amazon y las alertas a los editores siempre están en español.
 
 == Instalación ==
 

@@ -20,11 +20,11 @@ class BHNA_Admin {
 	}
 
 	public static function menu() {
-		add_menu_page( 'Noticias IA', 'Noticias IA', self::CAP, 'bhna', array( __CLASS__, 'page_dashboard' ), 'dashicons-rss', 26 );
-		add_submenu_page( 'bhna', 'Panel', 'Panel', self::CAP, 'bhna', array( __CLASS__, 'page_dashboard' ) );
-		add_submenu_page( 'bhna', 'Fuentes RSS', 'Fuentes RSS', self::CAP, 'bhna-feeds', array( __CLASS__, 'page_feeds' ) );
-		add_submenu_page( 'bhna', 'Ajustes IA', 'Ajustes IA', self::CAP, 'bhna-settings', array( __CLASS__, 'page_settings' ) );
-		add_submenu_page( 'bhna', 'Registro', 'Registro', self::CAP, 'bhna-log', array( __CLASS__, 'page_log' ) );
+		add_menu_page( bhna__( 'Noticias IA' ), bhna__( 'Noticias IA' ), self::CAP, 'bhna', array( __CLASS__, 'page_dashboard' ), 'dashicons-rss', 26 );
+		add_submenu_page( 'bhna', bhna__( 'Panel' ), bhna__( 'Panel' ), self::CAP, 'bhna', array( __CLASS__, 'page_dashboard' ) );
+		add_submenu_page( 'bhna', bhna__( 'Fuentes RSS' ), bhna__( 'Fuentes RSS' ), self::CAP, 'bhna-feeds', array( __CLASS__, 'page_feeds' ) );
+		add_submenu_page( 'bhna', bhna__( 'Ajustes IA' ), bhna__( 'Ajustes IA' ), self::CAP, 'bhna-settings', array( __CLASS__, 'page_settings' ) );
+		add_submenu_page( 'bhna', bhna__( 'Registro' ), bhna__( 'Registro' ), self::CAP, 'bhna-log', array( __CLASS__, 'page_log' ) );
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -40,15 +40,15 @@ class BHNA_Admin {
 		if ( isset( $_GET['bhna_msg'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
 			$message = sanitize_textarea_field( wp_unslash( $_GET['bhna_msg'] ) ); // phpcs:ignore WordPress.Security.NonceVerification
 			$type    = isset( $_GET['bhna_type'] ) && 'error' === $_GET['bhna_type'] ? 'error' : 'success'; // phpcs:ignore WordPress.Security.NonceVerification
-			printf( '<div class="notice notice-%s is-dismissible"><p>%s</p></div>', esc_attr( $type ), nl2br( esc_html( $message ) ) );
+			printf( '<div class="notice notice-%s is-dismissible"><p>%s</p></div>', esc_attr( $type ), nl2br( esc_html( BHNA_I18N::message( $message ) ) ) );
 		}
 
 		if ( '' === BHNA_Settings::api_key() && 'toplevel_page_bhna' !== $screen->id ) {
 			printf(
 				'<div class="notice notice-warning"><p>%s <a href="%s">%s</a></p></div>',
-				esc_html( 'Falta la clave API de Anthropic: el sistema no puede reescribir noticias hasta que la añadas.' ),
+				esc_html( bhna__( 'Falta la clave API de Anthropic: el sistema no puede reescribir noticias hasta que la añadas.' ) ),
 				esc_url( admin_url( 'admin.php?page=bhna-settings#claude' ) ),
-				esc_html( 'Añadir clave' )
+				esc_html( bhna__( 'Añadir clave' ) )
 			);
 		}
 	}
@@ -68,7 +68,7 @@ class BHNA_Admin {
 
 	public static function verify( $action ) {
 		if ( ! current_user_can( self::CAP ) ) {
-			wp_die( esc_html( 'No tienes permisos para hacer esto.' ) );
+			wp_die( esc_html( bhna__( 'No tienes permisos para hacer esto.' ) ) );
 		}
 		check_admin_referer( 'bhna_' . $action );
 	}
@@ -137,7 +137,7 @@ class BHNA_Admin {
 			BHNA_UI::card_open(
 				'Primeros pasos',
 				'dashicons-flag',
-				sprintf( 'Configuración completada al %d%%. Lo que se puede rellenar automáticamente (feeds, categorías y palabras clave) se aplica con un clic; las claves y cuentas las añades tú.', $percent ),
+				sprintf( bhna__( 'Configuración completada al %d%%. Lo que se puede rellenar automáticamente (feeds, categorías y palabras clave) se aplica con un clic; las claves y cuentas las añades tú.' ), $percent ),
 				BHNA_UI::action_button( 'apply_setup', 'Aplicar configuración recomendada', 'button button-primary', 'Se rellenarán los feeds, categorías y palabras clave vacíos. Lo que ya hayas configurado no se modifica. ¿Continuar?' )
 			);
 			echo '<div class="bhna-progress"><span style="width:' . (int) $percent . '%"></span></div><ul class="bhna-checklist">';
@@ -146,9 +146,9 @@ class BHNA_Admin {
 					'<li><span class="bhna-check %s">%s</span><span class="bhna-check-text">%s<small>%s</small></span>%s</li>',
 					$item['done'] ? 'is-done' : 'is-todo',
 					$item['done'] ? '✓' : '•',
-					esc_html( $item['label'] ),
-					esc_html( $item['hint'] ),
-					( ! $item['done'] && $item['url'] ) ? '<a class="button button-small" href="' . esc_url( $item['url'] ) . '">Configurar</a>' : ''
+					esc_html( bhna__( $item['label'] ) ),
+					esc_html( BHNA_I18N::message( $item['hint'] ) ),
+					( ! $item['done'] && $item['url'] ) ? '<a class="button button-small" href="' . esc_url( $item['url'] ) . '">' . esc_html( bhna__( 'Configurar' ) ) . '</a>' : ''
 				);
 			}
 			echo '</ul>';
@@ -167,17 +167,20 @@ class BHNA_Admin {
 		foreach ( $daily as $day => $row ) {
 			$label = substr( $day, 8, 2 ) . '/' . substr( $day, 5, 2 );
 			printf(
-				'<div class="bhna-chart-col" title="%s: %d leídas, %d borradores, %d fallidas"><div class="bhna-chart-bars"><div class="bhna-chart-bar is-read" style="height:%d%%"></div><div class="bhna-chart-bar is-done" style="height:%d%%"></div></div><div class="bhna-chart-label">%s</div></div>',
+				'<div class="bhna-chart-col" title="%s: %d %s, %d %s, %d %s"><div class="bhna-chart-bars"><div class="bhna-chart-bar is-read" style="height:%d%%"></div><div class="bhna-chart-bar is-done" style="height:%d%%"></div></div><div class="bhna-chart-label">%s</div></div>',
 				esc_attr( $label ),
 				(int) $row['read'],
+				esc_attr( bhna__( 'leídas' ) ),
 				(int) $row['done'],
+				esc_attr( bhna__( 'borradores' ) ),
 				(int) $row['failed'],
+				esc_attr( bhna__( 'fallidas' ) ),
 				(int) round( 100 * $row['read'] / $max ),
 				(int) round( 100 * $row['done'] / $max ),
 				esc_html( $label )
 			);
 		}
-		echo '</div><div class="bhna-legend"><span class="is-read">Leídas</span><span class="is-done">Borradores</span></div>';
+		echo '</div><div class="bhna-legend"><span class="is-read">' . esc_html( bhna__( 'Leídas' ) ) . '</span><span class="is-done">' . esc_html( bhna__( 'Borradores' ) ) . '</span></div>';
 		BHNA_UI::card_close();
 		echo '</div>';
 
@@ -185,20 +188,20 @@ class BHNA_Admin {
 		echo '<div class="bhna-col-4">';
 		BHNA_UI::card_open( 'Estado', 'dashicons-heart' );
 		echo '<table class="bhna-table"><tbody>';
-		printf( '<tr><td>Última ejecución</td><td>%s</td></tr>', $last ? esc_html( wp_date( 'd/m/Y H:i', $last['time'] ) ) : '—' );
-		printf( '<tr><td>Próxima ejecución</td><td>%s</td></tr>', $next ? esc_html( wp_date( 'd/m/Y H:i', $next ) ) : '—' );
+		printf( '<tr><td>%s</td><td>%s</td></tr>', esc_html( bhna__( 'Última ejecución' ) ), $last ? esc_html( wp_date( 'd/m/Y H:i', $last['time'] ) ) : '—' );
+		printf( '<tr><td>%s</td><td>%s</td></tr>', esc_html( bhna__( 'Próxima ejecución' ) ), $next ? esc_html( wp_date( 'd/m/Y H:i', $next ) ) : '—' );
 		printf(
-			'<tr><td>Cron del servidor</td><td>%s</td></tr>',
+			'<tr><td>' . esc_html( bhna__( 'Cron del servidor' ) ) . '</td><td>%s</td></tr>',
 			defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON ? BHNA_UI::badge( 'Activo', 'success' ) : BHNA_UI::badge( 'WP-Cron', 'warning' ) // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		);
-		printf( '<tr><td>Modelo</td><td>%s</td></tr>', esc_html( isset( $models[ $model ] ) ? strtok( $models[ $model ]['label'], '(' ) : $model ) );
-		printf( '<tr><td>Frecuencia</td><td>cada %d min</td></tr>', (int) BHNA_Settings::get( 'interval' ) );
+		printf( '<tr><td>' . esc_html( bhna__( 'Modelo' ) ) . '</td><td>%s</td></tr>', esc_html( isset( $models[ $model ] ) ? strtok( $models[ $model ]['label'], '(' ) : $model ) );
+		printf( '<tr><td>%s</td><td>%s</td></tr>', esc_html( bhna__( 'Frecuencia' ) ), esc_html( sprintf( bhna__( 'cada %d min' ), (int) BHNA_Settings::get( 'interval' ) ) ) );
 		printf(
 			'<tr><td>Amazon</td><td>%s</td></tr>',
 			BHNA_Settings::get( 'amazon_enabled' ) ? BHNA_UI::badge( 'Activo', 'success' ) : BHNA_UI::badge( 'Inactivo' ) // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		);
 		printf(
-			'<tr><td>Redes sociales</td><td>%s</td></tr>',
+			'<tr><td>' . esc_html( bhna__( 'Redes sociales' ) ) . '</td><td>%s</td></tr>',
 			BHNA_Social::any_network_enabled() ? BHNA_UI::badge( 'Activas', 'success' ) : BHNA_UI::badge( 'Inactivas' ) // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		);
 		echo '</tbody></table>';
@@ -207,8 +210,12 @@ class BHNA_Admin {
 
 		// Per feed.
 		echo '<div class="bhna-col-12">';
-		BHNA_UI::card_open( 'Por fuente', 'dashicons-rss', '', '<a class="button" href="' . esc_url( admin_url( 'admin.php?page=bhna-feeds' ) ) . '">Gestionar fuentes</a>' );
-		echo '<div class="bhna-scroll"><table class="bhna-table"><thead><tr><th>Fuente</th><th>Estado</th><th>Leídas</th><th>Descartadas</th><th>Borradores</th><th>Fallidas</th></tr></thead><tbody>';
+		BHNA_UI::card_open( 'Por fuente', 'dashicons-rss', '', '<a class="button" href="' . esc_url( admin_url( 'admin.php?page=bhna-feeds' ) ) . '">' . esc_html( bhna__( 'Gestionar fuentes' ) ) . '</a>' );
+		echo '<div class="bhna-scroll"><table class="bhna-table"><thead><tr>';
+		foreach ( array( 'Fuente', 'Estado', 'Leídas', 'Descartadas', 'Borradores', 'Fallidas' ) as $th ) {
+			echo '<th>' . esc_html( bhna__( $th ) ) . '</th>';
+		}
+		echo '</tr></thead><tbody>';
 		foreach ( BHNA_Settings::feeds() as $feed ) {
 			$row = isset( $by_feed[ $feed['id'] ] ) ? $by_feed[ $feed['id'] ] : array( 'read' => 0, 'skipped' => 0, 'done' => 0, 'failed' => 0 );
 			printf(
@@ -222,7 +229,7 @@ class BHNA_Admin {
 			);
 		}
 		echo '</tbody></table></div>';
-		echo '<p class="bhna-help">El coste es una estimación con las tarifas públicas de Anthropic; el importe real está en tu consola de Anthropic.</p>';
+		echo '<p class="bhna-help">' . esc_html( bhna__( 'El coste es una estimación con las tarifas públicas de Anthropic; el importe real está en tu consola de Anthropic.' ) ) . '</p>';
 		BHNA_UI::card_close();
 		echo '</div>';
 
@@ -268,9 +275,9 @@ class BHNA_Admin {
 			self::render_feed_card( $i, $feed );
 		}
 		echo '</div>';
-		echo '<p><button type="button" class="button" id="bhna-add-feed"><span class="dashicons dashicons-plus-alt2" style="vertical-align:-4px;"></span> Añadir fuente</button></p>';
-		echo '<div class="bhna-card" style="margin-top:20px;"><div class="bhna-card-head"><div><h3><span class="dashicons dashicons-info-outline"></span>Cómo funcionan las palabras clave</h3>';
-		echo '<p>Las palabras de <strong>exclusión</strong> de cada fuente se suman a las globales. Si una fuente tiene sus propias palabras de <strong>inclusión</strong>, se usan solo esas; si no, las globales de Ajustes IA. Así un mismo feed puede repartirse en secciones (por ejemplo, la cultura de Cubadebate).</p></div></div></div>';
+		echo '<p><button type="button" class="button" id="bhna-add-feed"><span class="dashicons dashicons-plus-alt2" style="vertical-align:-4px;"></span> ' . esc_html( bhna__( 'Añadir fuente' ) ) . '</button></p>';
+		echo '<div class="bhna-card" style="margin-top:20px;"><div class="bhna-card-head"><div><h3><span class="dashicons dashicons-info-outline"></span>' . esc_html( bhna__( 'Cómo funcionan las palabras clave' ) ) . '</h3>';
+		echo '<p>' . wp_kses_post( bhna__( 'Las palabras de <strong>exclusión</strong> de cada fuente se suman a las globales. Si una fuente tiene sus propias palabras de <strong>inclusión</strong>, se usan solo esas; si no, las globales de Ajustes IA. Así un mismo feed puede repartirse en secciones (por ejemplo, la cultura de Cubadebate).' ) ) . '</p></div></div></div>';
 		BHNA_UI::savebar( 'Guardar fuentes' );
 		echo '</form>';
 
@@ -292,39 +299,39 @@ class BHNA_Admin {
 			<input type="hidden" name="<?php echo esc_attr( $name ); ?>[delete]" value="0" data-delete-flag>
 			<div class="bhna-feed-top">
 				<?php echo BHNA_UI::toggle( $name . '[enabled]', $feed['enabled'], '', 'bhna-feed-toggle' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-				<span class="bhna-feed-name"><?php echo esc_html( $is_new ? 'Nueva fuente' : BHNA_Fetcher::label( $feed ) ); ?></span>
+				<span class="bhna-feed-name"><?php echo esc_html( $is_new ? bhna__( 'Nueva fuente' ) : BHNA_Fetcher::label( $feed ) ); ?></span>
 				<?php if ( ! $is_new ) : ?>
 					<?php echo self::feed_status_badge( $feed ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 					<?php echo BHNA_UI::badge( $country, 'info' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 					<?php if ( 'fraternidades' === $feed['group'] ) : ?>
 						<?php echo BHNA_UI::badge( 'Fraternidades' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 					<?php endif; ?>
-					<button type="submit" class="button button-small" name="test_feed" value="<?php echo esc_attr( $feed['id'] ); ?>">Guardar y probar</button>
+					<button type="submit" class="button button-small" name="test_feed" value="<?php echo esc_attr( $feed['id'] ); ?>"><?php echo esc_html( bhna__( 'Guardar y probar' ) ); ?></button>
 				<?php endif; ?>
-				<a href="#" class="bhna-feed-remove" data-bhna-remove-feed data-confirm="¿Eliminar esta fuente? Se aplicará al guardar.">Eliminar</a>
+				<a href="#" class="bhna-feed-remove" data-bhna-remove-feed data-confirm="<?php echo esc_attr( bhna__( '¿Eliminar esta fuente? Se aplicará al guardar.' ) ); ?>"><?php echo esc_html( bhna__( 'Eliminar' ) ); ?></a>
 			</div>
 			<div class="bhna-feed-grid">
 				<div>
-					<label>URL del feed (o de la web: se detecta el feed al probar)</label>
+					<label><?php echo esc_html( bhna__( 'URL del feed (o de la web: se detecta el feed al probar)' ) ); ?></label>
 					<input type="url" name="<?php echo esc_attr( $name ); ?>[url]" value="<?php echo esc_attr( $feed['url'] ); ?>" placeholder="https://…">
 				</div>
 				<div>
-					<label>Nombre del medio</label>
+					<label><?php echo esc_html( bhna__( 'Nombre del medio' ) ); ?></label>
 					<input type="text" name="<?php echo esc_attr( $name ); ?>[name]" value="<?php echo esc_attr( $feed['name'] ); ?>" placeholder="El Mundo">
 				</div>
 				<div>
-					<label>País</label>
+					<label><?php echo esc_html( bhna__( 'País' ) ); ?></label>
 					<?php echo BHNA_UI::select( $name . '[country]', BHNA_Settings::COUNTRIES, $feed['country'], 'bhna_country_' . $i ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 				</div>
 				<div>
-					<label>Categoría de WordPress</label>
+					<label><?php echo esc_html( bhna__( 'Categoría de WordPress' ) ); ?></label>
 					<?php
 					wp_dropdown_categories(
 						array(
 							'name'              => $name . '[category_id]',
 							'id'                => 'bhna_cat_' . $i,
 							'selected'          => (int) $feed['category_id'],
-							'show_option_none'  => '— Ninguna —',
+							'show_option_none'  => bhna__( '— Ninguna —' ),
 							'option_none_value' => 0,
 							'hide_empty'        => 0,
 							'hierarchical'      => 1,
@@ -335,16 +342,16 @@ class BHNA_Admin {
 			</div>
 			<div class="bhna-feed-grid is-keywords">
 				<div>
-					<label>Palabras de inclusión propias (opcional)</label>
-					<textarea name="<?php echo esc_attr( $name ); ?>[include]" rows="2" placeholder="Vacío = usar las globales"><?php echo esc_textarea( $feed['include'] ); ?></textarea>
+					<label><?php echo esc_html( bhna__( 'Palabras de inclusión propias (opcional)' ) ); ?></label>
+					<textarea name="<?php echo esc_attr( $name ); ?>[include]" rows="2" placeholder="<?php echo esc_attr( bhna__( 'Vacío = usar las globales' ) ); ?>"><?php echo esc_textarea( $feed['include'] ); ?></textarea>
 				</div>
 				<div>
-					<label>Palabras de exclusión propias (opcional)</label>
+					<label><?php echo esc_html( bhna__( 'Palabras de exclusión propias (opcional)' ) ); ?></label>
 					<textarea name="<?php echo esc_attr( $name ); ?>[exclude]" rows="2"><?php echo esc_textarea( $feed['exclude'] ); ?></textarea>
 				</div>
 			</div>
 			<div style="margin-top:10px;">
-				<label class="bhna-help" style="margin-right:6px;">Grupo:</label>
+				<label class="bhna-help" style="margin-right:6px;"><?php echo esc_html( bhna__( 'Grupo:' ) ); ?></label>
 				<?php echo BHNA_UI::select( $name . '[group]', BHNA_Settings::GROUPS, $feed['group'], 'bhna_group_' . $i ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 			</div>
 		</div>
@@ -444,7 +451,7 @@ class BHNA_Admin {
 		$key_in_cfg = defined( 'BHNA_ANTHROPIC_API_KEY' ) && BHNA_ANTHROPIC_API_KEY;
 		$models     = array();
 		foreach ( BHNA_Settings::MODELS as $id => $model ) {
-			$models[ $id ] = sprintf( '%s — $%s / $%s por millón de tokens', $model['label'], number_format_i18n( $model['in'], 2 ), number_format_i18n( $model['out'], 2 ) );
+			$models[ $id ] = sprintf( bhna__( '%s — $%s / $%s por millón de tokens' ), bhna__( $model['label'] ), number_format_i18n( $model['in'], 2 ), number_format_i18n( $model['out'], 2 ) );
 		}
 
 		BHNA_UI::page_open( 'bhna-settings', 'Ajustes IA', 'Claude, filtro de noticias, entradas de WordPress y alertas a los editores.' );
@@ -480,7 +487,7 @@ class BHNA_Admin {
 			'Estilo y reglas. La respuesta siempre incluye titular, párrafos, extracto, título SEO, meta descripción y etiquetas.',
 			'bhna_system_prompt'
 		);
-		BHNA_UI::field( 'Probar conexión', '<button type="submit" class="button" name="bhna_after" value="test_claude">Guardar y probar Claude</button>', 'Reescribe una noticia de ejemplo (no crea ninguna entrada).' );
+		BHNA_UI::field( 'Probar conexión', '<button type="submit" class="button" name="bhna_after" value="test_claude">' . esc_html( bhna__( 'Guardar y probar Claude' ) ) . '</button>', 'Reescribe una noticia de ejemplo (no crea ninguna entrada).' );
 		BHNA_UI::panel_close();
 
 		BHNA_UI::panel_open( 'filtro' );
@@ -500,7 +507,7 @@ class BHNA_Admin {
 				'name'              => 'post_author',
 				'id'                => 'bhna_post_author',
 				'selected'          => (int) $s['post_author'],
-				'show_option_none'  => '— Primer administrador —',
+				'show_option_none'  => bhna__( '— Primer administrador —' ),
 				'option_none_value' => 0,
 				'capability'        => array( 'edit_posts' ),
 			)
@@ -525,10 +532,10 @@ class BHNA_Admin {
 		BHNA_UI::field( 'Telegram (grupo privado)', BHNA_UI::toggle( 'telegram_enabled', $s['telegram_enabled'], 'Avisar por Telegram' ) );
 		BHNA_UI::field( 'Token del bot', BHNA_UI::secret( 'telegram_bot_token', $s['telegram_bot_token'], '123456:ABC… (de @BotFather)' ), 'El mismo bot publica en el canal público (Redes).', 'bhna_telegram_bot_token' );
 		BHNA_UI::field( 'ID del grupo de editores', BHNA_UI::text( 'telegram_chat_id', $s['telegram_chat_id'], '-1001234567890' ), 'Añade el bot al grupo y escribe aquí su ID.', 'bhna_telegram_chat_id' );
-		BHNA_UI::field( 'Probar', '<button type="submit" class="button" name="bhna_after" value="test_telegram">Guardar y enviar prueba</button>', 'Envía un mensaje de prueba al grupo privado.' );
+		BHNA_UI::field( 'Probar', '<button type="submit" class="button" name="bhna_after" value="test_telegram">' . esc_html( bhna__( 'Guardar y enviar prueba' ) ) . '</button>', 'Envía un mensaje de prueba al grupo privado.' );
 		BHNA_UI::field( 'Slack', BHNA_UI::toggle( 'slack_enabled', $s['slack_enabled'], 'Avisar también por Slack' ) );
 		BHNA_UI::field( 'Webhook de Slack', BHNA_UI::secret( 'slack_webhook', $s['slack_webhook'], 'https://hooks.slack.com/services/…' ), 'En Slack: Apps ➔ Incoming Webhooks ➔ elige el canal de los editores y copia la URL.', 'bhna_slack_webhook' );
-		BHNA_UI::field( 'Probar Slack', '<button type="submit" class="button" name="bhna_after" value="test_slack">Guardar y enviar prueba a Slack</button>' );
+		BHNA_UI::field( 'Probar Slack', '<button type="submit" class="button" name="bhna_after" value="test_slack">' . esc_html( bhna__( 'Guardar y enviar prueba a Slack' ) ) . '</button>' );
 		BHNA_UI::field( 'Errores', BHNA_UI::toggle( 'error_alerts', $s['error_alerts'], 'Avisar al administrador (máx. una vez por hora por error)' ) );
 		BHNA_UI::panel_close();
 
@@ -537,7 +544,7 @@ class BHNA_Admin {
 		BHNA_UI::field(
 			'Cron del servidor',
 			defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON ? BHNA_UI::badge( 'Activo', 'success' ) : BHNA_UI::badge( 'Usando WP-Cron', 'warning' ),
-			'Para funcionar 24/7, añade <code>define( \'DISABLE_WP_CRON\', true );</code> a wp-config.php y en Hostinger ➔ Cron Jobs una tarea cada 5 minutos:<br><code>wget -q -O - "' . esc_html( site_url( 'wp-cron.php?doing_wp_cron' ) ) . '" &gt;/dev/null 2&gt;&amp;1</code>'
+			bhna__( 'Para funcionar 24/7, añade <code>define( \'DISABLE_WP_CRON\', true );</code> a wp-config.php y en Hostinger ➔ Cron Jobs una tarea cada 5 minutos:' ) . '<br><code>wget -q -O - "' . esc_html( site_url( 'wp-cron.php?doing_wp_cron' ) ) . '" &gt;/dev/null 2&gt;&amp;1</code>'
 		);
 		BHNA_UI::panel_close();
 
@@ -655,7 +662,7 @@ class BHNA_Admin {
 				'<a href="%s" class="%s">%s<span class="count">%d</span></a>',
 				esc_url( add_query_arg( array( 'page' => 'bhna-log', 'status' => $key ), admin_url( 'admin.php' ) ) ),
 				$status === $key ? 'is-active' : '',
-				esc_html( $info[0] ),
+				esc_html( bhna__( $info[0] ) ),
 				(int) $info[1]
 			);
 		}
@@ -663,9 +670,13 @@ class BHNA_Admin {
 
 		BHNA_UI::card_open( 'Noticias', 'dashicons-media-text', 'Las últimas 100.' );
 		if ( ! $items ) {
-			echo '<div class="bhna-empty"><span class="dashicons dashicons-format-aside"></span><p>Todavía no hay noticias. Pulsa "Ejecutar ahora" en el Panel.</p></div>';
+			echo '<div class="bhna-empty"><span class="dashicons dashicons-format-aside"></span><p>' . esc_html( bhna__( 'Todavía no hay noticias. Pulsa "Ejecutar ahora" en el Panel.' ) ) . '</p></div>';
 		} else {
-			echo '<div class="bhna-scroll"><table class="bhna-table"><thead><tr><th>Fecha</th><th>Noticia original</th><th>Estado</th><th>Detalle</th><th></th></tr></thead><tbody>';
+			echo '<div class="bhna-scroll"><table class="bhna-table"><thead><tr>';
+			foreach ( array( 'Fecha', 'Noticia original', 'Estado', 'Detalle', '' ) as $th ) {
+				echo '<th>' . esc_html( bhna__( $th ) ) . '</th>';
+			}
+			echo '</tr></thead><tbody>';
 			foreach ( $items as $item ) {
 				echo '<tr>';
 				printf( '<td class="bhna-muted">%s</td>', esc_html( wp_date( 'd/m H:i', strtotime( $item['created_at'] . ' UTC' ) ) ) );
@@ -676,13 +687,13 @@ class BHNA_Admin {
 					esc_html( $item['source_name'] )
 				);
 				echo '<td>' . self::status_badge( $item['status'], (bool) $item['quality_flag'] ) . '</td>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-				printf( '<td class="bhna-muted">%s</td>', esc_html( $item['reason'] ) );
+				printf( '<td class="bhna-muted">%s</td>', esc_html( BHNA_I18N::message( $item['reason'] ) ) );
 				echo '<td style="text-align:right;white-space:nowrap;">';
 				$edit_link = $item['post_id'] ? get_edit_post_link( $item['post_id'] ) : '';
 				if ( $item['post_id'] && ! $edit_link ) {
 					echo BHNA_UI::badge( 'Entrada borrada' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 				} elseif ( $edit_link ) {
-					printf( '<a class="button button-small" href="%s">Editar borrador</a>', esc_url( $edit_link ) );
+					printf( '<a class="button button-small" href="%s">%s</a>', esc_url( $edit_link ), esc_html( bhna__( 'Editar borrador' ) ) );
 				} elseif ( in_array( $item['status'], array( BHNA_Items::FAILED, BHNA_Items::SKIPPED ), true ) ) {
 					echo BHNA_UI::action_button( 'retry_item', BHNA_Items::FAILED === $item['status'] ? 'Reintentar' : 'Procesar igualmente', 'button button-small', '', array( 'item_id' => (int) $item['id'] ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 				}
@@ -695,7 +706,7 @@ class BHNA_Admin {
 		BHNA_UI::card_open( 'Eventos', 'dashicons-list-view', 'Lecturas de feeds, errores y publicaciones en redes.', BHNA_UI::action_button( 'clear_log', 'Vaciar', 'button button-small', '¿Borrar todos los eventos?' ) );
 		$entries = BHNA_Logger::entries();
 		if ( ! $entries ) {
-			echo '<div class="bhna-empty"><p>Sin eventos.</p></div>';
+			echo '<div class="bhna-empty"><p>' . esc_html( bhna__( 'Sin eventos.' ) ) . '</p></div>';
 		} else {
 			$levels = array( 'info' => array( 'Info', 'info' ), 'warning' => array( 'Aviso', 'warning' ), 'error' => array( 'Error', 'danger' ) );
 			echo '<div class="bhna-scroll"><table class="bhna-table"><tbody>';
@@ -705,7 +716,7 @@ class BHNA_Admin {
 					'<tr><td class="bhna-muted" style="width:110px;">%s</td><td style="width:80px;">%s</td><td>%s</td></tr>',
 					esc_html( wp_date( 'd/m H:i', $entry['time'] ) ),
 					BHNA_UI::badge( $level[0], $level[1] ), // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-					esc_html( $entry['message'] )
+					esc_html( BHNA_I18N::message( $entry['message'] ) )
 				);
 			}
 			echo '</tbody></table></div>';
@@ -736,7 +747,7 @@ class BHNA_Admin {
 
 	public static function add_meta_box( $post ) {
 		if ( get_post_meta( $post->ID, '_bhna_item_id', true ) ) {
-			add_meta_box( 'bhna_source', 'Noticias IA', array( __CLASS__, 'render_meta_box' ), 'post', 'side', 'high' );
+			add_meta_box( 'bhna_source', bhna__( 'Noticias IA' ), array( __CLASS__, 'render_meta_box' ), 'post', 'side', 'high' );
 		}
 	}
 
@@ -746,7 +757,7 @@ class BHNA_Admin {
 		$model   = get_post_meta( $post->ID, '_bhna_model', true );
 		$missing = get_post_meta( $post->ID, '_bhna_quality_missing', true );
 
-		echo '<p><strong>Fuente:</strong> ';
+		echo '<p><strong>' . esc_html( bhna__( 'Fuente:' ) ) . '</strong> ';
 		if ( $url ) {
 			printf( '<a href="%s" target="_blank" rel="noopener">%s</a>', esc_url( $url ), esc_html( $name ) );
 		} else {
@@ -754,14 +765,16 @@ class BHNA_Admin {
 		}
 		echo '</p>';
 		if ( $model ) {
-			printf( '<p><strong>Modelo:</strong> %s</p>', esc_html( $model ) );
+			printf( '<p><strong>%s</strong> %s</p>', esc_html( bhna__( 'Modelo:' ) ), esc_html( $model ) );
 		}
 		if ( $missing && is_array( $missing ) ) {
 			printf(
-				'<p style="color:#b32d2e;"><strong>⚠️ Revisar:</strong> estos datos del original no aparecen en el texto: %s</p>',
+				'<p style="color:#b32d2e;"><strong>⚠️ %s</strong> %s</p>',
+				esc_html( bhna__( 'Revisar:' ) ),
+				esc_html( bhna__( 'estos datos del original no aparecen en el texto:' ) ) . ' ' .
 				esc_html( implode( ', ', $missing ) )
 			);
 		}
-		echo '<p class="description">Comprueba los datos con la fuente antes de publicar.</p>';
+		echo '<p class="description">' . esc_html( bhna__( 'Comprueba los datos con la fuente antes de publicar.' ) ) . '</p>';
 	}
 }

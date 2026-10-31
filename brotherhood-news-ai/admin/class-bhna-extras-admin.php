@@ -27,8 +27,8 @@ class BHNA_Extras_Admin {
 	}
 
 	public static function menu() {
-		add_submenu_page( 'bhna', 'Amazon', 'Ajustes de Amazon', self::CAP, 'bhna-amazon', array( __CLASS__, 'page_amazon' ) );
-		add_submenu_page( 'bhna', 'Redes sociales', 'Redes sociales', self::CAP, 'bhna-social', array( __CLASS__, 'page_social' ) );
+		add_submenu_page( 'bhna', bhna__( 'Amazon' ), bhna__( 'Ajustes de Amazon' ), self::CAP, 'bhna-amazon', array( __CLASS__, 'page_amazon' ) );
+		add_submenu_page( 'bhna', bhna__( 'Redes sociales' ), bhna__( 'Redes sociales' ), self::CAP, 'bhna-social', array( __CLASS__, 'page_social' ) );
 	}
 
 	/** The plugin navigation on top of the "Productos Amazon" list, so every screen looks the same. */
@@ -38,17 +38,17 @@ class BHNA_Extras_Admin {
 			return;
 		}
 		echo '<div class="bhna-wrap" style="min-height:0;padding-bottom:0;margin-bottom:-20px;">';
-		echo '<div class="bhna-header" style="margin-bottom:0;"><div class="bhna-brand"><div class="bhna-logo">BH</div><div><h1>Brotherhood News AI</h1><small>Productos de Amazon</small></div></div><nav class="bhna-nav">';
+		echo '<div class="bhna-header" style="margin-bottom:0;"><div class="bhna-brand"><div class="bhna-logo">BH</div><div><h1>Brotherhood News AI</h1><small>' . esc_html( bhna__( 'Productos de Amazon' ) ) . '</small></div></div><nav class="bhna-nav">';
 		foreach ( BHNA_UI::nav_items() as $slug => $item ) {
 			printf(
 				'<a href="%s" class="%s"><span class="dashicons %s"></span>%s</a>',
 				esc_url( $item[2] ),
 				'bhna-products' === $slug ? 'is-active' : '',
 				esc_attr( $item[1] ),
-				esc_html( $item[0] )
+				esc_html( bhna__( $item[0] ) )
 			);
 		}
-		echo '</nav></div></div>';
+		echo '</nav>' . BHNA_I18N::switcher() . '</div></div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -65,7 +65,7 @@ class BHNA_Extras_Admin {
 			'bhna-amazon',
 			'Amazon',
 			'Productos de afiliado en los artículos y sección de ofertas. Sin la API de Amazon no se muestran precios ni imágenes (Amazon solo los permite mediante su API).',
-			'<a class="button button-primary" href="' . esc_url( admin_url( 'post-new.php?post_type=' . BHNA_Amazon::CPT ) ) . '">Añadir producto</a>'
+			'<a class="button button-primary" href="' . esc_url( admin_url( 'post-new.php?post_type=' . BHNA_Amazon::CPT ) ) . '">' . esc_html( bhna__( 'Añadir producto' ) ) . '</a>'
 		);
 
 		echo '<div class="bhna-kpis">';
@@ -154,7 +154,7 @@ class BHNA_Extras_Admin {
 	/* ------------------------------------------------------------------ */
 
 	public static function add_product_box() {
-		add_meta_box( 'bhna_product', 'Datos del producto', array( __CLASS__, 'render_product_box' ), BHNA_Amazon::CPT, 'normal', 'high' );
+		add_meta_box( 'bhna_product', bhna__( 'Datos del producto' ), array( __CLASS__, 'render_product_box' ), BHNA_Amazon::CPT, 'normal', 'high' );
 	}
 
 	public static function render_product_box( $post ) {
@@ -167,28 +167,28 @@ class BHNA_Extras_Admin {
 		?>
 		<table class="form-table" role="presentation">
 			<tr>
-				<th scope="row"><label for="bhna_asin_or_url">ASIN o enlace de Amazon</label></th>
+				<th scope="row"><label for="bhna_asin_or_url"><?php echo esc_html( bhna__( 'ASIN o enlace de Amazon' ) ); ?></label></th>
 				<td>
-					<input type="text" id="bhna_asin_or_url" name="bhna_asin_or_url" value="<?php echo esc_attr( $asin ? $asin : $url ); ?>" class="large-text" placeholder="B0XXXXXXXX o https://www.amazon.com/dp/B0XXXXXXXX">
-					<p class="description">El ID de afiliado se añade automáticamente al enlace.</p>
+					<input type="text" id="bhna_asin_or_url" name="bhna_asin_or_url" value="<?php echo esc_attr( $asin ? $asin : $url ); ?>" class="large-text" placeholder="<?php echo esc_attr( bhna__( 'B0XXXXXXXX o https://www.amazon.com/dp/B0XXXXXXXX' ) ); ?>">
+					<p class="description"><?php echo esc_html( bhna__( 'El ID de afiliado se añade automáticamente al enlace.' ) ); ?></p>
 				</td>
 			</tr>
 			<tr>
-				<th scope="row">Tienda</th>
+				<th scope="row"><?php echo esc_html( bhna__( 'Tienda' ) ); ?></th>
 				<td>
 					<select name="bhna_store">
 						<?php foreach ( BHNA_Amazon::STORES as $value => $label ) : ?>
-							<option value="<?php echo esc_attr( $value ); ?>" <?php selected( $store ? $store : 'com', $value ); ?>><?php echo esc_html( $label ); ?></option>
+							<option value="<?php echo esc_attr( $value ); ?>" <?php selected( $store ? $store : 'com', $value ); ?>><?php echo esc_html( bhna__( $label ) ); ?></option>
 						<?php endforeach; ?>
 					</select>
 				</td>
 			</tr>
 			<tr>
-				<th scope="row"><label for="bhna_description">Descripción breve</label></th>
+				<th scope="row"><label for="bhna_description"><?php echo esc_html( bhna__( 'Descripción breve' ) ); ?></label></th>
 				<td><textarea id="bhna_description" name="bhna_description" rows="2" maxlength="200" class="large-text"><?php echo esc_textarea( get_post_meta( $post->ID, '_bhna_description', true ) ); ?></textarea></td>
 			</tr>
 			<tr>
-				<th scope="row">Categorías relacionadas</th>
+				<th scope="row"><?php echo esc_html( bhna__( 'Categorías relacionadas' ) ); ?></th>
 				<td>
 					<div style="max-height:160px;overflow:auto;border:1px solid #dcdcde;padding:8px;">
 						<?php foreach ( get_categories( array( 'hide_empty' => false ) ) as $category ) : ?>
@@ -198,24 +198,24 @@ class BHNA_Extras_Admin {
 				</td>
 			</tr>
 			<tr>
-				<th scope="row"><label for="bhna_keywords">Palabras clave</label></th>
+				<th scope="row"><label for="bhna_keywords"><?php echo esc_html( bhna__( 'Palabras clave' ) ); ?></label></th>
 				<td>
 					<textarea id="bhna_keywords" name="bhna_keywords" rows="3" class="large-text"><?php echo esc_textarea( get_post_meta( $post->ID, '_bhna_keywords', true ) ); ?></textarea>
-					<p class="description">El producto aparece en los artículos que tengan estas palabras o las categorías marcadas. Una por línea o separadas por comas.</p>
+					<p class="description"><?php echo esc_html( bhna__( 'El producto aparece en los artículos que tengan estas palabras o las categorías marcadas. Una por línea o separadas por comas.' ) ); ?></p>
 				</td>
 			</tr>
 			<tr>
-				<th scope="row">Opciones</th>
+				<th scope="row"><?php echo esc_html( bhna__( 'Opciones' ) ); ?></th>
 				<td>
-					<label><input type="checkbox" name="bhna_featured" value="1" <?php checked( get_post_meta( $post->ID, '_bhna_featured', true ) ); ?>> Destacado (tiene prioridad)</label>
+					<label><input type="checkbox" name="bhna_featured" value="1" <?php checked( get_post_meta( $post->ID, '_bhna_featured', true ) ); ?>> <?php echo esc_html( bhna__( 'Destacado (tiene prioridad)' ) ); ?></label>
 				</td>
 			</tr>
 			<tr>
-				<th scope="row">Oferta</th>
+				<th scope="row"><?php echo esc_html( bhna__( 'Oferta' ) ); ?></th>
 				<td>
-					<label><input type="checkbox" name="bhna_deal" value="1" <?php checked( get_post_meta( $post->ID, '_bhna_deal', true ) ); ?>> Mostrar en la sección de Ofertas</label><br>
-					<input type="text" name="bhna_deal_label" value="<?php echo esc_attr( get_post_meta( $post->ID, '_bhna_deal_label', true ) ); ?>" placeholder="Ej. -30% u Oferta del día" style="margin-top:6px;">
-					<label>Hasta: <input type="date" name="bhna_deal_until" value="<?php echo esc_attr( get_post_meta( $post->ID, '_bhna_deal_until', true ) ); ?>"></label>
+					<label><input type="checkbox" name="bhna_deal" value="1" <?php checked( get_post_meta( $post->ID, '_bhna_deal', true ) ); ?>> <?php echo esc_html( bhna__( 'Mostrar en la sección de Ofertas' ) ); ?></label><br>
+					<input type="text" name="bhna_deal_label" value="<?php echo esc_attr( get_post_meta( $post->ID, '_bhna_deal_label', true ) ); ?>" placeholder="<?php echo esc_attr( bhna__( 'Ej. -30% u Oferta del día' ) ); ?>" style="margin-top:6px;">
+					<label><?php echo esc_html( bhna__( 'Hasta:' ) ); ?> <input type="date" name="bhna_deal_until" value="<?php echo esc_attr( get_post_meta( $post->ID, '_bhna_deal_until', true ) ); ?>"></label>
 				</td>
 			</tr>
 		</table>
@@ -259,9 +259,9 @@ class BHNA_Extras_Admin {
 	public static function product_columns( $columns ) {
 		$date = isset( $columns['date'] ) ? $columns['date'] : null;
 		unset( $columns['date'] );
-		$columns['bhna_asin']  = 'ASIN / enlace';
-		$columns['bhna_store'] = 'Tienda';
-		$columns['bhna_deal']  = 'Oferta';
+		$columns['bhna_asin']  = bhna__( 'ASIN / enlace' );
+		$columns['bhna_store'] = bhna__( 'Tienda' );
+		$columns['bhna_deal']  = bhna__( 'Oferta' );
 		if ( $date ) {
 			$columns['date'] = $date;
 		}
@@ -277,7 +277,7 @@ class BHNA_Extras_Admin {
 		} elseif ( 'bhna_deal' === $column && get_post_meta( $post_id, '_bhna_deal', true ) ) {
 			$label = get_post_meta( $post_id, '_bhna_deal_label', true );
 			$until = get_post_meta( $post_id, '_bhna_deal_until', true );
-			echo esc_html( trim( ( $label ? $label : 'Sí' ) . ( $until ? ' (hasta ' . $until . ')' : '' ) ) );
+			echo esc_html( trim( ( $label ? $label : bhna__( 'Sí' ) ) . ( $until ? ' (' . sprintf( bhna__( 'hasta %s' ), $until ) . ')' : '' ) ) );
 		}
 	}
 
@@ -286,7 +286,7 @@ class BHNA_Extras_Admin {
 	/* ------------------------------------------------------------------ */
 
 	public static function add_post_box() {
-		add_meta_box( 'bhna_extras', 'Amazon y redes sociales', array( __CLASS__, 'render_post_box' ), 'post', 'side', 'default' );
+		add_meta_box( 'bhna_extras', bhna__( 'Amazon y redes sociales' ), array( __CLASS__, 'render_post_box' ), 'post', 'side', 'default' );
 	}
 
 	public static function render_post_box( $post ) {
@@ -296,37 +296,37 @@ class BHNA_Extras_Admin {
 		wp_nonce_field( 'bhna_post_extras', 'bhna_post_extras_nonce' );
 		?>
 		<p>
-			<label for="bhna_amazon_store"><strong>Tienda de Amazon</strong></label><br>
+			<label for="bhna_amazon_store"><strong><?php echo esc_html( bhna__( 'Tienda de Amazon' ) ); ?></strong></label><br>
 			<select id="bhna_amazon_store" name="bhna_amazon_store" style="width:100%;">
-				<option value="" <?php selected( $store, '' ); ?>>Automática (según el país)</option>
+				<option value="" <?php selected( $store, '' ); ?>><?php echo esc_html( bhna__( 'Automática (según el país)' ) ); ?></option>
 				<?php foreach ( BHNA_Amazon::STORES as $value => $label ) : ?>
-					<option value="<?php echo esc_attr( $value ); ?>" <?php selected( $store, $value ); ?>><?php echo esc_html( $label ); ?></option>
+					<option value="<?php echo esc_attr( $value ); ?>" <?php selected( $store, $value ); ?>><?php echo esc_html( bhna__( $label ) ); ?></option>
 				<?php endforeach; ?>
 			</select>
 		</p>
-		<p><strong>Productos elegidos a mano</strong><br><span class="description">Opcional. Se completan con los automáticos.</span></p>
+		<p><strong><?php echo esc_html( bhna__( 'Productos elegidos a mano' ) ); ?></strong><br><span class="description"><?php echo esc_html( bhna__( 'Opcional. Se completan con los automáticos.' ) ); ?></span></p>
 		<div style="max-height:150px;overflow:auto;border:1px solid #dcdcde;padding:6px;">
 			<?php if ( ! $products ) : ?>
-				<em>Todavía no hay productos.</em>
+				<em><?php echo esc_html( bhna__( 'Todavía no hay productos.' ) ); ?></em>
 			<?php endif; ?>
 			<?php foreach ( $products as $product ) : ?>
 				<label style="display:block;"><input type="checkbox" name="bhna_products[]" value="<?php echo (int) $product['id']; ?>" <?php checked( in_array( (int) $product['id'], $manual, true ) ); ?>> <?php echo esc_html( $product['title'] ); ?> <small>(<?php echo esc_html( $product['store'] ); ?>)</small></label>
 			<?php endforeach; ?>
 		</div>
 		<p>
-			<label><input type="checkbox" name="bhna_no_products" value="1" <?php checked( get_post_meta( $post->ID, '_bhna_no_products', true ) ); ?>> No mostrar productos en este artículo</label><br>
-			<label><input type="checkbox" name="bhna_no_share" value="1" <?php checked( get_post_meta( $post->ID, '_bhna_no_share', true ) ); ?>> No compartir en redes sociales</label>
+			<label><input type="checkbox" name="bhna_no_products" value="1" <?php checked( get_post_meta( $post->ID, '_bhna_no_products', true ) ); ?>> <?php echo esc_html( bhna__( 'No mostrar productos en este artículo' ) ); ?></label><br>
+			<label><input type="checkbox" name="bhna_no_share" value="1" <?php checked( get_post_meta( $post->ID, '_bhna_no_share', true ) ); ?>> <?php echo esc_html( bhna__( 'No compartir en redes sociales' ) ); ?></label>
 		</p>
 		<?php
 		$shared = array();
 		foreach ( array( 'x', 'telegram' ) as $network ) {
 			$time = get_post_meta( $post->ID, '_bhna_shared_' . $network, true );
 			if ( $time ) {
-				$shared[] = BHNA_Social::network_label( $network ) . ' (' . wp_date( 'd/m H:i', (int) $time ) . ')';
+				$shared[] = bhna__( BHNA_Social::network_label( $network ) ) . ' (' . wp_date( 'd/m H:i', (int) $time ) . ')';
 			}
 		}
 		if ( $shared ) {
-			echo '<p class="description">Compartido en: ' . esc_html( implode( ', ', $shared ) ) . '</p>';
+			echo '<p class="description">' . esc_html( bhna__( 'Compartido en:' ) . ' ' . implode( ', ', $shared ) ) . '</p>';
 		}
 	}
 
@@ -383,19 +383,19 @@ class BHNA_Extras_Admin {
 		BHNA_UI::field( 'Access Token', BHNA_UI::secret( 'x_access_token', $s['x_access_token'], 'Access Token' ), '', 'bhna_x_access_token' );
 		BHNA_UI::field( 'Access Token Secret', BHNA_UI::secret( 'x_access_secret', $s['x_access_secret'], 'Access Token Secret' ), '', 'bhna_x_access_secret' );
 		BHNA_UI::field( 'Plantilla', BHNA_UI::textarea( 'x_template', $s['x_template'], 3 ), 'Variables: <code>{titulo}</code>, <code>{extracto}</code>, <code>{enlace}</code>. Se recorta a 280 caracteres. X muestra la imagen del artículo en la tarjeta del enlace.', 'bhna_x_template' );
-		BHNA_UI::field( 'Comprobar', '<button type="submit" class="button" name="bhna_after" value="test_x">Guardar y verificar X</button>', 'Comprueba las claves sin publicar nada.' );
+		BHNA_UI::field( 'Comprobar', '<button type="submit" class="button" name="bhna_after" value="test_x">' . esc_html( bhna__( 'Guardar y verificar X' ) ) . '</button>', 'Comprueba las claves sin publicar nada.' );
 		BHNA_UI::card_close();
 
 		BHNA_UI::card_open( 'Canal público de Telegram', 'dashicons-megaphone', 'Usa el mismo bot que las alertas (Ajustes IA ➔ Alertas). Añádelo como <strong>administrador del canal</strong>. Las alertas de editores siguen yendo al grupo privado.' );
 		BHNA_UI::field( 'Activar', BHNA_UI::toggle( 'tg_channel_enabled', $s['tg_channel_enabled'], 'Publicar en el canal' ) );
 		BHNA_UI::field( 'ID del canal', BHNA_UI::text( 'tg_channel_id', $s['tg_channel_id'], '@micanal o -100…' ), '', 'bhna_tg_channel_id' );
 		BHNA_UI::field( 'Plantilla', BHNA_UI::textarea( 'tg_channel_template', $s['tg_channel_template'], 4 ), 'Variables: <code>{titulo}</code>, <code>{extracto}</code>, <code>{enlace}</code>. Admite &lt;b&gt; e &lt;i&gt;.', 'bhna_tg_channel_template' );
-		BHNA_UI::field( 'Comprobar', '<button type="submit" class="button" name="bhna_after" value="test_tg_channel">Guardar y verificar canal</button>', 'Comprueba que el bot tiene acceso al canal, sin publicar nada.' );
+		BHNA_UI::field( 'Comprobar', '<button type="submit" class="button" name="bhna_after" value="test_tg_channel">' . esc_html( bhna__( 'Guardar y verificar canal' ) ) . '</button>', 'Comprueba que el bot tiene acceso al canal, sin publicar nada.' );
 		BHNA_UI::card_close();
 
 		BHNA_UI::card_open( 'Próximamente', 'dashicons-share', 'Preparado para conectar más adelante.' );
-		BHNA_UI::field( 'Facebook', '<input type="text" class="regular-text" disabled placeholder="Página de Facebook">' . ' ' . BHNA_UI::badge( 'Preparado' ) );
-		BHNA_UI::field( 'LinkedIn', '<input type="text" class="regular-text" disabled placeholder="Página de empresa">' . ' ' . BHNA_UI::badge( 'Preparado' ) );
+		BHNA_UI::field( 'Facebook', '<input type="text" class="regular-text" disabled placeholder="' . esc_attr( bhna__( 'Página de Facebook' ) ) . '">' . ' ' . BHNA_UI::badge( 'Preparado' ) );
+		BHNA_UI::field( 'LinkedIn', '<input type="text" class="regular-text" disabled placeholder="' . esc_attr( bhna__( 'Página de empresa' ) ) . '">' . ' ' . BHNA_UI::badge( 'Preparado' ) );
 		BHNA_UI::card_close();
 
 		BHNA_UI::savebar( 'Guardar redes sociales' );

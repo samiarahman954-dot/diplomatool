@@ -49,14 +49,14 @@ class BHNA_UI {
 				esc_url( $item[2] ),
 				$slug === $active ? 'is-active' : '',
 				esc_attr( $item[1] ),
-				esc_html( $item[0] )
+				esc_html( bhna__( $item[0] ) )
 			);
 		}
-		echo '</nav></div>';
+		echo '</nav>' . BHNA_I18N::switcher() . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		echo '<hr class="wp-header-end" style="display:none;">';
-		echo '<div class="bhna-page-title"><div><h2>' . esc_html( $title ) . '</h2>';
+		echo '<div class="bhna-page-title"><div><h2>' . esc_html( bhna__( $title ) ) . '</h2>';
 		if ( $description ) {
-			echo '<p>' . wp_kses_post( $description ) . '</p>';
+			echo '<p>' . wp_kses_post( bhna__( $description ) ) . '</p>';
 		}
 		echo '</div>';
 		if ( $actions ) {
@@ -74,9 +74,9 @@ class BHNA_UI {
 		if ( $icon ) {
 			echo '<span class="dashicons ' . esc_attr( $icon ) . '"></span>';
 		}
-		echo esc_html( $title ) . '</h3>';
+		echo esc_html( bhna__( $title ) ) . '</h3>';
 		if ( $description ) {
-			echo '<p>' . wp_kses_post( $description ) . '</p>';
+			echo '<p>' . wp_kses_post( bhna__( $description ) ) . '</p>';
 		}
 		echo '</div>' . $head_extra . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 	}
@@ -89,13 +89,13 @@ class BHNA_UI {
 	public static function field( $label, $control, $description = '', $for = '' ) {
 		echo '<div class="bhna-field">';
 		if ( $for ) {
-			echo '<label for="' . esc_attr( $for ) . '">' . esc_html( $label ) . '</label>';
+			echo '<label for="' . esc_attr( $for ) . '">' . esc_html( bhna__( $label ) ) . '</label>';
 		} else {
-			echo '<div class="bhna-field-label">' . esc_html( $label ) . '</div>';
+			echo '<div class="bhna-field-label">' . esc_html( bhna__( $label ) ) . '</div>';
 		}
 		echo '<div>' . $control; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		if ( $description ) {
-			echo '<p class="description">' . wp_kses_post( $description ) . '</p>';
+			echo '<p class="description">' . wp_kses_post( bhna__( $description ) ) . '</p>';
 		}
 		echo '</div></div>';
 	}
@@ -106,7 +106,7 @@ class BHNA_UI {
 			esc_attr( $name ),
 			esc_attr( $class ),
 			checked( (bool) $checked, true, false ),
-			$label ? '<span>' . esc_html( $label ) . '</span>' : ''
+			$label ? '<span>' . esc_html( bhna__( $label ) ) . '</span>' : ''
 		);
 	}
 
@@ -117,7 +117,7 @@ class BHNA_UI {
 			esc_attr( $name ),
 			esc_attr( $id ? $id : 'bhna_' . $name ),
 			esc_attr( $value ),
-			esc_attr( $placeholder )
+			esc_attr( bhna__( $placeholder ) )
 		);
 	}
 
@@ -132,7 +132,7 @@ class BHNA_UI {
 			esc_attr( $name ),
 			(int) $rows,
 			esc_attr( $class ),
-			esc_attr( $placeholder ),
+			esc_attr( bhna__( $placeholder ) ),
 			esc_textarea( $value )
 		);
 	}
@@ -140,7 +140,7 @@ class BHNA_UI {
 	public static function select( $name, array $options, $selected, $id = '' ) {
 		$html = sprintf( '<select name="%s" id="%s">', esc_attr( $name ), esc_attr( $id ? $id : 'bhna_' . $name ) );
 		foreach ( $options as $value => $label ) {
-			$html .= sprintf( '<option value="%s"%s>%s</option>', esc_attr( $value ), selected( (string) $selected, (string) $value, false ), esc_html( $label ) );
+			$html .= sprintf( '<option value="%s"%s>%s</option>', esc_attr( $value ), selected( (string) $selected, (string) $value, false ), esc_html( bhna__( $label ) ) );
 		}
 		return $html . '</select>';
 	}
@@ -148,16 +148,19 @@ class BHNA_UI {
 	/** Password field that keeps the saved value unless a new one is typed. */
 	public static function secret( $name, $saved, $placeholder ) {
 		return sprintf(
-			'<div class="bhna-secret"><input type="password" name="%s" id="bhna_%s" value="" autocomplete="new-password" placeholder="%s"><button type="button" class="button" data-bhna-reveal data-show="Mostrar" data-hide="Ocultar">Mostrar</button></div>%s',
+			'<div class="bhna-secret"><input type="password" name="%s" id="bhna_%s" value="" autocomplete="new-password" placeholder="%s"><button type="button" class="button" data-bhna-reveal data-show="%s" data-hide="%s">%s</button></div>%s',
 			esc_attr( $name ),
 			esc_attr( $name ),
-			esc_attr( $saved ? 'Guardado (••••' . substr( (string) $saved, -4 ) . ') — escribe para cambiarlo' : $placeholder ),
+			esc_attr( $saved ? sprintf( bhna__( 'Guardado (••••%s) — escribe para cambiarlo' ), substr( (string) $saved, -4 ) ) : bhna__( $placeholder ) ),
+			esc_attr( bhna__( 'Mostrar' ) ),
+			esc_attr( bhna__( 'Ocultar' ) ),
+			esc_html( bhna__( 'Mostrar' ) ),
 			$saved ? ' ' . self::badge( 'Configurado', 'success' ) : ''
 		);
 	}
 
 	public static function badge( $text, $type = '' ) {
-		return '<span class="bhna-badge ' . ( $type ? 'is-' . esc_attr( $type ) : '' ) . '">' . esc_html( $text ) . '</span>';
+		return '<span class="bhna-badge ' . ( $type ? 'is-' . esc_attr( $type ) : '' ) . '">' . esc_html( bhna__( $text ) ) . '</span>';
 	}
 
 	public static function kpi( $label, $value, $icon, $type = '' ) {
@@ -165,8 +168,8 @@ class BHNA_UI {
 			'<div class="bhna-kpi"><div class="bhna-kpi-icon %s"><span class="dashicons %s"></span></div><div><div class="bhna-kpi-label">%s</div><div class="bhna-kpi-value">%s</div></div></div>',
 			$type ? 'is-' . esc_attr( $type ) : '',
 			esc_attr( $icon ),
-			esc_html( $label ),
-			esc_html( (string) $value )
+			esc_html( bhna__( $label ) ),
+			esc_html( bhna__( (string) $value ) )
 		);
 	}
 
@@ -189,8 +192,8 @@ class BHNA_UI {
 		printf(
 			'<button type="submit" class="%s"%s>%s</button></form>',
 			esc_attr( $class ),
-			$confirm ? ' data-bhna-confirm="' . esc_attr( $confirm ) . '"' : '',
-			esc_html( $label )
+			$confirm ? ' data-bhna-confirm="' . esc_attr( bhna__( $confirm ) ) . '"' : '',
+			esc_html( bhna__( $label ) )
 		);
 		return ob_get_clean();
 	}
@@ -198,7 +201,7 @@ class BHNA_UI {
 	public static function tabs( array $tabs ) {
 		echo '<div class="bhna-tabs" role="tablist">';
 		foreach ( $tabs as $key => $label ) {
-			printf( '<button type="button" role="tab" data-tab="%s">%s</button>', esc_attr( $key ), esc_html( $label ) );
+			printf( '<button type="button" role="tab" data-tab="%s">%s</button>', esc_attr( $key ), esc_html( bhna__( $label ) ) );
 		}
 		echo '</div>';
 	}
@@ -212,6 +215,6 @@ class BHNA_UI {
 	}
 
 	public static function savebar( $label ) {
-		echo '<div class="bhna-savebar"><button type="submit" class="button button-primary button-large">' . esc_html( $label ) . '</button></div>';
+		echo '<div class="bhna-savebar"><button type="submit" class="button button-primary button-large">' . esc_html( bhna__( $label ) ) . '</button></div>';
 	}
 }

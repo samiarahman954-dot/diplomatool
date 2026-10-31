@@ -40,14 +40,14 @@ class BHNA_Amazon {
 			self::CPT,
 			array(
 				'labels'          => array(
-					'name'          => 'Productos Amazon',
-					'singular_name' => 'Producto Amazon',
-					'add_new'       => 'Añadir producto',
-					'add_new_item'  => 'Añadir producto de Amazon',
-					'edit_item'     => 'Editar producto',
-					'all_items'     => 'Productos Amazon',
-					'search_items'  => 'Buscar productos',
-					'not_found'     => 'No hay productos.',
+					'name'          => bhna__( 'Productos Amazon' ),
+					'singular_name' => bhna__( 'Producto Amazon' ),
+					'add_new'       => bhna__( 'Añadir producto' ),
+					'add_new_item'  => bhna__( 'Añadir producto de Amazon' ),
+					'edit_item'     => bhna__( 'Editar producto' ),
+					'all_items'     => bhna__( 'Productos Amazon' ),
+					'search_items'  => bhna__( 'Buscar productos' ),
+					'not_found'     => bhna__( 'No hay productos.' ),
 				),
 				'public'          => false,
 				'show_ui'         => true,
@@ -415,7 +415,7 @@ class BHNA_Amazon {
 class BHNA_Deals_Widget extends WP_Widget {
 
 	public function __construct() {
-		parent::__construct( 'bhna_deals', 'Ofertas de Amazon', array( 'description' => 'Muestra las ofertas activas de Amazon.' ) );
+		parent::__construct( 'bhna_deals', bhna__( 'Ofertas de Amazon' ), array( 'description' => bhna__( 'Muestra las ofertas activas de Amazon.' ) ) );
 	}
 
 	public function widget( $args, $instance ) {
@@ -437,19 +437,19 @@ class BHNA_Deals_Widget extends WP_Widget {
 		$store  = isset( $instance['store'] ) ? $instance['store'] : '';
 		?>
 		<p>
-			<label for="<?php echo esc_attr( $this->get_field_id( 'title' ) ); ?>">Título:</label>
+			<label for="<?php echo esc_attr( $this->get_field_id( 'title' ) ); ?>"><?php echo esc_html( bhna__( 'Título:' ) ); ?></label>
 			<input class="widefat" id="<?php echo esc_attr( $this->get_field_id( 'title' ) ); ?>" name="<?php echo esc_attr( $this->get_field_name( 'title' ) ); ?>" type="text" value="<?php echo esc_attr( $title ); ?>">
 		</p>
 		<p>
-			<label for="<?php echo esc_attr( $this->get_field_id( 'number' ) ); ?>">Número de ofertas:</label>
+			<label for="<?php echo esc_attr( $this->get_field_id( 'number' ) ); ?>"><?php echo esc_html( bhna__( 'Número de ofertas:' ) ); ?></label>
 			<input id="<?php echo esc_attr( $this->get_field_id( 'number' ) ); ?>" name="<?php echo esc_attr( $this->get_field_name( 'number' ) ); ?>" type="number" min="1" max="20" value="<?php echo esc_attr( $number ); ?>">
 		</p>
 		<p>
-			<label for="<?php echo esc_attr( $this->get_field_id( 'store' ) ); ?>">Tienda:</label>
+			<label for="<?php echo esc_attr( $this->get_field_id( 'store' ) ); ?>"><?php echo esc_html( bhna__( 'Tienda:' ) ); ?></label>
 			<select id="<?php echo esc_attr( $this->get_field_id( 'store' ) ); ?>" name="<?php echo esc_attr( $this->get_field_name( 'store' ) ); ?>">
-				<option value="" <?php selected( $store, '' ); ?>>Todas</option>
+				<option value="" <?php selected( $store, '' ); ?>><?php echo esc_html( bhna__( 'Todas' ) ); ?></option>
 				<?php foreach ( BHNA_Amazon::STORES as $value => $label ) : ?>
-					<option value="<?php echo esc_attr( $value ); ?>" <?php selected( $store, $value ); ?>><?php echo esc_html( $label ); ?></option>
+					<option value="<?php echo esc_attr( $value ); ?>" <?php selected( $store, $value ); ?>><?php echo esc_html( bhna__( $label ) ); ?></option>
 				<?php endforeach; ?>
 			</select>
 		</p>
