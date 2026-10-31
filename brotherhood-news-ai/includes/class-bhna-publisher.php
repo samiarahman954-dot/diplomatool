@@ -44,13 +44,23 @@ class BHNA_Publisher {
 			$postarr['meta_input']['_bhna_quality_missing'] = $missing;
 		}
 
-		if ( BHNA_Settings::get( 'seo_meta' ) && ! empty( $rewrite['meta_descripcion'] ) ) {
-			$description = sanitize_text_field( $rewrite['meta_descripcion'] );
-			if ( defined( 'WPSEO_VERSION' ) ) {
-				$postarr['meta_input']['_yoast_wpseo_metadesc'] = $description;
-			}
-			if ( defined( 'RANK_MATH_VERSION' ) ) {
-				$postarr['meta_input']['rank_math_description'] = $description;
+		if ( BHNA_Settings::get( 'seo_meta' ) ) {
+			$seo = array(
+				// Yoast key => Rank Math key => value.
+				array( '_yoast_wpseo_title', 'rank_math_title', isset( $rewrite['meta_titulo'] ) ? $rewrite['meta_titulo'] : '' ),
+				array( '_yoast_wpseo_metadesc', 'rank_math_description', isset( $rewrite['meta_descripcion'] ) ? $rewrite['meta_descripcion'] : '' ),
+			);
+			foreach ( $seo as $field ) {
+				$value = sanitize_text_field( $field[2] );
+				if ( '' === $value ) {
+					continue;
+				}
+				if ( defined( 'WPSEO_VERSION' ) ) {
+					$postarr['meta_input'][ $field[0] ] = $value;
+				}
+				if ( defined( 'RANK_MATH_VERSION' ) ) {
+					$postarr['meta_input'][ $field[1] ] = $value;
+				}
 			}
 		}
 

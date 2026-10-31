@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Brotherhood News AI
  * Description:       Lee feeds RSS, filtra por palabras clave, reescribe las noticias con la API de Claude (Anthropic) y las guarda como borrador para revisión editorial. Incluye productos de Amazon y publicación automática en X y Telegram.
- * Version:           0.3.1
+ * Version:           0.4.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            Samia
@@ -12,7 +12,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'BHNA_VERSION', '0.3.1' );
+define( 'BHNA_VERSION', '0.4.0' );
 define( 'BHNA_DB_VERSION', '1' );
 define( 'BHNA_FILE', __FILE__ );
 define( 'BHNA_DIR', plugin_dir_path( __FILE__ ) );

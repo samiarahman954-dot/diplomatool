@@ -477,7 +477,7 @@ class BHNA_Admin {
 		BHNA_UI::field(
 			'Instrucciones de redacción',
 			BHNA_UI::textarea( 'system_prompt', $s['system_prompt'], 14, 'large-text code' ),
-			'Estilo y reglas. La respuesta siempre incluye titular, párrafos, extracto, meta descripción y etiquetas.',
+			'Estilo y reglas. La respuesta siempre incluye titular, párrafos, extracto, título SEO, meta descripción y etiquetas.',
 			'bhna_system_prompt'
 		);
 		BHNA_UI::field( 'Probar conexión', '<button type="submit" class="button" name="bhna_after" value="test_claude">Guardar y probar Claude</button>', 'Reescribe una noticia de ejemplo (no crea ninguna entrada).' );
@@ -512,7 +512,7 @@ class BHNA_Admin {
 			'<code>{medio}</code> se sustituye por el nombre de la fuente.',
 			'bhna_attribution_text'
 		);
-		BHNA_UI::field( 'Meta descripción SEO', BHNA_UI::toggle( 'seo_meta', $s['seo_meta'], 'Guardarla en Yoast / Rank Math' ) );
+		BHNA_UI::field( 'SEO', BHNA_UI::toggle( 'seo_meta', $s['seo_meta'], 'Guardar el título SEO y la meta descripción en Yoast / Rank Math' ) );
 		BHNA_UI::field( 'Control de calidad', BHNA_UI::toggle( 'quality_check', $s['quality_check'], 'Avisar si faltan nombres o cifras del original' ) );
 		BHNA_UI::panel_close();
 
@@ -526,6 +526,9 @@ class BHNA_Admin {
 		BHNA_UI::field( 'Token del bot', BHNA_UI::secret( 'telegram_bot_token', $s['telegram_bot_token'], '123456:ABC… (de @BotFather)' ), 'El mismo bot publica en el canal público (Redes).', 'bhna_telegram_bot_token' );
 		BHNA_UI::field( 'ID del grupo de editores', BHNA_UI::text( 'telegram_chat_id', $s['telegram_chat_id'], '-1001234567890' ), 'Añade el bot al grupo y escribe aquí su ID.', 'bhna_telegram_chat_id' );
 		BHNA_UI::field( 'Probar', '<button type="submit" class="button" name="bhna_after" value="test_telegram">Guardar y enviar prueba</button>', 'Envía un mensaje de prueba al grupo privado.' );
+		BHNA_UI::field( 'Slack', BHNA_UI::toggle( 'slack_enabled', $s['slack_enabled'], 'Avisar también por Slack' ) );
+		BHNA_UI::field( 'Webhook de Slack', BHNA_UI::secret( 'slack_webhook', $s['slack_webhook'], 'https://hooks.slack.com/services/…' ), 'En Slack: Apps ➔ Incoming Webhooks ➔ elige el canal de los editores y copia la URL.', 'bhna_slack_webhook' );
+		BHNA_UI::field( 'Probar Slack', '<button type="submit" class="button" name="bhna_after" value="test_slack">Guardar y enviar prueba a Slack</button>' );
 		BHNA_UI::field( 'Errores', BHNA_UI::toggle( 'error_alerts', $s['error_alerts'], 'Avisar al administrador (máx. una vez por hora por error)' ) );
 		BHNA_UI::panel_close();
 
@@ -569,10 +572,11 @@ class BHNA_Admin {
 			'email_recipients'    => isset( $p['email_recipients'] ) ? implode( ', ', array_filter( array_map( 'sanitize_email', explode( ',', $p['email_recipients'] ) ) ) ) : '',
 			'telegram_enabled'    => empty( $p['telegram_enabled'] ) ? 0 : 1,
 			'telegram_chat_id'    => isset( $p['telegram_chat_id'] ) ? sanitize_text_field( $p['telegram_chat_id'] ) : '',
+			'slack_enabled'       => empty( $p['slack_enabled'] ) ? 0 : 1,
 			'error_alerts'        => empty( $p['error_alerts'] ) ? 0 : 1,
 			'delete_on_uninstall' => empty( $p['delete_on_uninstall'] ) ? 0 : 1,
 		);
-		foreach ( array( 'api_key', 'telegram_bot_token' ) as $secret ) {
+		foreach ( array( 'api_key', 'telegram_bot_token', 'slack_webhook' ) as $secret ) {
 			if ( ! empty( $p[ $secret ] ) ) {
 				$values[ $secret ] = sanitize_text_field( $p[ $secret ] );
 			}
@@ -592,6 +596,12 @@ class BHNA_Admin {
 				self::redirect( 'bhna-settings', 'Ajustes guardados. Telegram: ' . $result->get_error_message(), 'error', 'alertas' );
 			}
 			self::redirect( 'bhna-settings', 'Ajustes guardados. Mensaje de prueba enviado al grupo de Telegram.', 'success', 'alertas' );
+		} elseif ( 'test_slack' === $after ) {
+			$result = BHNA_Notifier::slack( ':white_check_mark: Prueba de Brotherhood News AI: las alertas de Slack funcionan.' );
+			if ( is_wp_error( $result ) ) {
+				self::redirect( 'bhna-settings', 'Ajustes guardados. Slack: ' . $result->get_error_message(), 'error', 'alertas' );
+			}
+			self::redirect( 'bhna-settings', 'Ajustes guardados. Mensaje de prueba enviado a Slack.', 'success', 'alertas' );
 		}
 
 		self::redirect( 'bhna-settings', 'Ajustes guardados.' );

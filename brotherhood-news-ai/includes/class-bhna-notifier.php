@@ -36,6 +36,13 @@ class BHNA_Notifier {
 				. "\n" . '<a href="' . esc_url( $edit_link ) . '">Abrir en WordPress</a>';
 			self::telegram( $text );
 		}
+
+		if ( BHNA_Settings::get( 'slack_enabled' ) ) {
+			$text = ':newspaper: *Nuevo borrador para revisar*\n*' . self::slack_escape( $title ) . '*\nFuente: ' . self::slack_escape( $item['source_name'] )
+				. ( $warning ? "\n:warning: " . self::slack_escape( $warning ) : '' )
+				. "\n<" . $edit_link . '|Abrir en WordPress>';
+			self::slack( $text );
+		}
 	}
 
 	public static function error_alert( $key, $message ) {
@@ -53,6 +60,44 @@ class BHNA_Notifier {
 		if ( BHNA_Settings::get( 'telegram_enabled' ) ) {
 			self::telegram( "🚨 <b>Error en Brotherhood News AI</b>\n\n" . esc_html( $message ) );
 		}
+		if ( BHNA_Settings::get( 'slack_enabled' ) ) {
+			self::slack( ":rotating_light: *Error en Brotherhood News AI*\n" . self::slack_escape( $message ) );
+		}
+	}
+
+	/** Slack mrkdwn: only &, < and > must be escaped. */
+	public static function slack_escape( $text ) {
+		return str_replace( array( '&', '<', '>' ), array( '&amp;', '&lt;', '&gt;' ), (string) $text );
+	}
+
+	/**
+	 * Posts to a Slack incoming webhook.
+	 *
+	 * @return true|WP_Error
+	 */
+	public static function slack( $text ) {
+		$webhook = trim( (string) BHNA_Settings::get( 'slack_webhook' ) );
+		if ( 0 !== strpos( $webhook, 'https://hooks.slack.com/' ) ) {
+			return new WP_Error( 'bhna_slack_config', 'Falta la URL del webhook de Slack (https://hooks.slack.com/…).' );
+		}
+		$response = wp_remote_post(
+			$webhook,
+			array(
+				'timeout' => 15,
+				'headers' => array( 'Content-Type' => 'application/json' ),
+				'body'    => wp_json_encode( array( 'text' => $text ) ),
+			)
+		);
+		if ( is_wp_error( $response ) ) {
+			BHNA_Logger::error( 'Slack: ' . $response->get_error_message() );
+			return $response;
+		}
+		if ( 200 !== (int) wp_remote_retrieve_response_code( $response ) ) {
+			$message = trim( wp_remote_retrieve_body( $response ) );
+			BHNA_Logger::error( 'Slack: ' . $message );
+			return new WP_Error( 'bhna_slack', $message ? $message : 'respuesta inesperada' );
+		}
+		return true;
 	}
 
 	public static function email( $subject, $body ) {

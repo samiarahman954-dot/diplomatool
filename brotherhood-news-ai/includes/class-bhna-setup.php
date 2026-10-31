@@ -11,8 +11,8 @@ defined( 'ABSPATH' ) || exit;
 
 class BHNA_Setup {
 
-	/** Words that mark a Cubadebate story as culture, so the shared feed can be split into two sections. */
-	const CULTURE_KEYWORDS = "cultura\nmúsica\nmúsica urbana\nreguetón\nconcierto\narte\nartista\nexposición\ncine\nteatro\ndanza\nliteratura\nlibro\nfestival\nmuseo\nfarándula";
+	/** Words that mark a Cubadebate story as culture/society (client's \"Cultura/Sociedad\"), so the shared feed can be split into two sections. */
+	const CULTURE_KEYWORDS = "cultura\nmúsica\nmúsica urbana\nreguetón\nconcierto\narte\nartista\nexposición\ncine\nteatro\ndanza\nliteratura\nlibro\nfestival\nmuseo\nfarándula\nsociedad\nsalud\neducación\nescuela\nuniversidad\nfamilia\njóvenes\nmujeres\ncomunidad\nvivienda\ntransporte";
 
 	/** Topics from the client's editorial lines and example keywords. */
 	const INCLUDE_KEYWORDS = "IA\ninteligencia artificial\nsubasta\nreforma\nconcierto\narancel\naranceles\nimportaciones\nexportaciones\ncomercio\neconomía\ninflación\nempresas\ninversión\nciberseguridad\ntecnología\ngadget\nmóvil\nciencia\nenergía solar\nfotovoltaica\nenergías renovables\nmúsica\nmúsica urbana\narte\ncultura\ncine\nfestival\nCongreso\nSenado\nDiputados\nley\nelecciones\nGobierno\nCuba\nLa Habana\nCaribe\nEstados Unidos\nmasonería\nfraternidad\nfilantropía";
@@ -29,7 +29,7 @@ class BHNA_Setup {
 			array( 'id' => 'elmundo_cultura', 'name' => 'El Mundo', 'url' => 'https://e00-elmundo.uecdn.es/elmundo/rss/cultura.xml', 'country' => 'es', 'category' => 'Cultura', 'include' => '' ),
 			array( 'id' => 'elmundo_portada', 'name' => 'El Mundo', 'url' => 'https://e00-elmundo.uecdn.es/elmundo/rss/portada.xml', 'country' => 'es', 'category' => 'España', 'include' => '' ),
 			array( 'id' => 'us_internacional', 'name' => 'El Diario NY', 'url' => 'https://eldiariony.com/feed/', 'country' => 'us', 'category' => 'Estados Unidos', 'include' => '' ),
-			array( 'id' => 'cubadebate_cultura', 'name' => 'Cubadebate', 'url' => 'https://www.cubadebate.cu/feed/', 'country' => 'cu', 'category' => 'Cultura', 'include' => self::CULTURE_KEYWORDS ),
+			array( 'id' => 'cubadebate_cultura', 'name' => 'Cubadebate', 'url' => 'https://www.cubadebate.cu/feed/', 'country' => 'cu', 'category' => 'Cultura y Sociedad', 'include' => self::CULTURE_KEYWORDS ),
 			array( 'id' => 'cubadebate_general', 'name' => 'Cubadebate', 'url' => 'https://www.cubadebate.cu/feed/', 'country' => 'cu', 'category' => 'Cuba', 'include' => '' ),
 		);
 	}
@@ -78,7 +78,7 @@ class BHNA_Setup {
 			}
 			if ( '' === trim( $feed['include'] ) && $rec['include'] ) {
 				$feed['include'] = $rec['include'];
-				$changes[]       = sprintf( 'Palabras de cultura añadidas a %s – %s.', $rec['name'], $rec['category'] );
+				$changes[]       = sprintf( 'Palabras de la sección añadidas a %s – %s.', $rec['name'], $rec['category'] );
 			}
 			if ( empty( $feed['country'] ) ) {
 				$feed['country'] = $rec['country'];

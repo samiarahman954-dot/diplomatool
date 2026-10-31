@@ -54,6 +54,8 @@ class BHNA_Settings {
 			'telegram_enabled'     => 0,
 			'telegram_bot_token'   => '',
 			'telegram_chat_id'     => '',
+			'slack_enabled'        => 0,
+			'slack_webhook'        => '',
 			'error_alerts'         => 1,
 			'delete_on_uninstall'  => 0,
 
@@ -83,7 +85,7 @@ class BHNA_Settings {
 	}
 
 	/** Option keys that hold secrets: only replaced when the admin types a new value. */
-	const SECRET_KEYS = array( 'api_key', 'telegram_bot_token', 'x_api_key', 'x_api_secret', 'x_access_token', 'x_access_secret' );
+	const SECRET_KEYS = array( 'api_key', 'telegram_bot_token', 'slack_webhook', 'x_api_key', 'x_api_secret', 'x_access_token', 'x_access_secret' );
 
 	public static function default_prompt() {
 		return "Eres un redactor profesional de un periódico digital en español.\n\n"
@@ -94,7 +96,7 @@ class BHNA_Settings {
 			. "- Mantén exactos los nombres propios, las cifras y las fechas.\n"
 			. "- Tono periodístico, claro y neutral. Extensión: entre 150 y 300 palabras, en 3 a 5 párrafos.\n"
 			. "- No menciones el medio original en el texto: la atribución se añade automáticamente.\n"
-			. "- El extracto debe tener una o dos frases. La meta descripción, como máximo 155 caracteres.\n"
+			. "- El extracto debe tener una o dos frases. El título SEO, como máximo 60 caracteres. La meta descripción, como máximo 155 caracteres.\n"
 			. "- Propón entre 2 y 5 etiquetas cortas.";
 	}
 

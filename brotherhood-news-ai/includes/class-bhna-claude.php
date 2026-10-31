@@ -24,7 +24,7 @@ class BHNA_Claude {
 	/**
 	 * Rewrites one news item.
 	 *
-	 * @return array|WP_Error On success: titulo, cuerpo (paragraph list), extracto, meta_descripcion,
+	 * @return array|WP_Error On success: titulo, cuerpo (paragraph list), extracto, meta_titulo, meta_descripcion,
 	 *                        etiquetas, model, input_tokens, output_tokens.
 	 *                        WP_Error data includes 'retryable' => bool.
 	 */
@@ -157,6 +157,10 @@ class BHNA_Claude {
 					'type'        => 'string',
 					'description' => 'Resumen de una o dos frases.',
 				),
+				'meta_titulo'      => array(
+					'type'        => 'string',
+					'description' => 'Título SEO de 60 caracteres como máximo.',
+				),
 				'meta_descripcion' => array(
 					'type'        => 'string',
 					'description' => 'Meta descripción SEO de 155 caracteres como máximo.',
@@ -167,7 +171,7 @@ class BHNA_Claude {
 					'items'       => array( 'type' => 'string' ),
 				),
 			),
-			'required'             => array( 'titulo', 'cuerpo', 'extracto', 'meta_descripcion', 'etiquetas' ),
+			'required'             => array( 'titulo', 'cuerpo', 'extracto', 'meta_titulo', 'meta_descripcion', 'etiquetas' ),
 			'additionalProperties' => false,
 		);
 	}

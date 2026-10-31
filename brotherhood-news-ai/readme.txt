@@ -1,7 +1,7 @@
 === Brotherhood News AI ===
 Requires at least: 6.0
 Requires PHP: 7.4
-Stable tag: 0.3.1
+Stable tag: 0.4.0
 License: GPLv2 or later
 
 Lee feeds RSS, filtra por palabras clave, reescribe las noticias con la API de Claude (Anthropic) y las guarda como borrador para revisión editorial.
@@ -12,7 +12,7 @@ Lee feeds RSS, filtra por palabras clave, reescribe las noticias con la API de C
 2. Las noticias pasan por el filtro de palabras clave (inclusión / exclusión, globales y por fuente).
 3. Las noticias aprobadas entran en una cola y se envían a Claude, que redacta un titular y un texto nuevos sin inventar datos.
 4. Se crea la entrada como "Borrador" o "Pendiente de revisión" (nunca se publica sola), con la atribución "Con información original de [Medio]".
-5. Se avisa a los editores por email y/o Telegram. Si faltan nombres o cifras del original, el aviso y la entrada muestran una advertencia.
+5. Se avisa a los editores por email, Telegram y/o Slack. Si faltan nombres o cifras del original, el aviso y la entrada muestran una advertencia.
 
 Incluye control de duplicados, límite diario, reintentos automáticos, panel con estadísticas y registro.
 
@@ -38,6 +38,10 @@ WP-Cron solo se ejecuta cuando alguien visita la web. Para que el sistema funcio
 2. En hPanel ➔ Avanzado ➔ Cron Jobs, crea una tarea cada 5 minutos con el comando:
 
     wget -q -O - "https://TU-DOMINIO.com/wp-cron.php?doing_wp_cron" >/dev/null 2>&1
+
+== Slack (opcional) ==
+
+En Slack: Apps ➔ Incoming Webhooks ➔ elige el canal de los editores y copia la URL del webhook en Ajustes IA ➔ Alertas. Pulsa "Guardar y enviar prueba a Slack".
 
 == Telegram ==
 
