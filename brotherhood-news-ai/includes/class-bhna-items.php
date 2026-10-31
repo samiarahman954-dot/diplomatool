@@ -29,6 +29,13 @@ class BHNA_Items {
 		return sha1( (string) $guid );
 	}
 
+	/** Id and status of an already seen entry, or null. */
+	public static function find( $guid ) {
+		global $wpdb;
+		$table = self::table();
+		return $wpdb->get_row( $wpdb->prepare( "SELECT id, status FROM {$table} WHERE guid_hash = %s", self::hash( $guid ) ), ARRAY_A );
+	}
+
 	public static function exists( $guid ) {
 		global $wpdb;
 		$table = self::table();

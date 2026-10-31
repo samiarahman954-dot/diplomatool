@@ -15,6 +15,8 @@ class BHNA_Installer {
 		}
 		if ( false === get_option( BHNA_Settings::FEEDS_OPTION ) ) {
 			add_option( BHNA_Settings::FEEDS_OPTION, BHNA_Settings::default_feeds(), '', false );
+			// First install: create the sections' categories and fill the keyword lists.
+			BHNA_Setup::apply();
 		}
 
 		BHNA_Cron::schedule();

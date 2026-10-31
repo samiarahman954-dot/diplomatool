@@ -2,9 +2,10 @@
 /**
  * Keyword filter: decides which feed entries are worth sending to Claude.
  *
- * Rules (global lists plus the feed's own lists):
- * - An exclude keyword anywhere in the title or summary skips the entry.
- * - If there are include keywords, at least one must appear. With no include keywords, everything passes.
+ * Rules:
+ * - An exclude keyword (global or the feed's own) anywhere in the title or summary skips the entry.
+ * - Include keywords: the feed's own list if it has one, otherwise the global list. At least one must
+ *   appear. With no include keywords at all, everything passes.
  * Matching ignores case and accents and only matches whole words or phrases.
  */
 
@@ -28,10 +29,11 @@ class BHNA_Filter {
 			}
 		}
 
-		$include = array_merge(
-			BHNA_Settings::keyword_list( BHNA_Settings::get( 'include_keywords' ) ),
-			BHNA_Settings::keyword_list( isset( $feed['include'] ) ? $feed['include'] : '' )
-		);
+		// A feed with its own include list uses only that list (e.g. to split one feed into sections).
+		$include = BHNA_Settings::keyword_list( isset( $feed['include'] ) ? $feed['include'] : '' );
+		if ( empty( $include ) ) {
+			$include = BHNA_Settings::keyword_list( BHNA_Settings::get( 'include_keywords' ) );
+		}
 		if ( empty( $include ) ) {
 			return array( true, '' );
 		}

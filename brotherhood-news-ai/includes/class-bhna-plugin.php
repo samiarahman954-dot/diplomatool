@@ -14,6 +14,7 @@ class BHNA_Plugin {
 		BHNA_Social::init();
 
 		if ( is_admin() ) {
+			BHNA_UI::init();
 			BHNA_Admin::init();
 			BHNA_Extras_Admin::init();
 		}

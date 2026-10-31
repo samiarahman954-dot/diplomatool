@@ -66,7 +66,13 @@ class BHNA_Fetcher {
 			$guid  = $entry->get_id() ? $entry->get_id() : $link;
 			$title = self::clean( $entry->get_title() );
 
-			if ( ! $guid || ! $title || BHNA_Items::exists( $guid ) ) {
+			if ( ! $guid || ! $title ) {
+				continue;
+			}
+
+			// Seen before: only an entry another feed filtered out can still be taken by this feed.
+			$existing = BHNA_Items::find( $guid );
+			if ( $existing && BHNA_Items::SKIPPED !== $existing['status'] ) {
 				continue;
 			}
 
@@ -81,6 +87,22 @@ class BHNA_Fetcher {
 			}
 
 			list( $passes, $reason ) = BHNA_Filter::check( $title, $summary, $feed );
+
+			if ( $existing ) {
+				if ( $passes ) {
+					BHNA_Items::update(
+						$existing['id'],
+						array(
+							'feed_id'     => $feed['id'],
+							'source_name' => $feed['name'],
+							'status'      => BHNA_Items::QUEUED,
+							'reason'      => $reason,
+						)
+					);
+					$counts['queued']++;
+				}
+				continue;
+			}
 
 			$id = BHNA_Items::insert(
 				array(

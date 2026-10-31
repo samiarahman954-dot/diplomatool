@@ -1,7 +1,7 @@
 === Brotherhood News AI ===
 Requires at least: 6.0
 Requires PHP: 7.4
-Stable tag: 0.2.0
+Stable tag: 0.3.0
 License: GPLv2 or later
 
 Lee feeds RSS, filtra por palabras clave, reescribe las noticias con la API de Claude (Anthropic) y las guarda como borrador para revisión editorial.
@@ -17,6 +17,8 @@ Lee feeds RSS, filtra por palabras clave, reescribe las noticias con la API de C
 Incluye control de duplicados, límite diario, reintentos automáticos, panel con estadísticas y registro.
 
 == Instalación ==
+
+Al activarlo por primera vez, el plugin crea las categorías de las secciones (España, Economía, Cultura, Estados Unidos, Cuba), las asigna a los feeds y rellena las palabras clave del filtro. Lo mismo hace el botón "Aplicar configuración recomendada" del Panel, sin tocar lo que ya hayas cambiado.
 
 1. Sube la carpeta `brotherhood-news-ai` a `wp-content/plugins/` y activa el plugin.
 2. Noticias IA ➔ Ajustes: añade la clave API de Anthropic, elige el modelo y revisa el prompt. Pulsa "Probar Claude".
@@ -66,6 +68,6 @@ Si una publicación falla se reintenta dos veces (cada 15 minutos) y después se
 
 == Notas ==
 
-* Las URL de feeds incluidas por defecto deben verificarse en la instalación. Las fuentes sin URL quedan inactivas hasta que se completen.
+* Feeds por defecto: El Mundo (Economía, Cultura, Portada), El Diario NY (EE. UU., sustituye a NYT en Español, que cerró en 2019) y Cubadebate. La cultura de Cubadebate se separa del mismo feed con palabras clave propias. Usa "Guardar y probar" en cada fuente para comprobarla; si pegas la dirección de una web, el plugin detecta su feed.
 * El coste mostrado en el panel es una estimación con las tarifas públicas de Anthropic.
 * Al eliminar el plugin, los datos solo se borran si se activa la opción en Ajustes. Las entradas creadas nunca se borran.

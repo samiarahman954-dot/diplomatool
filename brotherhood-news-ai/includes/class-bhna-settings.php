@@ -157,16 +157,22 @@ class BHNA_Settings {
 		);
 	}
 
-	/** Initial feed list agreed with the client. URLs marked empty must be filled in from the admin. */
+	/** Initial feed list agreed with the client (see BHNA_Setup for the recommended configuration). */
 	public static function default_feeds() {
-		return array(
-			self::new_feed( array( 'id' => 'elmundo_portada', 'name' => 'El Mundo', 'url' => 'https://e00-elmundo.uecdn.es/elmundo/rss/portada.xml', 'country' => 'es', 'enabled' => 1 ) ),
-			self::new_feed( array( 'id' => 'elmundo_economia', 'name' => 'El Mundo', 'url' => 'https://e00-elmundo.uecdn.es/elmundo/rss/economia.xml', 'country' => 'es', 'enabled' => 1 ) ),
-			self::new_feed( array( 'id' => 'elmundo_cultura', 'name' => 'El Mundo', 'url' => 'https://e00-elmundo.uecdn.es/elmundo/rss/cultura.xml', 'country' => 'es', 'enabled' => 1 ) ),
-			self::new_feed( array( 'id' => 'us_internacional', 'name' => 'Internacional en Español (EE. UU.)', 'url' => '', 'country' => 'us', 'enabled' => 0 ) ),
-			self::new_feed( array( 'id' => 'cubadebate_general', 'name' => 'Cubadebate', 'url' => 'https://www.cubadebate.cu/feed/', 'country' => 'cu', 'enabled' => 1 ) ),
-			self::new_feed( array( 'id' => 'cubadebate_cultura', 'name' => 'Cubadebate', 'url' => '', 'country' => 'cu', 'enabled' => 0 ) ),
-		);
+		$feeds = array();
+		foreach ( BHNA_Setup::recommended_feeds() as $rec ) {
+			$feeds[] = self::new_feed(
+				array(
+					'id'      => $rec['id'],
+					'name'    => $rec['name'],
+					'url'     => $rec['url'],
+					'country' => $rec['country'],
+					'include' => $rec['include'],
+					'enabled' => 1,
+				)
+			);
+		}
+		return $feeds;
 	}
 
 	/** Splits a textarea of keywords (one per line or comma separated) into a clean list. */

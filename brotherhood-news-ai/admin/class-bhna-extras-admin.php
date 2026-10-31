@@ -16,11 +16,12 @@ class BHNA_Extras_Admin {
 		add_action( 'save_post_' . BHNA_Amazon::CPT, array( __CLASS__, 'save_product' ), 5, 2 );
 		add_action( 'add_meta_boxes_post', array( __CLASS__, 'add_post_box' ) );
 		add_action( 'save_post_post', array( __CLASS__, 'save_post_box' ), 10, 2 );
+		add_action( 'all_admin_notices', array( __CLASS__, 'products_header' ) );
 
 		add_filter( 'manage_' . BHNA_Amazon::CPT . '_posts_columns', array( __CLASS__, 'product_columns' ) );
 		add_action( 'manage_' . BHNA_Amazon::CPT . '_posts_custom_column', array( __CLASS__, 'product_column' ), 10, 2 );
 
-		foreach ( array( 'save_amazon', 'save_social', 'test_x', 'test_tg_channel', 'create_deals_page' ) as $action ) {
+		foreach ( array( 'save_amazon', 'save_social', 'create_deals_page' ) as $action ) {
 			add_action( 'admin_post_bhna_' . $action, array( __CLASS__, 'handle_' . $action ) );
 		}
 	}
@@ -30,30 +31,24 @@ class BHNA_Extras_Admin {
 		add_submenu_page( 'bhna', 'Redes sociales', 'Redes sociales', self::CAP, 'bhna-social', array( __CLASS__, 'page_social' ) );
 	}
 
-	private static function verify( $action ) {
-		if ( ! current_user_can( self::CAP ) ) {
-			wp_die( esc_html( 'No tienes permisos para hacer esto.' ) );
+	/** The plugin navigation on top of the "Productos Amazon" list, so every screen looks the same. */
+	public static function products_header() {
+		$screen = get_current_screen();
+		if ( ! $screen || 'edit-' . BHNA_Amazon::CPT !== $screen->id ) {
+			return;
 		}
-		check_admin_referer( 'bhna_' . $action );
-	}
-
-	private static function redirect( $page, $message, $type = 'success' ) {
-		wp_safe_redirect( add_query_arg( array( 'page' => $page, 'bhna_msg' => rawurlencode( $message ), 'bhna_type' => $type ), admin_url( 'admin.php' ) ) );
-		exit;
-	}
-
-	private static function form_open( $action ) {
-		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
-		wp_nonce_field( 'bhna_' . $action );
-		echo '<input type="hidden" name="action" value="bhna_' . esc_attr( $action ) . '">';
-	}
-
-	private static function secret_field( $name, $saved, $placeholder ) {
-		printf(
-			'<input type="password" name="%s" value="" class="regular-text" autocomplete="off" placeholder="%s">',
-			esc_attr( $name ),
-			esc_attr( $saved ? 'Guardado (••••' . substr( $saved, -4 ) . ')' : $placeholder )
-		);
+		echo '<div class="bhna-wrap" style="min-height:0;padding-bottom:0;margin-bottom:-20px;">';
+		echo '<div class="bhna-header" style="margin-bottom:0;"><div class="bhna-brand"><div class="bhna-logo">BH</div><div><h1>Brotherhood News AI</h1><small>Productos de Amazon</small></div></div><nav class="bhna-nav">';
+		foreach ( BHNA_UI::nav_items() as $slug => $item ) {
+			printf(
+				'<a href="%s" class="%s"><span class="dashicons %s"></span>%s</a>',
+				esc_url( $item[2] ),
+				'bhna-products' === $slug ? 'is-active' : '',
+				esc_attr( $item[1] ),
+				esc_html( $item[0] )
+			);
+		}
+		echo '</nav></div></div>';
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -61,79 +56,54 @@ class BHNA_Extras_Admin {
 	/* ------------------------------------------------------------------ */
 
 	public static function page_amazon() {
-		$s = BHNA_Settings::get();
-		?>
-		<div class="wrap">
-			<h1>Noticias IA – Amazon</h1>
-			<p>Los productos se añaden en <a href="<?php echo esc_url( admin_url( 'edit.php?post_type=' . BHNA_Amazon::CPT ) ); ?>">Productos Amazon</a>. Sin la API de Amazon no se muestran precios ni imágenes (Amazon solo los permite a través de su API).</p>
-			<?php self::form_open( 'save_amazon' ); ?>
-				<table class="form-table" role="presentation">
-					<tr>
-						<th scope="row">Activar</th>
-						<td><label><input type="checkbox" name="amazon_enabled" value="1" <?php checked( $s['amazon_enabled'] ); ?>> Mostrar productos de Amazon en los artículos</label></td>
-					</tr>
-					<tr>
-						<th scope="row">ID de afiliado Amazon.com</th>
-						<td><input type="text" name="amazon_tag_com" value="<?php echo esc_attr( $s['amazon_tag_com'] ); ?>" class="regular-text" placeholder="tuid-20"></td>
-					</tr>
-					<tr>
-						<th scope="row">ID de afiliado Amazon.es</th>
-						<td>
-							<input type="text" name="amazon_tag_es" value="<?php echo esc_attr( $s['amazon_tag_es'] ); ?>" class="regular-text" placeholder="tuid-21">
-							<p class="description">Mientras esté vacío, las noticias de España mostrarán productos de Amazon.com con tu ID de Amazon.com, para no perder comisiones.</p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row">Tienda por defecto</th>
-						<td>
-							<select name="amazon_default_store">
-								<?php foreach ( BHNA_Amazon::STORES as $value => $label ) : ?>
-									<option value="<?php echo esc_attr( $value ); ?>" <?php selected( $s['amazon_default_store'], $value ); ?>><?php echo esc_html( $label ); ?></option>
-								<?php endforeach; ?>
-							</select>
-							<p class="description">Se usa en artículos sin país. Noticias de España ➔ Amazon.es; EE. UU. y Cuba ➔ Amazon.com.</p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row">Productos por artículo</th>
-						<td><input type="number" name="amazon_max_products" min="1" max="6" value="<?php echo esc_attr( $s['amazon_max_products'] ); ?>"></td>
-					</tr>
-					<tr>
-						<th scope="row">Posición</th>
-						<td>
-							<select name="amazon_position">
-								<option value="end" <?php selected( $s['amazon_position'], 'end' ); ?>>Al final del artículo</option>
-								<option value="middle" <?php selected( $s['amazon_position'], 'middle' ); ?>>Después del segundo párrafo</option>
-							</select>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row">Título del bloque</th>
-						<td><input type="text" name="amazon_box_title" value="<?php echo esc_attr( $s['amazon_box_title'] ); ?>" class="regular-text"></td>
-					</tr>
-					<tr>
-						<th scope="row">Texto del botón</th>
-						<td><input type="text" name="amazon_button_text" value="<?php echo esc_attr( $s['amazon_button_text'] ); ?>" class="regular-text"></td>
-					</tr>
-					<tr>
-						<th scope="row">Aviso de afiliación</th>
-						<td>
-							<textarea name="amazon_disclosure" rows="2" class="large-text"><?php echo esc_textarea( $s['amazon_disclosure'] ); ?></textarea>
-							<p class="description">Amazon exige mostrar este aviso. Los enlaces llevan rel="sponsored", como recomienda Google.</p>
-						</td>
-					</tr>
-				</table>
-				<?php submit_button( 'Guardar ajustes de Amazon' ); ?>
-			</form>
+		$s        = BHNA_Settings::get();
+		$products = wp_count_posts( BHNA_Amazon::CPT );
+		$total    = $products ? (int) $products->publish : 0;
+		$deals    = count( BHNA_Amazon::deals( '', 500 ) );
 
-			<hr>
-			<h2>Sección de Ofertas</h2>
-			<p>Usa el shortcode <code>[bhna_ofertas]</code> en cualquier página (opciones: <code>limite="12"</code>, <code>tienda="es"</code> o <code>tienda="com"</code>, <code>titulo="…"</code>), o el widget <strong>"Ofertas de Amazon"</strong> en Apariencia ➔ Widgets.</p>
-			<?php self::form_open( 'create_deals_page' ); ?>
-				<?php submit_button( 'Crear página "Ofertas" (borrador)', 'secondary', 'submit', false ); ?>
-			</form>
-		</div>
-		<?php
+		BHNA_UI::page_open(
+			'bhna-amazon',
+			'Amazon',
+			'Productos de afiliado en los artículos y sección de ofertas. Sin la API de Amazon no se muestran precios ni imágenes (Amazon solo los permite mediante su API).',
+			'<a class="button button-primary" href="' . esc_url( admin_url( 'post-new.php?post_type=' . BHNA_Amazon::CPT ) ) . '">Añadir producto</a>'
+		);
+
+		echo '<div class="bhna-kpis">';
+		BHNA_UI::kpi( 'Módulo', $s['amazon_enabled'] ? 'Activo' : 'Inactivo', 'dashicons-amazon', $s['amazon_enabled'] ? 'success' : 'warning' );
+		BHNA_UI::kpi( 'Productos', $total, 'dashicons-cart' );
+		BHNA_UI::kpi( 'Ofertas activas', $deals, 'dashicons-tag' );
+		BHNA_UI::kpi( 'Tienda España', '' !== $s['amazon_tag_es'] ? 'Amazon.es' : 'Amazon.com (sin ID .es)', 'dashicons-location', '' !== $s['amazon_tag_es'] ? 'success' : 'warning' );
+		echo '</div>';
+
+		BHNA_UI::form_open( 'save_amazon' );
+
+		BHNA_UI::card_open( 'Módulo e IDs de afiliado', 'dashicons-admin-network' );
+		BHNA_UI::field( 'Activar', BHNA_UI::toggle( 'amazon_enabled', $s['amazon_enabled'], 'Mostrar productos de Amazon en los artículos' ) );
+		BHNA_UI::field( 'ID de Amazon.com', BHNA_UI::text( 'amazon_tag_com', $s['amazon_tag_com'], 'tuid-20' ), 'El identificador de afiliado que termina en -20.', 'bhna_amazon_tag_com' );
+		BHNA_UI::field( 'ID de Amazon.es', BHNA_UI::text( 'amazon_tag_es', $s['amazon_tag_es'], 'tuid-21' ), 'Mientras esté vacío, las noticias de España muestran productos de Amazon.com con tu ID de .com, para no perder comisiones.', 'bhna_amazon_tag_es' );
+		BHNA_UI::field( 'Tienda por defecto', BHNA_UI::select( 'amazon_default_store', BHNA_Amazon::STORES, $s['amazon_default_store'] ), 'Para artículos sin país. España ➔ Amazon.es; EE. UU. y Cuba ➔ Amazon.com.', 'bhna_amazon_default_store' );
+		BHNA_UI::card_close();
+
+		BHNA_UI::card_open( 'Bloque de productos', 'dashicons-screenoptions', 'Cómo se ve el bloque dentro de los artículos.' );
+		BHNA_UI::field( 'Productos por artículo', BHNA_UI::number( 'amazon_max_products', $s['amazon_max_products'], 1, 6 ), '', 'bhna_amazon_max_products' );
+		BHNA_UI::field( 'Posición', BHNA_UI::select( 'amazon_position', array( 'end' => 'Al final del artículo', 'middle' => 'Después del segundo párrafo' ), $s['amazon_position'] ), '', 'bhna_amazon_position' );
+		BHNA_UI::field( 'Título del bloque', BHNA_UI::text( 'amazon_box_title', $s['amazon_box_title'] ), '', 'bhna_amazon_box_title' );
+		BHNA_UI::field( 'Texto del botón', BHNA_UI::text( 'amazon_button_text', $s['amazon_button_text'] ), '', 'bhna_amazon_button_text' );
+		BHNA_UI::field( 'Aviso de afiliación', BHNA_UI::textarea( 'amazon_disclosure', $s['amazon_disclosure'], 2 ), 'Amazon exige mostrarlo. Los enlaces llevan rel="sponsored", como recomienda Google.', 'bhna_amazon_disclosure' );
+		BHNA_UI::card_close();
+
+		BHNA_UI::savebar( 'Guardar ajustes de Amazon' );
+		echo '</form>';
+
+		BHNA_UI::card_open(
+			'Sección de Ofertas',
+			'dashicons-tag',
+			'Marca un producto como "Oferta" para que aparezca aquí. Usa el shortcode <code>[bhna_ofertas]</code> (opciones: <code>limite="12"</code>, <code>tienda="es"</code> o <code>tienda="com"</code>, <code>titulo="…"</code>) o el widget "Ofertas de Amazon" en Apariencia ➔ Widgets.',
+			BHNA_UI::action_button( 'create_deals_page', 'Crear página "Ofertas"', 'button' )
+		);
+		BHNA_UI::card_close();
+
+		BHNA_UI::page_close();
 	}
 
 	public static function handle_save_amazon() {
@@ -154,7 +124,7 @@ class BHNA_Extras_Admin {
 			)
 		);
 		BHNA_Amazon::flush_cache();
-		self::redirect( 'bhna-amazon', 'Ajustes de Amazon guardados.' );
+		BHNA_Admin::redirect( 'bhna-amazon', 'Ajustes de Amazon guardados.' );
 	}
 
 	public static function handle_create_deals_page() {
@@ -169,10 +139,14 @@ class BHNA_Extras_Admin {
 			true
 		);
 		if ( is_wp_error( $page_id ) ) {
-			self::redirect( 'bhna-amazon', $page_id->get_error_message(), 'error' );
+			BHNA_Admin::redirect( 'bhna-amazon', $page_id->get_error_message(), 'error' );
 		}
 		wp_safe_redirect( admin_url( 'post.php?post=' . (int) $page_id . '&action=edit' ) );
 		exit;
+	}
+
+	private static function verify( $action ) {
+		BHNA_Admin::verify( $action );
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -378,97 +352,55 @@ class BHNA_Extras_Admin {
 
 	public static function page_social() {
 		$s = BHNA_Settings::get();
-		?>
-		<div class="wrap">
-			<h1>Noticias IA – Redes sociales</h1>
-			<p>Cuando un editor <strong>publica</strong> un artículo, se comparte automáticamente en las redes activas (nunca los borradores). Cada artículo puede excluirse desde su caja "Amazon y redes sociales".</p>
-			<?php self::form_open( 'save_social' ); ?>
-				<table class="form-table" role="presentation">
-					<tr>
-						<th scope="row">Qué artículos compartir</th>
-						<td>
-							<label><input type="radio" name="social_share_all" value="1" <?php checked( $s['social_share_all'], 1 ); ?>> Todos los artículos publicados</label><br>
-							<label><input type="radio" name="social_share_all" value="0" <?php checked( $s['social_share_all'], 0 ); ?>> Solo los creados por Noticias IA</label>
-						</td>
-					</tr>
-				</table>
 
-				<h2>X (Twitter)</h2>
-				<table class="form-table" role="presentation">
-					<tr>
-						<th scope="row">Activar</th>
-						<td><label><input type="checkbox" name="x_enabled" value="1" <?php checked( $s['x_enabled'] ); ?>> Publicar en X</label></td>
-					</tr>
-					<tr>
-						<th scope="row">API Key / API Secret</th>
-						<td>
-							<?php self::secret_field( 'x_api_key', $s['x_api_key'], 'API Key (Consumer Key)' ); ?><br>
-							<?php self::secret_field( 'x_api_secret', $s['x_api_secret'], 'API Key Secret' ); ?>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row">Access Token / Secret</th>
-						<td>
-							<?php self::secret_field( 'x_access_token', $s['x_access_token'], 'Access Token' ); ?><br>
-							<?php self::secret_field( 'x_access_secret', $s['x_access_secret'], 'Access Token Secret' ); ?>
-							<p class="description">Del portal de desarrolladores de X, con permisos de "Read and write".</p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row">Plantilla</th>
-						<td>
-							<textarea name="x_template" rows="3" class="large-text"><?php echo esc_textarea( $s['x_template'] ); ?></textarea>
-							<p class="description">Variables: <code>{titulo}</code>, <code>{extracto}</code>, <code>{enlace}</code>. Se recorta automáticamente a 280 caracteres. X muestra la imagen del artículo en la tarjeta del enlace.</p>
-						</td>
-					</tr>
-				</table>
+		BHNA_UI::page_open(
+			'bhna-social',
+			'Redes sociales',
+			'Cuando un editor <strong>publica</strong> un artículo, se comparte automáticamente en las redes activas (nunca los borradores). Cada artículo puede excluirse desde su caja "Amazon y redes sociales".'
+		);
 
-				<h2>Canal público de Telegram</h2>
-				<table class="form-table" role="presentation">
-					<tr>
-						<th scope="row">Activar</th>
-						<td>
-							<label><input type="checkbox" name="tg_channel_enabled" value="1" <?php checked( $s['tg_channel_enabled'] ); ?>> Publicar en el canal de Telegram</label>
-							<p class="description">Usa el mismo bot que las alertas (Ajustes). Añádelo como administrador del canal. Las alertas de editores siguen yendo al grupo privado.</p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row">ID del canal</th>
-						<td><input type="text" name="tg_channel_id" value="<?php echo esc_attr( $s['tg_channel_id'] ); ?>" class="regular-text" placeholder="@micanal o -100…"></td>
-					</tr>
-					<tr>
-						<th scope="row">Plantilla</th>
-						<td>
-							<textarea name="tg_channel_template" rows="4" class="large-text"><?php echo esc_textarea( $s['tg_channel_template'] ); ?></textarea>
-							<p class="description">Variables: <code>{titulo}</code>, <code>{extracto}</code>, <code>{enlace}</code>. Admite &lt;b&gt; e &lt;i&gt;.</p>
-						</td>
-					</tr>
-				</table>
+		echo '<div class="bhna-kpis">';
+		BHNA_UI::kpi( 'X (Twitter)', $s['x_enabled'] ? 'Activo' : 'Inactivo', 'dashicons-twitter', $s['x_enabled'] ? 'success' : '' );
+		BHNA_UI::kpi( 'Canal de Telegram', $s['tg_channel_enabled'] ? 'Activo' : 'Inactivo', 'dashicons-megaphone', $s['tg_channel_enabled'] ? 'success' : '' );
+		BHNA_UI::kpi( 'Facebook / LinkedIn', 'Próximamente', 'dashicons-share' );
+		echo '</div>';
 
-				<h2>Próximamente</h2>
-				<table class="form-table" role="presentation">
-					<tr>
-						<th scope="row">Facebook</th>
-						<td><input type="text" class="regular-text" disabled placeholder="Preparado para conectar (página de Facebook)"></td>
-					</tr>
-					<tr>
-						<th scope="row">LinkedIn</th>
-						<td><input type="text" class="regular-text" disabled placeholder="Preparado para conectar (página de empresa)"></td>
-					</tr>
-				</table>
+		BHNA_UI::form_open( 'save_social' );
 
-				<?php submit_button( 'Guardar redes sociales' ); ?>
-			</form>
+		BHNA_UI::card_open( 'General', 'dashicons-admin-settings' );
+		BHNA_UI::field(
+			'Qué artículos compartir',
+			BHNA_UI::select( 'social_share_all', array( '1' => 'Todos los artículos publicados', '0' => 'Solo los creados por Noticias IA' ), (string) (int) $s['social_share_all'] ),
+			'',
+			'bhna_social_share_all'
+		);
+		BHNA_UI::card_close();
 
-			<hr>
-			<h2>Comprobaciones</h2>
-			<p class="description">Verifican las credenciales sin publicar nada.</p>
-			<div style="display:flex;gap:8px;">
-				<?php self::form_open( 'test_x' ); ?><?php submit_button( 'Verificar X', 'secondary', 'submit', false ); ?></form>
-				<?php self::form_open( 'test_tg_channel' ); ?><?php submit_button( 'Verificar canal de Telegram', 'secondary', 'submit', false ); ?></form>
-			</div>
-		</div>
-		<?php
+		BHNA_UI::card_open( 'X (Twitter)', 'dashicons-twitter', 'Crea una app en el portal de desarrolladores de X con permisos <strong>Read and write</strong> y copia aquí sus cuatro claves. El plan gratuito de X tiene un límite mensual de publicaciones.' );
+		BHNA_UI::field( 'Activar', BHNA_UI::toggle( 'x_enabled', $s['x_enabled'], 'Publicar en X' ) );
+		BHNA_UI::field( 'API Key', BHNA_UI::secret( 'x_api_key', $s['x_api_key'], 'API Key (Consumer Key)' ), '', 'bhna_x_api_key' );
+		BHNA_UI::field( 'API Key Secret', BHNA_UI::secret( 'x_api_secret', $s['x_api_secret'], 'API Key Secret' ), '', 'bhna_x_api_secret' );
+		BHNA_UI::field( 'Access Token', BHNA_UI::secret( 'x_access_token', $s['x_access_token'], 'Access Token' ), '', 'bhna_x_access_token' );
+		BHNA_UI::field( 'Access Token Secret', BHNA_UI::secret( 'x_access_secret', $s['x_access_secret'], 'Access Token Secret' ), '', 'bhna_x_access_secret' );
+		BHNA_UI::field( 'Plantilla', BHNA_UI::textarea( 'x_template', $s['x_template'], 3 ), 'Variables: <code>{titulo}</code>, <code>{extracto}</code>, <code>{enlace}</code>. Se recorta a 280 caracteres. X muestra la imagen del artículo en la tarjeta del enlace.', 'bhna_x_template' );
+		BHNA_UI::field( 'Comprobar', '<button type="submit" class="button" name="bhna_after" value="test_x">Guardar y verificar X</button>', 'Comprueba las claves sin publicar nada.' );
+		BHNA_UI::card_close();
+
+		BHNA_UI::card_open( 'Canal público de Telegram', 'dashicons-megaphone', 'Usa el mismo bot que las alertas (Ajustes IA ➔ Alertas). Añádelo como <strong>administrador del canal</strong>. Las alertas de editores siguen yendo al grupo privado.' );
+		BHNA_UI::field( 'Activar', BHNA_UI::toggle( 'tg_channel_enabled', $s['tg_channel_enabled'], 'Publicar en el canal' ) );
+		BHNA_UI::field( 'ID del canal', BHNA_UI::text( 'tg_channel_id', $s['tg_channel_id'], '@micanal o -100…' ), '', 'bhna_tg_channel_id' );
+		BHNA_UI::field( 'Plantilla', BHNA_UI::textarea( 'tg_channel_template', $s['tg_channel_template'], 4 ), 'Variables: <code>{titulo}</code>, <code>{extracto}</code>, <code>{enlace}</code>. Admite &lt;b&gt; e &lt;i&gt;.', 'bhna_tg_channel_template' );
+		BHNA_UI::field( 'Comprobar', '<button type="submit" class="button" name="bhna_after" value="test_tg_channel">Guardar y verificar canal</button>', 'Comprueba que el bot tiene acceso al canal, sin publicar nada.' );
+		BHNA_UI::card_close();
+
+		BHNA_UI::card_open( 'Próximamente', 'dashicons-share', 'Preparado para conectar más adelante.' );
+		BHNA_UI::field( 'Facebook', '<input type="text" class="regular-text" disabled placeholder="Página de Facebook">' . ' ' . BHNA_UI::badge( 'Preparado' ) );
+		BHNA_UI::field( 'LinkedIn', '<input type="text" class="regular-text" disabled placeholder="Página de empresa">' . ' ' . BHNA_UI::badge( 'Preparado' ) );
+		BHNA_UI::card_close();
+
+		BHNA_UI::savebar( 'Guardar redes sociales' );
+		echo '</form>';
+		BHNA_UI::page_close();
 	}
 
 	public static function handle_save_social() {
@@ -488,26 +420,24 @@ class BHNA_Extras_Admin {
 				$values[ $key ] = sanitize_text_field( $p[ $key ] );
 			}
 		}
-
 		BHNA_Settings::update( $values );
-		self::redirect( 'bhna-social', 'Redes sociales guardadas.' );
-	}
 
-	public static function handle_test_x() {
-		self::verify( 'test_x' );
-		$result = BHNA_Social::check_x();
-		if ( is_wp_error( $result ) ) {
-			self::redirect( 'bhna-social', 'X: ' . $result->get_error_message(), 'error' );
+		$after = isset( $p['bhna_after'] ) ? $p['bhna_after'] : '';
+		if ( 'test_x' === $after ) {
+			$result = BHNA_Social::check_x();
+			if ( is_wp_error( $result ) ) {
+				BHNA_Admin::redirect( 'bhna-social', 'Guardado. X: ' . $result->get_error_message(), 'error' );
+			}
+			BHNA_Admin::redirect( 'bhna-social', 'Guardado. X conectado correctamente: ' . $result );
 		}
-		self::redirect( 'bhna-social', 'X conectado correctamente: ' . $result );
-	}
+		if ( 'test_tg_channel' === $after ) {
+			$result = BHNA_Social::check_telegram_channel();
+			if ( is_wp_error( $result ) ) {
+				BHNA_Admin::redirect( 'bhna-social', 'Guardado. Telegram: ' . $result->get_error_message(), 'error' );
+			}
+			BHNA_Admin::redirect( 'bhna-social', 'Guardado. El bot tiene acceso al canal: ' . $result );
+		}
 
-	public static function handle_test_tg_channel() {
-		self::verify( 'test_tg_channel' );
-		$result = BHNA_Social::check_telegram_channel();
-		if ( is_wp_error( $result ) ) {
-			self::redirect( 'bhna-social', 'Telegram: ' . $result->get_error_message(), 'error' );
-		}
-		self::redirect( 'bhna-social', 'El bot tiene acceso al canal: ' . $result );
+		BHNA_Admin::redirect( 'bhna-social', 'Redes sociales guardadas.' );
 	}
 }
