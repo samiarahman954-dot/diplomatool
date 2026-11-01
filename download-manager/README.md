@@ -25,30 +25,41 @@ standard library দিয়ে লেখা। দেখতে Windows 11 এ�
 | **Expired link refresh** | Properties থেকে নতুন link বসিয়ে আগের progress রেখেই resume করা যায় |
 | **Proxy, User-Agent, cookies/referer** | browser থেকে আসা download-এর cookies আর referer সাথে যায়, তাই login লাগে এমন সাইটেও কাজ করে |
 
-## কীভাবে পাবেন (Get the .exe)
+## Install (IDM-এর মতই)
 
-### উপায় ১ — GitHub থেকে তৈরি করা .exe (সবচেয়ে সহজ)
-1. GitHub-এ repo-র **Actions** ট্যাবে যান → **Build SwiftGet for Windows** খুলুন।
-2. সবচেয়ে নতুন সফল run-টা খুলুন। নিচে **Artifacts** অংশে থাকা **SwiftGet-windows** ডাউনলোড করুন।
-3. zip খুললে `SwiftGet.exe` আর `browser-extension` folder পাবেন। দুটো একই folder-এ রাখুন।
-4. `SwiftGet.exe` চালান। প্রথমবার Windows SmartScreen দেখালে **More info → Run anyway** চাপুন, কারণ exe-টা sign করা নেই।
+1. GitHub-এ repo-র **Actions** ট্যাব খুলুন → **Build SwiftGet for Windows** → সবচেয়ে নতুন সফল run খুলুন।
+2. নিচের **Artifacts** অংশ থেকে **SwiftGet-Setup** ডাউনলোড করুন। zip খুললে `SwiftGet-Setup.exe` পাবেন।
+3. `SwiftGet-Setup.exe` চালান, তারপর **Next → Install → Finish** চাপুন। Setup-টা sign করা নেই, তাই SmartScreen দেখালে
+   **More info → Run anyway** চাপুন।
+4. Install হলে যা যা হয়:
+   - Start Menu-তে **SwiftGet**, আর চাইলে Desktop-এ shortcut
+   - Windows চালু হলে SwiftGet নিজে থেকে tray-তে চালু হয়, তাই প্রতিবার খুলতে হয় না
+   - window-এর ✕ চাপলে অ্যাপ বন্ধ হয় না, ঘড়ির পাশের tray icon-এ চলতে থাকে। পুরো বন্ধ করতে tray icon-এ
+     right-click করে **Exit** চাপুন
+   - download শেষ হলে notification আসে
+   - Uninstall করতে: **Settings → Apps → SwiftGet → Uninstall**
 
-### উপায় ২ — নিজের PC-তে build করুন
-1. [python.org](https://www.python.org/downloads/) থেকে Python 3.10 বা তার নতুন version install করুন ("Add to PATH" টিক দিয়ে)।
+Install না করে চালাতে চাইলে **SwiftGet-portable** artifact-ও আছে।
+
+### নিজের PC-তে build করুন
+1. [python.org](https://www.python.org/downloads/) থেকে Python 3.10 বা তার নতুন version install করুন ("Add to PATH" টিক দিয়ে),
+   আর [Inno Setup 6](https://jrsoftware.org/isinfo.php) install করুন।
 2. `download-manager` folder-এ `build_windows.bat`-এ double-click করুন।
-3. `dist\SwiftGet.exe` তৈরি হবে।
+3. `dist-installer\SwiftGet-Setup.exe` তৈরি হবে।
 
-### উপায় ৩ — build ছাড়াই সরাসরি চালান
+### Code থেকে সরাসরি চালান
 ```bash
 cd download-manager
-pip install -r requirements.txt   # ঐচ্ছিক: modern theme
+pip install -r requirements.txt   # ঐচ্ছিক: modern theme + tray icon
 python run.py
 ```
 
 ## Browser extension install (একবারই করতে হবে)
+প্রথমবার SwiftGet খুললে Welcome screen-এ এই ধাপগুলো দেখায়, সাথে "Copy address" আর "Open extension folder" বাটনও থাকে।
+
 1. Chrome-এ `chrome://extensions` খুলুন (Edge-এ `edge://extensions`)।
 2. উপরে ডানদিকের **Developer mode** চালু করুন।
-3. **Load unpacked** চাপুন, তারপর `browser-extension` folder-টা বেছে নিন।
+3. **Load unpacked** চাপুন, তারপর `C:\Program Files\SwiftGet\browser-extension` folder-টা বেছে নিন।
 4. এখন থেকে zip, exe, mp4, pdf ইত্যাদি ফাইল ডাউনলোড করলে SwiftGet নিজে থেকে ধরে নেবে। কোন কোন ধরনের ফাইল ধরবে
    সেটা **Options ▸ Browser** থেকে বদলাতে পারবেন।
 5. SwiftGet বন্ধ থাকলে browser আগের মত নিজেই ফাইল নামাবে।
@@ -71,15 +82,19 @@ download-manager/
 │   ├── widgets.py         # custom-drawn download cards & sidebar
 │   ├── theme.py           # light / dark theme, fonts, colours
 │   ├── server.py          # 127.0.0.1 API for the browser extension
+│   ├── tray.py            # system-tray icon + notifications
+│   ├── autostart.py       # start with Windows
 │   ├── config.py          # settings
 │   └── utils.py
 ├── browser-extension/     # Chrome/Edge Manifest V3 extension
 ├── tests/test_engine.py   # python -m unittest discover -s tests
 ├── tools/make_icons.py    # regenerates the icons
+├── installer/swiftget.iss # Inno Setup script -> SwiftGet-Setup.exe
 └── build_windows.bat
 ```
 
 ## Notes
 - এটা নিজের ব্যক্তিগত ব্যবহারের জন্য। শুধু সেই কনটেন্ট ডাউনলোড করুন যেটা নামানোর অধিকার আপনার আছে।
-- এখনো যা নেই: YouTube বা অন্য streaming সাইট থেকে ভিডিও ধরা (IDM-এর "video grabber"), system tray icon। দরকার হলে পরে যোগ করা যাবে।
+- এখনো যা নেই: YouTube বা অন্য streaming সাইট থেকে ভিডিও ধরা (IDM-এর "video grabber")। দরকার হলে পরে যোগ করা যাবে।
+- Chrome-এর নিয়মের কারণে browser extension নিজে থেকে install করা যায় না, ওটা একবার হাতে বসাতে হয়।
 - Browser integration শুধু `127.0.0.1`-এ শোনে। extension বাদে অন্য কোনো website এতে download যোগ করতে পারে না।

@@ -9,10 +9,11 @@ import time
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-from . import APP_NAME, VERSION, engine
+from . import APP_NAME, VERSION, autostart, engine
 from .engine import ACTIVE_STATES, COMPLETED, DOWNLOADING, ERROR, PAUSED, QUEUED, WAITING
 from .server import IntegrationServer
 from .theme import CATEGORY_COLORS, Theme, set_titlebar_dark
+from .tray import Tray
 from .utils import (CATEGORY_NAMES, category_for, expand_batch_pattern, extension_of, human_size,
                     human_speed, human_time, is_url, open_path, reveal_in_folder, sanitize_filename)
 from .widgets import DownloadList, Sidebar, rounded_rect
@@ -49,6 +50,11 @@ def make_icon(size=32, color=ICON_BLUE):
 def center_on(win, parent):
     win.update_idletasks()
     try:
+        if not parent.winfo_viewable():  # main window hidden in the tray: centre on screen
+            w, h = win.winfo_reqwidth(), win.winfo_reqheight()
+            sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
+            win.geometry(f"+{max(0, (sw - w) // 2)}+{max(0, (sh - h) // 3)}")
+            return
         px, py = parent.winfo_rootx(), parent.winfo_rooty()
         pw, ph = parent.winfo_width(), parent.winfo_height()
         w, h = win.winfo_reqwidth(), win.winfo_reqheight()
@@ -98,7 +104,7 @@ FILTER_TITLES = {key: label for key, label, _ in FILTERS if key != "-"}
 
 
 class App:
-    def __init__(self, root, settings, manager):
+    def __init__(self, root, settings, manager, start_hidden=False):
         self.root = root
         self.settings = settings
         self.manager = manager
@@ -128,6 +134,23 @@ class App:
         self._on_theme_changed()
         self._bind_keys()
         self.start_server()
+
+        # tray icon + start with Windows (like IDM)
+        self.tray = Tray(manager.events, resource_path("assets", "swiftget.ico"))
+        if settings["close_to_tray"] or start_hidden:
+            self.tray.start()
+        if autostart.supported():
+            if not settings["autostart_initialized"]:
+                # First run: follow the installer's "start with Windows" choice; the portable
+                # .exe (no installer) defaults to on.
+                settings["start_with_windows"] = autostart.is_enabled() or not autostart.installed()
+                settings["autostart_initialized"] = True
+                settings.save()
+            autostart.set_enabled(bool(settings["start_with_windows"]))
+        if start_hidden and self.tray.running:
+            root.withdraw()
+        elif not settings["welcome_shown"]:
+            root.after(700, lambda: WelcomeDialog(self))
 
         root.protocol("WM_DELETE_WINDOW", self.on_close)
         root.after(100, self._refresh)
@@ -228,7 +251,7 @@ class App:
         self.more.add_command(label="Browser extension…", command=self.browser_help)
         self.more.add_command(label="About SwiftGet", command=self.about)
         self.more.add_separator()
-        self.more.add_command(label="Exit", command=self.on_close)
+        self.more.add_command(label="Exit", command=self.quit_app)
 
     def _on_theme_changed(self):
         c = self.theme.c
@@ -362,6 +385,8 @@ class App:
 
             pct = [d.progress for d in active if d.size > 0]
             self.root.title(f"{sum(pct) / len(pct):.0f}% · {APP_NAME}" if pct else APP_NAME)
+            tip = f"{APP_NAME} – {len(active)} downloading, {human_speed(total_speed)}" if active else APP_NAME
+            self.tray.set_title(tip)
         finally:
             if reschedule:
                 self.root.after(500, self._refresh)
@@ -382,16 +407,22 @@ class App:
                         if win:
                             win.destroy()
                         self.flash(f"Completed: {d.filename}")
-                        if self.settings["show_complete_dialog"]:
+                        if not self.root.winfo_viewable() and self.tray.running:
+                            self.tray.notify("Download complete", d.filename)
+                        elif self.settings["show_complete_dialog"]:
                             CompleteDialog(self, d)
                 elif kind == "error":
                     d = self.manager.get(payload)
                     if d:
                         self.flash(f"Failed: {d.filename}")
+                        if not self.root.winfo_viewable():
+                            self.tray.notify("Download failed", f"{d.filename}\n{d.error}")
                 elif kind == "browser_add":
                     self.handle_browser_add(payload)
                 elif kind == "show":
-                    bring_to_front(self.root)
+                    self.show_window()
+                elif kind == "tray":
+                    self._tray_action(payload)
                 elif kind == "shutdown":
                     self._shutdown_computer()
                 elif kind == "info":
@@ -604,14 +635,45 @@ class App:
                             "speed limiter and browser integration.\n\nFor personal use.",
                             parent=self.root)
 
+    def show_window(self):
+        self.root.deiconify()
+        bring_to_front(self.root)
+
+    def _tray_action(self, action):
+        if action == "show":
+            self.show_window()
+        elif action == "new":
+            self.add_url()
+        elif action == "pause_all":
+            self.manager.pause_all()
+        elif action == "resume_all":
+            self.manager.resume_all()
+        elif action == "exit":
+            self.quit_app()
+
     def on_close(self):
+        """Window X button: keep running in the tray (like IDM)."""
+        if self.settings["close_to_tray"] and (self.tray.running or self.tray.start()):
+            self.root.withdraw()
+            if not self.settings["tray_notice_shown"]:
+                self.tray.notify(APP_NAME, "SwiftGet is still running here and will catch your downloads. "
+                                           "Right-click this icon to exit.")
+                self.settings["tray_notice_shown"] = True
+                self.settings.save()
+        else:
+            self.quit_app()
+
+    def quit_app(self):
         active = [d for d in self.manager.snapshot() if d.is_active]
-        if active and not messagebox.askyesno(
-                APP_NAME, f"{len(active)} download(s) are running.\n\n"
-                "They will be paused and can be resumed next time. Exit now?", parent=self.root):
-            return
+        if active:
+            self.show_window()
+            if not messagebox.askyesno(
+                    APP_NAME, f"{len(active)} download(s) are running.\n\n"
+                    "They will be paused and can be resumed next time. Exit now?", parent=self.root):
+                return
         if self.server:
             self.server.stop()
+        self.tray.stop()
         self.manager.shutdown()
         self.root.destroy()
 
@@ -624,7 +686,8 @@ class Dialog(tk.Toplevel):
         self.withdraw()
         self.title(title)
         self.resizable(True, False)
-        self.transient(app.root)
+        if app.root.winfo_viewable():  # a hidden (tray) parent would hide the dialog too
+            self.transient(app.root)
         self.configure(bg=app.theme.c["bg"])
         self.body = ttk.Frame(self, padding=(22, 18, 22, 18))
         self.body.pack(fill="both", expand=True)
@@ -1205,7 +1268,10 @@ class OptionsDialog(Dialog):
         checks = [("use_category_folders", "Sort files into category folders (Video, Music, Programs…)"),
                   ("show_progress_window", "Show the progress window when a download starts"),
                   ("show_complete_dialog", "Show a notice when a download finishes"),
-                  ("clipboard_monitor", "Watch the clipboard for download links")]
+                  ("clipboard_monitor", "Watch the clipboard for download links"),
+                  ("close_to_tray", "Keep running in the system tray when the window is closed")]
+        if autostart.supported():
+            checks.insert(0, ("start_with_windows", "Start SwiftGet automatically when Windows starts"))
         for i, (key, text) in enumerate(checks, start=2):
             ttk.Checkbutton(g, text=text, variable=var(key, tk.BooleanVar)).grid(
                 row=i, column=0, columnspan=3, sticky="w", pady=4)
@@ -1281,6 +1347,10 @@ class OptionsDialog(Dialog):
         if old_port != s["browser_port"] or old_enabled != s["browser_integration"]:
             self.app.start_server()
         self.destroy()
+        if autostart.supported():
+            autostart.set_enabled(bool(s["start_with_windows"]))
+        if s["close_to_tray"] and not self.app.tray.running:
+            self.app.tray.start()
         if old_theme != s["theme"]:
             self.app.theme.apply(s["theme"])
 
@@ -1341,3 +1411,58 @@ class SchedulerDialog(Dialog):
         self.app.manager.start_queue()
         self.app.manager._shutdown_armed = bool(self.shutdown.get())
         self.destroy()
+
+
+class WelcomeDialog(Dialog):
+    """Shown once on first start: explains the automatic behaviour and the browser extension."""
+
+    def __init__(self, app):
+        super().__init__(app, "Welcome", heading="Welcome to SwiftGet",
+                         subheading="Everything runs automatically, just like other download managers.")
+        app.settings["welcome_shown"] = True
+        app.settings.save()
+        points = [
+            ("Always ready", "SwiftGet starts with Windows and waits in the system tray (next to the clock). "
+                             "Closing the window keeps it running there."),
+            ("Catches browser downloads", "Add the browser extension once (steps below). After that, files "
+                                          "you download in Chrome or Edge open in SwiftGet automatically."),
+            ("Fast and resumable", "Each file is downloaded with up to 32 connections. Pause any time, even "
+                                   "turn off the PC, and continue later."),
+        ]
+        box = ttk.Frame(self.body)
+        box.pack(fill="x", pady=(14, 0))
+        for i, (title, text) in enumerate(points):
+            ttk.Label(box, text=f"{i + 1}", style="Big.TLabel").grid(row=i, column=0, sticky="nw", padx=(0, 14))
+            cell = ttk.Frame(box)
+            cell.grid(row=i, column=1, sticky="w", pady=(4, 10))
+            ttk.Label(cell, text=title, style="Title.TLabel").pack(anchor="w")
+            ttk.Label(cell, text=text, style="Muted.TLabel", wraplength=480).pack(anchor="w")
+
+        ttk.Separator(self.body).pack(fill="x", pady=(6, 12))
+        ttk.Label(self.body, text="Add the browser extension (one time)", style="Title.TLabel").pack(anchor="w")
+        steps = ("1.  Click “Copy address” and paste it into Chrome’s (or Edge’s) address bar.\n"
+                 "2.  Turn on “Developer mode” (top right).\n"
+                 "3.  Click “Load unpacked” and pick the folder that “Open extension folder” shows.")
+        ttk.Label(self.body, text=steps, style="Muted.TLabel", justify="left").pack(anchor="w", pady=(4, 0))
+        row = ttk.Frame(self.body)
+        row.pack(fill="x", pady=(10, 0))
+        ttk.Button(row, text="Copy address", command=self.copy_address).pack(side="left")
+        ttk.Button(row, text="Open extension folder", command=self.open_folder).pack(side="left", padx=(8, 0))
+        self.copied = ttk.Label(row, text="", style="Muted.TLabel")
+        self.copied.pack(side="left", padx=(10, 0))
+
+        self.button_row(self.body, [("Get started", self.destroy, True)]).pack(fill="x", pady=(18, 0))
+        self.finish_layout()
+
+    def copy_address(self):
+        self.app.root.clipboard_clear()
+        self.app.root.clipboard_append("chrome://extensions")
+        self.app._clip_last = "chrome://extensions"
+        self.copied.configure(text="Copied! (Edge: edge://extensions)")
+
+    def open_folder(self):
+        folder = extension_dir()
+        if os.path.isdir(folder):
+            open_path(folder)
+        else:
+            messagebox.showinfo(APP_NAME, f"Extension folder:\n{folder}", parent=self)

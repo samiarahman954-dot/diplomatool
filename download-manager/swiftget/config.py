@@ -40,6 +40,11 @@ DEFAULTS = {
     "show_complete_dialog": True,
     "show_progress_window": True,
     "theme": "system",              # system | light | dark
+    "start_with_windows": True,     # like IDM: runs in the tray from Windows start-up
+    "close_to_tray": True,          # the X button hides the window instead of quitting
+    "tray_notice_shown": False,
+    "autostart_initialized": False,
+    "welcome_shown": False,
     "clipboard_monitor": True,
     "browser_integration": True,
     "browser_port": 9614,

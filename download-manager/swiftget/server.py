@@ -110,13 +110,15 @@ def _local_opener():
     return urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 
-def other_instance_running(port):
-    """True if another SwiftGet already listens on the port (asks it to show itself)."""
+def other_instance_running(port, show=True):
+    """True if another SwiftGet already listens on the port (optionally asks it to show itself)."""
     try:
         with _local_opener().open(f"http://127.0.0.1:{port}/ping", timeout=1.5) as resp:
             info = json.loads(resp.read() or b"{}")
         if info.get("app") != APP_NAME:
             return False
+        if not show:
+            return True
         req = urllib.request.Request(f"http://127.0.0.1:{port}/show", data=b"{}", method="POST",
                                      headers={"X-SwiftGet": "1", "Content-Type": "application/json"})
         _local_opener().open(req, timeout=1.5).close()

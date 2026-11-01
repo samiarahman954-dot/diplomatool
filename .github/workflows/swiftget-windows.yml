@@ -16,6 +16,7 @@ jobs:
     defaults:
       run:
         working-directory: download-manager
+        shell: pwsh
     steps:
       - uses: actions/checkout@v4
 
@@ -26,21 +27,41 @@ jobs:
       - name: Run tests
         run: python -m unittest discover -s tests -v
 
-      - name: Install PyInstaller and the UI theme
+      - name: Install PyInstaller, theme and tray support
         run: python -m pip install pyinstaller -r requirements.txt
 
-      - name: Build SwiftGet.exe
-        run: pyinstaller --noconfirm --onefile --windowed --name SwiftGet --icon assets/swiftget.ico --add-data "assets/swiftget.ico;assets" --collect-data sv_ttk run.py
+      - name: Build the app (one-folder)
+        run: >
+          pyinstaller --noconfirm --onedir --windowed --name SwiftGet
+          --icon assets/swiftget.ico --add-data "assets/swiftget.ico;assets"
+          --collect-data sv_ttk --hidden-import pystray._win32 run.py
 
-      - name: Package
-        shell: pwsh
+      - name: Build SwiftGet-Setup.exe (Inno Setup)
         run: |
-          New-Item -ItemType Directory -Force package | Out-Null
-          Copy-Item dist/SwiftGet.exe package/
-          Copy-Item -Recurse browser-extension package/browser-extension
-          Copy-Item README.md package/
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup --no-progress -y
+            $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          }
+          $version = python -c "import swiftget; print(swiftget.VERSION)"
+          & $iscc "/DMyAppVersion=$version" installer\swiftget.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - uses: actions/upload-artifact@v4
+      - name: Package portable version
+        run: |
+          New-Item -ItemType Directory -Force portable | Out-Null
+          Copy-Item -Recurse dist/SwiftGet portable/SwiftGet
+          Copy-Item -Recurse browser-extension portable/SwiftGet/browser-extension
+          Copy-Item README.md portable/SwiftGet/
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
         with:
-          name: SwiftGet-windows
-          path: download-manager/package
+          name: SwiftGet-Setup
+          path: download-manager/dist-installer/SwiftGet-Setup.exe
+
+      - name: Upload portable version
+        uses: actions/upload-artifact@v4
+        with:
+          name: SwiftGet-portable
+          path: download-manager/portable
