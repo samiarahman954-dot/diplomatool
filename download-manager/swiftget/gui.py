@@ -1,4 +1,4 @@
-"""Tkinter user interface."""
+"""Tkinter user interface (modern, light / dark)."""
 
 import datetime
 import os
@@ -7,41 +7,38 @@ import sys
 import threading
 import time
 import tkinter as tk
-import tkinter.font as tkfont
 from tkinter import filedialog, messagebox, ttk
 
 from . import APP_NAME, VERSION, engine
 from .engine import ACTIVE_STATES, COMPLETED, DOWNLOADING, ERROR, PAUSED, QUEUED, WAITING
 from .server import IntegrationServer
+from .theme import CATEGORY_COLORS, Theme, set_titlebar_dark
 from .utils import (CATEGORY_NAMES, category_for, expand_batch_pattern, extension_of, human_size,
                     human_speed, human_time, is_url, open_path, reveal_in_folder, sanitize_filename)
+from .widgets import DownloadList, Sidebar, rounded_rect
 
-ACCENT = "#1a73e8"
+ICON_BLUE = "#0067c0"
 
 
-def make_icon(size=32):
-    """Draw a simple round icon with a down arrow (no image files needed)."""
+def make_icon(size=32, color=ICON_BLUE):
+    """Round icon with a down arrow, drawn in code (no image files needed)."""
     img = tk.PhotoImage(width=size, height=size)
     c = (size - 1) / 2
-    r = size / 2 - 1
-    rows = []
-    outside = []
+    r = size / 2 - 0.5
+    rows, outside = [], []
     for y in range(size):
         row = []
         for x in range(size):
             dx, dy = x - c, y - c
-            inside = dx * dx + dy * dy <= r * r
-            nx, ny = x / size, y / size
+            nx, ny = (x + 0.5) / size, (y + 0.5) / size
             shaft = 0.42 <= nx <= 0.58 and 0.18 <= ny <= 0.55
-            head = 0.5 <= ny <= 0.78 and abs(nx - 0.5) <= (0.78 - ny) * 1.1
-            bar = 0.78 < ny <= 0.84 and 0.28 <= nx <= 0.72
-            if not inside:
+            head = 0.48 <= ny <= 0.76 and abs(nx - 0.5) <= (0.76 - ny) * 1.1
+            bar = 0.79 <= ny <= 0.85 and 0.28 <= nx <= 0.72
+            if dx * dx + dy * dy > r * r:
                 outside.append((x, y))
                 row.append("#ffffff")
-            elif shaft or head or bar:
-                row.append("#ffffff")
             else:
-                row.append(ACCENT)
+                row.append("#ffffff" if (shaft or head or bar) else color)
         rows.append("{" + " ".join(row) + "}")
     img.put(" ".join(rows))
     for x, y in outside:
@@ -55,9 +52,7 @@ def center_on(win, parent):
         px, py = parent.winfo_rootx(), parent.winfo_rooty()
         pw, ph = parent.winfo_width(), parent.winfo_height()
         w, h = win.winfo_reqwidth(), win.winfo_reqheight()
-        x = px + max(0, (pw - w) // 2)
-        y = py + max(0, (ph - h) // 3)
-        win.geometry(f"+{x}+{y}")
+        win.geometry(f"+{px + max(0, (pw - w) // 2)}+{py + max(0, (ph - h) // 3)}")
     except tk.TclError:
         pass
 
@@ -73,30 +68,50 @@ def bring_to_front(win):
         pass
 
 
-class App:
-    COLUMNS = (
-        ("name", "File Name", 300, "w"),
-        ("size", "Size", 90, "e"),
-        ("status", "Status", 120, "w"),
-        ("speed", "Transfer rate", 100, "e"),
-        ("eta", "Time left", 80, "e"),
-        ("conn", "Conns", 64, "center"),
-        ("added", "Date added", 130, "w"),
-    )
+def resource_path(*parts):
+    """Path of a bundled file, both from source and inside the PyInstaller .exe."""
+    base = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base, *parts)
 
+
+def extension_dir():
+    candidates = []
+    exe_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, "frozen", False) else __file__))
+    candidates.append(os.path.join(exe_dir, "browser-extension"))
+    candidates.append(os.path.join(os.path.dirname(exe_dir), "browser-extension"))
+    for c in candidates:
+        if os.path.isdir(c):
+            return c
+    return candidates[-1]
+
+
+FILTERS = [
+    ("All", "All downloads", None),
+    ("Active", "Downloading", "#0091ff"),
+    ("Finished", "Completed", "#30a46c"),
+    ("Unfinished", "Unfinished", "#f5a524"),
+    ("Queue", "Queue", "#8e4ec6"),
+    ("-", "Categories", None),
+] + [(f"cat:{name}", name, CATEGORY_COLORS[name]) for name in CATEGORY_NAMES]
+
+FILTER_TITLES = {key: label for key, label, _ in FILTERS if key != "-"}
+
+
+class App:
     def __init__(self, root, settings, manager):
         self.root = root
         self.settings = settings
         self.manager = manager
         self.filter = "All"
-        self.sort = ("added", False)
-        self._rows = {}
         self.progress_windows = {}
         self._clip_last = None
         self.server = None
-        self.icon = make_icon()
+        self._message = ""
+        self._message_until = 0
 
-        root.title(f"{APP_NAME} Download Manager")
+        root.title(f"{APP_NAME}")
+        self.icon = make_icon(32)
+        self.logo = make_icon(28)
         root.iconphoto(True, self.icon)
         ico = resource_path("assets", "swiftget.ico")
         if sys.platform.startswith("win") and os.path.exists(ico):
@@ -104,170 +119,182 @@ class App:
                 root.iconbitmap(default=ico)
             except tk.TclError:
                 pass
-        root.geometry("1120x580")
-        root.minsize(760, 380)
-        self._setup_style()
-        self._build_menu()
-        self._build_toolbar()
-        self._build_body()
-        self._build_statusbar()
+        root.geometry("1180x660")
+        root.minsize(860, 460)
+
+        self.theme = Theme(root, settings["theme"])
+        self._build()
+        self.theme.listeners.append(self._on_theme_changed)
+        self._on_theme_changed()
         self._bind_keys()
         self.start_server()
 
         root.protocol("WM_DELETE_WINDOW", self.on_close)
-        root.after(300, self._refresh)
+        root.after(100, self._refresh)
         root.after(200, self._process_events)
         root.after(1500, self._poll_clipboard)
 
-    # ------------------------------------------------------------------ UI
-    def _setup_style(self):
-        style = ttk.Style(self.root)
-        themes = style.theme_names()
-        style.theme_use("vista" if "vista" in themes else "clam")
-        base = tkfont.nametofont("TkDefaultFont")
-        line = base.metrics("linespace")
-        style.configure("Treeview", rowheight=line + 8)
-        style.configure("Horizontal.TProgressbar", background=ACCENT)
-        style.configure("Toolbar.TButton", padding=(4, 3))
-        style.configure("Status.TLabel", padding=(6, 2))
-        style.configure("Big.TLabel", font=(base.actual("family"), base.actual("size") + 3, "bold"))
-        self.bold_font = (base.actual("family"), base.actual("size"), "bold")
+    # ------------------------------------------------------------------ layout
+    def _build(self):
+        self.sidebar = Sidebar(self.root, self, FILTERS)
+        self.sidebar.pack(side="left", fill="y")
 
-    def _build_menu(self):
-        m = tk.Menu(self.root)
-        tasks = tk.Menu(m, tearoff=False)
-        tasks.add_command(label="Add new download...", accelerator="Ctrl+N", command=self.add_url)
-        tasks.add_command(label="Add batch download...", accelerator="Ctrl+B", command=self.add_batch)
-        tasks.add_separator()
-        tasks.add_command(label="Exit", command=self.on_close)
-        m.add_cascade(label="Tasks", menu=tasks)
+        main = ttk.Frame(self.root, padding=(20, 16, 16, 0))
+        main.pack(side="left", fill="both", expand=True)
+        self.main = main
 
-        dl = tk.Menu(m, tearoff=False)
-        dl.add_command(label="Resume", command=self.resume_selected)
-        dl.add_command(label="Pause", command=self.pause_selected)
-        dl.add_command(label="Pause all", command=self.manager.pause_all)
-        dl.add_command(label="Resume all", command=self.manager.resume_all)
-        dl.add_separator()
-        dl.add_command(label="Delete...", accelerator="Del", command=self.delete_selected)
-        dl.add_command(label="Delete completed", command=self.manager.remove_completed)
-        dl.add_separator()
+        # header: title + primary actions
+        header = ttk.Frame(main)
+        header.pack(fill="x")
+        title_box = ttk.Frame(header)
+        title_box.pack(side="left")
+        self.title_lbl = ttk.Label(title_box, text="All downloads", style="H1.TLabel")
+        self.title_lbl.pack(anchor="w")
+        self.subtitle_lbl = ttk.Label(title_box, text="", style="Muted.TLabel")
+        self.subtitle_lbl.pack(anchor="w")
+
+        ttk.Button(header, text="＋  New download", style="Accent.TButton", command=self.add_url).pack(
+            side="right", padx=(6, 0))
+        self.more_btn = ttk.Button(header, text="•••", width=4, command=self._show_more_menu)
+        self.more_btn.pack(side="right", padx=(6, 0))
+        self.theme_btn = ttk.Button(header, width=4, command=self.toggle_theme)
+        self.theme_btn.pack(side="right", padx=(6, 0))
+        ttk.Button(header, text="⚙  Settings", command=self.open_options).pack(side="right", padx=(6, 0))
+
+        # toolbar: search + item actions
+        bar = ttk.Frame(main)
+        bar.pack(fill="x", pady=(14, 10))
+        for text, cmd in (("◷  Scheduler", self.open_scheduler), ("■  Stop queue", self.manager.stop_queue),
+                          ("▶▶  Start queue", self.start_queue)):
+            ttk.Button(bar, text=text, command=cmd).pack(side="right", padx=(6, 0))
+        ttk.Separator(bar, orient="vertical").pack(side="right", fill="y", padx=8, pady=4)
+        for text, cmd in (("✕  Delete", self.delete_selected), ("❚❚  Pause", self.pause_selected),
+                          ("▶  Resume", self.resume_selected)):
+            ttk.Button(bar, text=text, command=cmd).pack(side="right", padx=(6, 0))
+        # search box takes whatever width is left (packed last so buttons never get cut off)
+        self.search_var = tk.StringVar()
+        self.search_entry = ttk.Entry(bar, textvariable=self.search_var, width=12)
+        self.search_entry.pack(side="left", fill="x", expand=True, padx=(0, 6))
+        self._placeholder = "Search downloads"
+        self._set_placeholder()
+        self.search_entry.bind("<FocusIn>", self._clear_placeholder)
+        self.search_entry.bind("<FocusOut>", lambda e: self._set_placeholder())
+        self.search_var.trace_add("write", lambda *a: self._refresh(reschedule=False))
+
+        # list
+        list_frame = ttk.Frame(main)
+        list_frame.pack(fill="both", expand=True)
+        self.list = DownloadList(list_frame, self)
+        self.list.vsb.pack(side="right", fill="y")
+        self.list.pack(side="left", fill="both", expand=True)
+
+        # status bar
+        self.status = tk.Frame(main, height=34)
+        self.status.pack(fill="x")
+        self.status_dot = tk.Canvas(self.status, width=10, height=10, highlightthickness=0, bd=0)
+        self.status_left = tk.Label(self.status, anchor="w")
+        self.status_right = tk.Label(self.status, anchor="e")
+        self.status_left.pack(side="left", pady=8)
+        self.status_right.pack(side="right", pady=8)
+        self.status_dot.pack(side="right", padx=(0, 6))
+
+        # menus
+        self.ctx = tk.Menu(self.root, tearoff=False)
+        for entry in (("Open", self.open_selected), ("Show in folder", self.open_folder_selected), None,
+                      ("Resume", self.resume_selected), ("Pause", self.pause_selected),
+                      ("Redownload", self.redownload_selected), ("Show progress", self.progress_selected),
+                      None, ("Copy address", self.copy_url_selected), ("Properties", self.properties_selected),
+                      None, ("Delete…", self.delete_selected)):
+            if entry is None:
+                self.ctx.add_separator()
+            else:
+                self.ctx.add_command(label=entry[0], command=entry[1])
+
+        self.more = tk.Menu(self.root, tearoff=False)
+        self.more.add_command(label="Batch download…", accelerator="Ctrl+B", command=self.add_batch)
+        self.more.add_separator()
+        self.more.add_command(label="Resume all", command=self.manager.resume_all)
+        self.more.add_command(label="Pause all", command=self.manager.pause_all)
+        self.more.add_command(label="Clear completed", command=self.manager.remove_completed)
+        self.more.add_separator()
         self.limit_var = tk.IntVar(value=int(self.settings["speed_limit_kb"] or 0))
-        limiter = tk.Menu(dl, tearoff=False)
+        self.limiter_menu = tk.Menu(self.more, tearoff=False)
         for label, kb in (("Unlimited", 0), ("128 KB/s", 128), ("256 KB/s", 256), ("512 KB/s", 512),
                           ("1 MB/s", 1024), ("2 MB/s", 2048), ("5 MB/s", 5120), ("10 MB/s", 10240)):
-            limiter.add_radiobutton(label=label, value=kb, variable=self.limit_var,
-                                    command=lambda kb=kb: self.set_speed_limit(kb))
-        dl.add_cascade(label="Speed limiter", menu=limiter)
-        dl.add_command(label="Options...", command=self.open_options)
-        m.add_cascade(label="Downloads", menu=dl)
+            self.limiter_menu.add_radiobutton(label=label, value=kb, variable=self.limit_var,
+                                              command=lambda kb=kb: self.set_speed_limit(kb))
+        self.more.add_cascade(label="Speed limit", menu=self.limiter_menu)
+        self.more.add_separator()
+        self.more.add_command(label="Browser extension…", command=self.browser_help)
+        self.more.add_command(label="About SwiftGet", command=self.about)
+        self.more.add_separator()
+        self.more.add_command(label="Exit", command=self.on_close)
 
-        q = tk.Menu(m, tearoff=False)
-        q.add_command(label="Start queue", command=self.start_queue)
-        q.add_command(label="Stop queue", command=self.manager.stop_queue)
-        q.add_command(label="Scheduler...", command=self.open_scheduler)
-        m.add_cascade(label="Queue", menu=q)
+    def _on_theme_changed(self):
+        c = self.theme.c
+        for w in (self.status, self.status_left, self.status_right, self.status_dot):
+            w.configure(bg=c["bg"])
+        self.status_left.configure(fg=c["muted"], font=self.theme.font_small)
+        self.status_right.configure(fg=c["muted"], font=self.theme.font_small)
+        for m in (self.ctx, self.more, self.limiter_menu):
+            self.theme.style_menu(m)
+        self.theme_btn.configure(text="☀" if self.theme.dark else "☾")
+        self.sidebar.redraw()
+        self.list.redraw()
+        for win in list(self.progress_windows.values()):
+            win.restyle()
 
-        h = tk.Menu(m, tearoff=False)
-        h.add_command(label="Browser integration help", command=self.browser_help)
-        h.add_command(label="About", command=self.about)
-        m.add_cascade(label="Help", menu=h)
-        self.root.config(menu=m)
+    def toggle_theme(self):
+        mode = "light" if self.theme.dark else "dark"
+        self.settings["theme"] = mode
+        self.settings.save()
+        self.theme.apply(mode)
 
-    def _build_toolbar(self):
-        bar = ttk.Frame(self.root, padding=(6, 6, 6, 2))
-        bar.pack(side="top", fill="x")
-        buttons = [
-            ("+ Add URL", self.add_url), ("☰ Batch", self.add_batch), None,
-            ("▶ Resume", self.resume_selected), ("❚❚ Pause", self.pause_selected),
-            ("■ Pause All", self.manager.pause_all), None,
-            ("✖ Delete", self.delete_selected), ("✔ Clear Done", self.manager.remove_completed), None,
-            ("▶▶ Start Queue", self.start_queue), ("■ Stop Queue", self.manager.stop_queue),
-            ("◷ Scheduler", self.open_scheduler), ("⚙ Options", self.open_options),
-        ]
-        for b in buttons:
-            if b is None:
-                ttk.Separator(bar, orient="vertical").pack(side="left", fill="y", padx=6, pady=2)
-                continue
-            ttk.Button(bar, text=b[0], command=b[1], style="Toolbar.TButton", width=-1).pack(side="left", padx=1)
+    def _show_more_menu(self):
+        b = self.more_btn
+        self.more.tk_popup(b.winfo_rootx(), b.winfo_rooty() + b.winfo_height() + 2)
 
-    def _build_body(self):
-        paned = ttk.PanedWindow(self.root, orient="horizontal")
-        paned.pack(side="top", fill="both", expand=True, padx=6, pady=4)
+    def show_context_menu(self, x, y):
+        self.ctx.tk_popup(x, y)
 
-        left = ttk.Frame(paned)
-        self.cat_tree = ttk.Treeview(left, show="tree", selectmode="browse")
-        self.cat_tree.pack(fill="both", expand=True)
-        self.cat_tree.insert("", "end", iid="All", text="All Downloads", open=True)
-        for name in CATEGORY_NAMES:
-            self.cat_tree.insert("All", "end", iid=f"cat:{name}", text=name)
-        self.cat_tree.insert("", "end", iid="Unfinished", text="Unfinished")
-        self.cat_tree.insert("", "end", iid="Finished", text="Finished")
-        self.cat_tree.insert("", "end", iid="Queue", text="Queue")
-        self.cat_tree.selection_set("All")
-        self.cat_tree.bind("<<TreeviewSelect>>", self._on_filter)
-        paned.add(left, weight=0)
+    def _set_placeholder(self):
+        if not self.search_var.get():
+            self.search_entry.configure(foreground=self.theme.c["muted"])
+            self._placeholder_on = True
+            self.search_var.set(self._placeholder)
 
-        right = ttk.Frame(paned)
-        cols = [c[0] for c in self.COLUMNS]
-        self.tree = ttk.Treeview(right, columns=cols, show="headings", selectmode="extended")
-        for key, title, width, anchor in self.COLUMNS:
-            self.tree.heading(key, text=title, command=lambda k=key: self._sort_by(k))
-            self.tree.column(key, width=width, anchor=anchor, stretch=(key == "name"))
-        vsb = ttk.Scrollbar(right, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscrollcommand=vsb.set)
-        self.tree.grid(row=0, column=0, sticky="nsew")
-        vsb.grid(row=0, column=1, sticky="ns")
-        right.rowconfigure(0, weight=1)
-        right.columnconfigure(0, weight=1)
-        paned.add(right, weight=1)
+    def _clear_placeholder(self, _e=None):
+        if getattr(self, "_placeholder_on", False):
+            self._placeholder_on = False
+            self.search_var.set("")
+            self.search_entry.configure(foreground=self.theme.c["text"])
 
-        self.tree.tag_configure("done", foreground="#2e7d32")
-        self.tree.tag_configure("error", foreground="#c62828")
-        self.tree.tag_configure("active", foreground=ACCENT)
-        self.tree.tag_configure("waiting", foreground="#6b6b6b")
-        self.tree.bind("<Double-1>", self._on_double_click)
-        self.tree.bind("<Return>", self._on_double_click)
-        self.tree.bind("<Button-3>", self._on_right_click)
-        self.tree.bind("<Button-2>", self._on_right_click)
-
-        self.ctx = tk.Menu(self.root, tearoff=False)
-        self.ctx.add_command(label="Open", command=self.open_selected)
-        self.ctx.add_command(label="Open folder", command=self.open_folder_selected)
-        self.ctx.add_separator()
-        self.ctx.add_command(label="Resume", command=self.resume_selected)
-        self.ctx.add_command(label="Pause", command=self.pause_selected)
-        self.ctx.add_command(label="Redownload", command=self.redownload_selected)
-        self.ctx.add_command(label="Show progress", command=self.progress_selected)
-        self.ctx.add_separator()
-        self.ctx.add_command(label="Copy address", command=self.copy_url_selected)
-        self.ctx.add_command(label="Properties...", command=self.properties_selected)
-        self.ctx.add_separator()
-        self.ctx.add_command(label="Delete...", command=self.delete_selected)
-
-    def _build_statusbar(self):
-        bar = ttk.Frame(self.root, relief="sunken")
-        bar.pack(side="bottom", fill="x")
-        self.status_left = ttk.Label(bar, style="Status.TLabel")
-        self.status_left.pack(side="left")
-        self.status_right = ttk.Label(bar, style="Status.TLabel")
-        self.status_right.pack(side="right")
-        self._message = ""
-        self._message_until = 0
+    def search_text(self):
+        if getattr(self, "_placeholder_on", False):
+            return ""
+        return self.search_var.get().strip().lower()
 
     def _bind_keys(self):
-        self.root.bind("<Control-n>", lambda e: self.add_url())
-        self.root.bind("<Control-b>", lambda e: self.add_batch())
-        self.root.bind("<Control-a>", lambda e: self.tree.selection_set(self.tree.get_children()))
-        self.tree.bind("<Delete>", lambda e: self.delete_selected())
-        self.root.bind("<Control-v>", self._paste_url)
+        r = self.root
+        r.bind("<Control-n>", lambda e: self.add_url())
+        r.bind("<Control-b>", lambda e: self.add_batch())
+        r.bind("<Control-f>", lambda e: self.search_entry.focus_set())
+        self.list.bind("<Control-a>", lambda e: self.list.select_all())
+        self.list.bind("<Delete>", lambda e: self.delete_selected())
+        r.bind("<Control-v>", self._paste_url)
 
-    # ------------------------------------------------------------- refresh
+    # ----------------------------------------------------------------- refresh
     def _matches(self, d):
         f = self.filter
+        q = self.search_text()
+        if q and q not in d.filename.lower() and q not in d.url.lower():
+            return False
         if f == "All":
             return True
         if f.startswith("cat:"):
             return d.category == f[4:]
+        if f == "Active":
+            return d.status in ACTIVE_STATES
         if f == "Unfinished":
             return d.status != COMPLETED
         if f == "Finished":
@@ -276,106 +303,65 @@ class App:
             return d.status in (QUEUED, WAITING) or (d.from_queue and d.is_active)
         return True
 
-    def _values(self, d):
-        status = d.status
-        if d.status == DOWNLOADING:
-            status = f"{d.progress:.1f}%" if d.size > 0 else human_size(d.downloaded)
-        elif status == COMPLETED:
-            status = "Complete"
-        elif status == ERROR:
-            status = f"Error: {d.error}"
-        elif status == PAUSED and d.size > 0:
-            status = f"Paused {d.progress:.1f}%"
-        active = d.status in ACTIVE_STATES
-        return (
-            d.filename,
-            human_size(d.size) if d.size >= 0 else "",
-            status,
-            human_speed(d.speed) if active else "",
-            human_time(d.eta) if active and d.eta is not None else "",
-            str(d.active_connections) if active and d.active_connections else "",
-            datetime.datetime.fromtimestamp(d.added).strftime("%Y-%m-%d %H:%M"),
-        )
-
-    @staticmethod
-    def _tag(d):
-        if d.status == COMPLETED:
-            return ("done",)
-        if d.status == ERROR:
-            return ("error",)
-        if d.status in ACTIVE_STATES:
-            return ("active",)
-        if d.status in (QUEUED, WAITING):
-            return ("waiting",)
-        return ()
-
-    def _sort_key(self, d):
-        key = self.sort[0]
-        if key == "name":
-            return d.filename.lower()
-        if key == "size":
-            return d.size
-        if key == "status":
-            return d.status
-        if key == "speed":
-            return d.speed
-        if key == "eta":
-            return d.eta or 0
-        return d.added
-
-    def _sort_by(self, key):
-        col, rev = self.sort
-        self.sort = (key, not rev if col == key else False)
+    def on_filter(self, key):
+        self.filter = key
+        self.list.offset = 0
         self._refresh(reschedule=False)
 
-    def _on_filter(self, _event=None):
-        sel = self.cat_tree.selection()
-        self.filter = sel[0] if sel else "All"
-        self._refresh(reschedule=False)
+    def _counts(self, items):
+        counts = {"All": len(items)}
+        for d in items:
+            if d.status in ACTIVE_STATES:
+                counts["Active"] = counts.get("Active", 0) + 1
+            if d.status == COMPLETED:
+                counts["Finished"] = counts.get("Finished", 0) + 1
+            else:
+                counts["Unfinished"] = counts.get("Unfinished", 0) + 1
+            if d.status in (QUEUED, WAITING):
+                counts["Queue"] = counts.get("Queue", 0) + 1
+            key = f"cat:{d.category}"
+            counts[key] = counts.get(key, 0) + 1
+        return counts
 
     def _refresh(self, reschedule=True):
         try:
             all_items = self.manager.snapshot()
-            items = sorted((d for d in all_items if self._matches(d)), key=self._sort_key, reverse=self.sort[1])
-            wanted = [d.id for d in items]
-            existing = set(self.tree.get_children())
-            for iid in existing - set(wanted):
-                self.tree.delete(iid)
-                self._rows.pop(iid, None)
-            for idx, d in enumerate(items):
-                vals = self._values(d)
-                if d.id not in existing:
-                    self.tree.insert("", idx, iid=d.id, values=vals, tags=self._tag(d))
-                else:
-                    if self._rows.get(d.id) != vals:
-                        self.tree.item(d.id, values=vals, tags=self._tag(d))
-                    if self.tree.index(d.id) != idx:
-                        self.tree.move(d.id, "", idx)
-                self._rows[d.id] = vals
+            items = [d for d in all_items if self._matches(d)]
+            items.sort(key=lambda d: d.added, reverse=True)  # newest first
+            self.list.set_items(items)
+            self.sidebar.set_counts(self._counts(all_items))
+
+            self.title_lbl.configure(text=FILTER_TITLES.get(self.filter, "Downloads"))
+            n = len(items)
+            self.subtitle_lbl.configure(text=f"{n} item{'s' if n != 1 else ''}")
 
             active = [d for d in all_items if d.status in ACTIVE_STATES]
             total_speed = sum(d.speed for d in active)
+            parts = []
+            if time.time() < self._message_until and self._message:
+                parts.append(self._message)
+            parts.append(f"↓ {human_speed(total_speed) or '0 B/s'}")
+            parts.append(f"{len(active)} active")
             queued = sum(1 for d in all_items if d.status == QUEUED)
-            text = f"Active: {len(active)}   Queued: {queued}   Total: {len(all_items)}"
-            if total_speed:
-                text += f"   Speed: {human_speed(total_speed)}"
+            if queued:
+                parts.append(f"{queued} queued")
             if self.settings["speed_limit_kb"]:
-                text += f"   (limit {human_speed(int(self.settings['speed_limit_kb']) * 1024)})"
-            if self._message and time.time() < self._message_until:
-                text = self._message + "    |    " + text
-            self.status_left.config(text=text)
+                parts.append(f"limit {human_speed(int(self.settings['speed_limit_kb']) * 1024)}")
+            self.status_left.configure(text="     ".join(parts))
+
+            c = self.theme.c
             if self.server and self.server.httpd:
-                self.status_right.config(text=f"Browser integration: on (port {self.server.port})")
+                text, dot = f"Browser integration on  ·  port {self.server.port}", c["success"]
             elif self.server and self.server.error:
-                self.status_right.config(text=f"Browser integration: port {self.server.port} busy")
+                text, dot = f"Port {self.server.port} is busy", c["error"]
             else:
-                self.status_right.config(text="Browser integration: off")
-            if active:
-                pct = [d.progress for d in active if d.size > 0]
-                title = f"{sum(pct) / len(pct):.0f}% - {APP_NAME}" if pct else APP_NAME
-                self.root.title(f"{title} Download Manager")
-            else:
-                self.root.title(f"{APP_NAME} Download Manager")
+                text, dot = "Browser integration off", c["paused"]
+            self.status_right.configure(text=text)
+            self.status_dot.delete("all")
+            self.status_dot.create_oval(1, 1, 9, 9, fill=dot, outline="")
+
+            pct = [d.progress for d in active if d.size > 0]
+            self.root.title(f"{sum(pct) / len(pct):.0f}% · {APP_NAME}" if pct else APP_NAME)
         finally:
             if reschedule:
                 self.root.after(500, self._refresh)
@@ -384,7 +370,7 @@ class App:
         self._message = message
         self._message_until = time.time() + seconds
 
-    # --------------------------------------------------------------- events
+    # ------------------------------------------------------------------ events
     def _process_events(self):
         try:
             while True:
@@ -401,7 +387,7 @@ class App:
                 elif kind == "error":
                     d = self.manager.get(payload)
                     if d:
-                        self.flash(f"Error: {d.filename} - {d.error}")
+                        self.flash(f"Failed: {d.filename}")
                 elif kind == "browser_add":
                     self.handle_browser_add(payload)
                 elif kind == "show":
@@ -430,12 +416,16 @@ class App:
         self.root.after(1000, self._poll_clipboard)
 
     def _paste_url(self, _event=None):
+        if self.root.focus_get() in (self.search_entry,):
+            return None
         try:
             text = self.root.clipboard_get().strip()
         except tk.TclError:
-            return
+            return None
         if is_url(text):
             AddDialog(self, url=text)
+            return "break"
+        return None
 
     def handle_browser_add(self, data):
         url = str(data.get("url", ""))
@@ -463,26 +453,31 @@ class App:
                                "Do you want to CANCEL the shutdown?", parent=self.root):
             engine.cancel_shutdown()
 
-    # -------------------------------------------------------------- helpers
+    # ----------------------------------------------------------------- helpers
     def selected(self):
-        return [d for d in (self.manager.get(i) for i in self.tree.selection()) if d]
+        return self.list.selection()
 
-    def _on_double_click(self, event=None):
-        items = self.selected()
-        if not items:
-            return
-        d = items[0]
+    def open_item(self, d):
         if d.status == COMPLETED:
             self._open(d)
         else:
             self.show_progress(d)
 
-    def _on_right_click(self, event):
-        row = self.tree.identify_row(event.y)
-        if row and row not in self.tree.selection():
-            self.tree.selection_set(row)
-        if self.tree.selection():
-            self.ctx.tk_popup(event.x_root, event.y_root)
+    def primary_action(self, d):
+        """The round button on each card."""
+        if d.status == COMPLETED:
+            path = d.saved_path or d.path
+            if os.path.exists(path):
+                reveal_in_folder(path)
+            else:
+                messagebox.showerror(APP_NAME, f"File not found:\n{path}", parent=self.root)
+        elif d.is_active or d.status == QUEUED:
+            self.manager.pause(d)
+        else:
+            self.manager.resume(d)
+            if self.settings["show_progress_window"]:
+                self.show_progress(d)
+        self.list.redraw()
 
     def _open(self, d):
         path = d.saved_path or d.path
@@ -501,7 +496,7 @@ class App:
             return
         self.progress_windows[d.id] = ProgressWindow(self, d)
 
-    # -------------------------------------------------------------- actions
+    # ----------------------------------------------------------------- actions
     def add_url(self):
         url = ""
         try:
@@ -552,9 +547,10 @@ class App:
     def copy_url_selected(self):
         items = self.selected()
         if items:
+            text = "\n".join(d.url for d in items)
             self.root.clipboard_clear()
-            self.root.clipboard_append("\n".join(d.url for d in items))
-            self._clip_last = "\n".join(d.url for d in items)
+            self.root.clipboard_append(text)
+            self._clip_last = text
 
     def properties_selected(self):
         for d in self.selected()[:1]:
@@ -592,15 +588,14 @@ class App:
     def browser_help(self):
         ext_dir = extension_dir()
         messagebox.showinfo(
-            "Browser integration",
-            "To send browser downloads to SwiftGet, install the extension once:\n\n"
+            "Browser extension",
+            "Install the extension once to send browser downloads to SwiftGet:\n\n"
             "1. Open chrome://extensions (or edge://extensions)\n"
             "2. Turn on 'Developer mode'\n"
-            "3. Click 'Load unpacked' and choose the folder:\n"
+            "3. Click 'Load unpacked' and choose this folder:\n"
             f"   {ext_dir}\n\n"
-            "After that, downloads of the file types listed in Options > Browser are caught "
-            "automatically, and you can right-click any link > 'Download with SwiftGet'.\n"
-            "Keep SwiftGet running while you browse.",
+            "Downloads of the file types in Settings › Browser are then caught automatically, "
+            "and you can right-click any link › 'Download with SwiftGet'.",
             parent=self.root)
 
     def about(self):
@@ -621,92 +616,106 @@ class App:
         self.root.destroy()
 
 
-def resource_path(*parts):
-    """Path of a bundled file, both from source and inside the PyInstaller .exe."""
-    base = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(base, *parts)
-
-
-def extension_dir():
-    candidates = []
-    exe_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, "frozen", False) else __file__))
-    candidates.append(os.path.join(exe_dir, "browser-extension"))
-    candidates.append(os.path.join(os.path.dirname(exe_dir), "browser-extension"))
-    for c in candidates:
-        if os.path.isdir(c):
-            return c
-    return candidates[-1]
-
-
 # ====================================================================== dialogs
 class Dialog(tk.Toplevel):
-    def __init__(self, app, title, modal=False):
+    def __init__(self, app, title, modal=False, heading=None, subheading=None):
         super().__init__(app.root)
         self.app = app
+        self.withdraw()
         self.title(title)
         self.resizable(True, False)
         self.transient(app.root)
-        self.body = ttk.Frame(self, padding=12)
+        self.configure(bg=app.theme.c["bg"])
+        self.body = ttk.Frame(self, padding=(22, 18, 22, 18))
         self.body.pack(fill="both", expand=True)
+        if heading:
+            ttk.Label(self.body, text=heading, style="H1.TLabel").pack(anchor="w")
+            if subheading:
+                ttk.Label(self.body, text=subheading, style="Muted.TLabel", wraplength=560).pack(
+                    anchor="w", pady=(2, 0))
         self.bind("<Escape>", lambda e: self.destroy())
-        if modal:
-            self.grab_set()
+        self._modal = modal
 
     def finish_layout(self):
         center_on(self, self.app.root)
+        self.deiconify()
+        set_titlebar_dark(self, self.app.theme.dark)
         bring_to_front(self)
+        if self._modal:
+            try:
+                self.grab_set()
+            except tk.TclError:
+                pass
+
+    def button_row(self, parent, buttons):
+        """buttons: list of (text, command, primary)"""
+        row = ttk.Frame(parent)
+        for text, cmd, primary in reversed(buttons):
+            ttk.Button(row, text=text, command=cmd, style="Accent.TButton" if primary else "TButton").pack(
+                side="right", padx=(8, 0))
+        return row
 
 
 class AddDialog(Dialog):
     def __init__(self, app, url="", filename=None, headers=None):
-        super().__init__(app, "Download File Info")
+        super().__init__(app, "New download", heading="New download",
+                         subheading="Paste a link. SwiftGet checks the file and downloads it with "
+                                    "several connections at once.")
         self.headers = headers or {}
         self.name_edited = bool(filename)
         self.folder_edited = False
         self.probe_result = None
         self._probe_id = 0
-        b = self.body
-        b.columnconfigure(1, weight=1)
 
-        ttk.Label(b, text="URL:").grid(row=0, column=0, sticky="w", pady=3)
+        form = ttk.Frame(self.body)
+        form.pack(fill="x", pady=(16, 0))
+        form.columnconfigure(1, weight=1)
+
+        def label(row, text):
+            ttk.Label(form, text=text, style="Muted.TLabel").grid(row=row, column=0, sticky="w", pady=6,
+                                                                 padx=(0, 14))
+
+        label(0, "Address")
         self.url_var = tk.StringVar(value=url)
-        url_entry = ttk.Entry(b, textvariable=self.url_var, width=70)
-        url_entry.grid(row=0, column=1, columnspan=2, sticky="ew", pady=3)
+        url_entry = ttk.Entry(form, textvariable=self.url_var, width=72)
+        url_entry.grid(row=0, column=1, columnspan=2, sticky="ew", pady=6)
         url_entry.bind("<FocusOut>", lambda e: self.start_probe())
         url_entry.bind("<Return>", lambda e: self.start_probe())
 
-        ttk.Label(b, text="Category:").grid(row=1, column=0, sticky="w", pady=3)
-        self.cat_var = tk.StringVar(value=category_for(filename or ""))
-        cat = ttk.Combobox(b, textvariable=self.cat_var, values=CATEGORY_NAMES, state="readonly", width=18)
-        cat.grid(row=1, column=1, sticky="w", pady=3)
-        cat.bind("<<ComboboxSelected>>", lambda e: self._update_folder())
-
-        ttk.Label(b, text="Save as:").grid(row=2, column=0, sticky="w", pady=3)
+        label(1, "File name")
         self.name_var = tk.StringVar(value=filename or "")
-        name_entry = ttk.Entry(b, textvariable=self.name_var)
-        name_entry.grid(row=2, column=1, columnspan=2, sticky="ew", pady=3)
+        name_entry = ttk.Entry(form, textvariable=self.name_var)
+        name_entry.grid(row=1, column=1, columnspan=2, sticky="ew", pady=6)
         name_entry.bind("<Key>", lambda e: setattr(self, "name_edited", True))
 
-        ttk.Label(b, text="Folder:").grid(row=3, column=0, sticky="w", pady=3)
+        label(2, "Save to")
         self.folder_var = tk.StringVar()
-        folder_entry = ttk.Entry(b, textvariable=self.folder_var)
-        folder_entry.grid(row=3, column=1, sticky="ew", pady=3)
+        folder_entry = ttk.Entry(form, textvariable=self.folder_var)
+        folder_entry.grid(row=2, column=1, sticky="ew", pady=6)
         folder_entry.bind("<Key>", lambda e: setattr(self, "folder_edited", True))
-        ttk.Button(b, text="Browse...", command=self._browse).grid(row=3, column=2, padx=(6, 0))
+        ttk.Button(form, text="Browse…", command=self._browse).grid(row=2, column=2, padx=(8, 0))
 
-        ttk.Label(b, text="Connections:").grid(row=4, column=0, sticky="w", pady=3)
+        label(3, "Category")
+        opts = ttk.Frame(form)
+        opts.grid(row=3, column=1, columnspan=2, sticky="w", pady=6)
+        self.cat_var = tk.StringVar(value=category_for(filename or ""))
+        cat = ttk.Combobox(opts, textvariable=self.cat_var, values=CATEGORY_NAMES, state="readonly", width=14)
+        cat.pack(side="left")
+        cat.bind("<<ComboboxSelected>>", lambda e: self._update_folder())
+        ttk.Label(opts, text="Connections", style="Muted.TLabel").pack(side="left", padx=(24, 10))
         self.conn_var = tk.IntVar(value=int(app.settings["max_connections"]))
-        ttk.Spinbox(b, from_=1, to=32, textvariable=self.conn_var, width=6).grid(row=4, column=1, sticky="w")
+        ttk.Spinbox(opts, from_=1, to=32, textvariable=self.conn_var, width=5).pack(side="left")
 
-        self.info_var = tk.StringVar(value="")
-        ttk.Label(b, textvariable=self.info_var, foreground="#555").grid(row=5, column=0, columnspan=3,
-                                                                          sticky="w", pady=(8, 4))
-        btns = ttk.Frame(b)
-        btns.grid(row=6, column=0, columnspan=3, sticky="e", pady=(8, 0))
-        start_btn = ttk.Button(btns, text="Start Download", command=lambda: self.submit(True))
-        start_btn.pack(side="left", padx=3)
-        ttk.Button(btns, text="Download Later", command=lambda: self.submit(False)).pack(side="left", padx=3)
-        ttk.Button(btns, text="Cancel", command=self.destroy).pack(side="left", padx=3)
+        # info card
+        self.info = tk.Canvas(self.body, height=64, highlightthickness=0, bd=0)
+        self.info.pack(fill="x", pady=(14, 0))
+        self.info.bind("<Configure>", lambda e: self._draw_info())
+        self.info_state = ("idle", "Enter an address to see the file details.", "")
+
+        btns = self.button_row(self.body, [("Download later", lambda: self.submit(False), False),
+                                           ("Cancel", self.destroy, False),
+                                           ("Start download", lambda: self.submit(True), True)])
+        btns.pack(fill="x", pady=(18, 0))
         self.bind("<Control-Return>", lambda e: self.submit(True))
 
         self._update_folder()
@@ -714,7 +723,30 @@ class AddDialog(Dialog):
         url_entry.focus_set()
         if is_url(url):
             self.start_probe()
-            start_btn.focus_set()
+
+    def _draw_info(self):
+        c, t = self.app.theme.c, self.app.theme
+        cv = self.info
+        cv.configure(bg=c["bg"])
+        cv.delete("all")
+        w = cv.winfo_width()
+        state, line1, line2 = self.info_state
+        rounded_rect(cv, 1, 1, w - 1, 63, 10, fill=c["surface"], outline=c["border"])
+        name = self.name_var.get() or "file"
+        color = CATEGORY_COLORS.get(category_for(name), CATEGORY_COLORS["Other"])
+        if state == "error":
+            color = c["error"]
+        rounded_rect(cv, 12, 12, 52, 52, 9, fill=color if state != "idle" else c["track"], outline="")
+        ext = (extension_of(name) or "?")[:4].upper() if state != "idle" else "?"
+        cv.create_text(32, 32, text=ext, fill="#ffffff", font=t.font_badge)
+        cv.create_text(66, 24 if line2 else 32, text=line1, anchor="w", fill=c["text"],
+                       font=t.font_bold if state == "ok" else t.font)
+        if line2:
+            cv.create_text(66, 44, text=line2, anchor="w", fill=c["muted"], font=t.font_small)
+
+    def _set_info(self, state, line1, line2=""):
+        self.info_state = (state, line1, line2)
+        self._draw_info()
 
     def _update_folder(self):
         if self.folder_edited:
@@ -734,13 +766,14 @@ class AddDialog(Dialog):
         url = self.url_var.get().strip()
         if not is_url(url):
             if url:
-                self.info_var.set("Please enter a valid http(s) or ftp address.")
+                self._set_info("error", "That doesn't look like a download link.",
+                               "Use an address that starts with http://, https:// or ftp://")
             return
         if self.probe_result and self.probe_result[0] == url:
             return
         self._probe_id += 1
         probe_id = self._probe_id
-        self.info_var.set("Checking file information...")
+        self._set_info("busy", "Checking the file…", url if len(url) < 80 else url[:77] + "…")
         result = {}
 
         def work():
@@ -760,7 +793,8 @@ class AddDialog(Dialog):
             self.after(100, lambda: self._poll_probe(thread, result, url, probe_id))
             return
         if "error" in result:
-            self.info_var.set(f"Could not check the file ({result['error']}). You can still try to download it.")
+            self._set_info("error", f"Couldn't check the file ({result['error']})",
+                           "You can still try to download it.")
             return
         d = result["d"]
         self.probe_result = (url, d)
@@ -768,8 +802,8 @@ class AddDialog(Dialog):
             self.name_var.set(d.filename)
         self.cat_var.set(category_for(self.name_var.get()))
         self._update_folder()
-        resume = "Yes" if d.resumable else "No (single connection)"
-        self.info_var.set(f"Size: {human_size(d.size)}     Resume capability: {resume}")
+        resume = "Resume supported · multi-connection" if d.resumable else "No resume · single connection"
+        self._set_info("ok", self.name_var.get(), f"{human_size(d.size)}   ·   {resume}")
 
     def submit(self, start):
         url = self.url_var.get().strip()
@@ -800,33 +834,31 @@ class AddDialog(Dialog):
 
 class BatchDialog(Dialog):
     def __init__(self, app):
-        super().__init__(app, "Batch download")
+        super().__init__(app, "Batch download", heading="Batch download",
+                         subheading="One address per line. Patterns like file[1-20].jpg, file[01-20].jpg "
+                                    "or part[a-f].zip are expanded automatically.")
         self.resizable(True, True)
-        b = self.body
-        b.columnconfigure(0, weight=1)
-        b.rowconfigure(1, weight=1)
-        ttk.Label(b, text="One address per line. Patterns like file[1-20].jpg, file[01-20].jpg "
-                          "or part[a-f].zip are expanded.").grid(row=0, column=0, columnspan=2, sticky="w")
-        self.text = tk.Text(b, width=80, height=12, wrap="none")
-        self.text.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=6)
+        self.text = tk.Text(self.body, width=84, height=12, wrap="none")
+        app.theme.style_text(self.text)
+        self.text.pack(fill="both", expand=True, pady=(14, 10))
         try:
             clip = app.root.clipboard_get()
             if any(is_url(line.strip()) for line in clip.splitlines()):
                 self.text.insert("1.0", clip.strip())
         except tk.TclError:
             pass
-        frm = ttk.Frame(b)
-        frm.grid(row=2, column=0, columnspan=2, sticky="ew")
+        frm = ttk.Frame(self.body)
+        frm.pack(fill="x")
         frm.columnconfigure(1, weight=1)
-        ttk.Label(frm, text="Folder (empty = automatic by category):").grid(row=0, column=0, sticky="w")
+        ttk.Label(frm, text="Save to", style="Muted.TLabel").grid(row=0, column=0, sticky="w", padx=(0, 12))
         self.folder_var = tk.StringVar()
-        ttk.Entry(frm, textvariable=self.folder_var).grid(row=0, column=1, sticky="ew", padx=6)
-        ttk.Button(frm, text="Browse...", command=self._browse).grid(row=0, column=2)
-        btns = ttk.Frame(b)
-        btns.grid(row=3, column=0, columnspan=2, sticky="e", pady=(10, 0))
-        ttk.Button(btns, text="Add & start queue", command=lambda: self.submit(True)).pack(side="left", padx=3)
-        ttk.Button(btns, text="Add to queue", command=lambda: self.submit(False)).pack(side="left", padx=3)
-        ttk.Button(btns, text="Cancel", command=self.destroy).pack(side="left", padx=3)
+        ttk.Entry(frm, textvariable=self.folder_var).grid(row=0, column=1, sticky="ew")
+        ttk.Button(frm, text="Browse…", command=self._browse).grid(row=0, column=2, padx=(8, 0))
+        ttk.Label(frm, text="Leave empty to sort into category folders automatically.",
+                  style="Muted.TLabel").grid(row=1, column=1, sticky="w", pady=(4, 0))
+        self.button_row(self.body, [("Cancel", self.destroy, False),
+                                    ("Add to queue", lambda: self.submit(False), False),
+                                    ("Add and start", lambda: self.submit(True), True)]).pack(fill="x", pady=(16, 0))
         self.finish_layout()
         self.text.focus_set()
 
@@ -854,47 +886,89 @@ class BatchDialog(Dialog):
 
 
 class ProgressWindow(tk.Toplevel):
-    BAR_W = 520
+    WIDTH = 560
 
     def __init__(self, app, d):
         super().__init__(app.root)
         self.app = app
         self.d = d
+        self.withdraw()
         self.resizable(False, False)
         self.title(d.filename)
-        body = ttk.Frame(self, padding=12)
+        self.configure(bg=app.theme.c["bg"])
+        body = ttk.Frame(self, padding=(22, 18, 22, 18))
         body.pack(fill="both", expand=True)
-        body.columnconfigure(1, weight=1)
+
+        self.head = tk.Canvas(body, width=self.WIDTH, height=58, highlightthickness=0, bd=0)
+        self.head.pack(fill="x")
+
+        big = ttk.Frame(body)
+        big.pack(fill="x", pady=(12, 0))
+        self.pct_lbl = ttk.Label(big, text="0%", style="Big.TLabel")
+        self.pct_lbl.pack(side="left")
+        self.speed_lbl = ttk.Label(big, text="", style="Title.TLabel")
+        self.speed_lbl.pack(side="right", anchor="s", pady=(0, 6))
+
+        self.bar = tk.Canvas(body, width=self.WIDTH, height=26, highlightthickness=0, bd=0)
+        self.bar.pack(fill="x", pady=(6, 0))
+        ttk.Label(body, text="Each blue block is one connection downloading its own part of the file.",
+                  style="Muted.TLabel").pack(anchor="w", pady=(4, 0))
+
+        stats = ttk.Frame(body)
+        stats.pack(fill="x", pady=(14, 0))
         self.vars = {}
-        rows = [("url", "Address"), ("status", "Status"), ("size", "File size"), ("done", "Downloaded"),
-                ("speed", "Transfer rate"), ("eta", "Time left"), ("resume", "Resume capability")]
-        for i, (key, label) in enumerate(rows):
-            ttk.Label(body, text=label + ":").grid(row=i, column=0, sticky="w", pady=1)
-            var = tk.StringVar()
-            ttk.Label(body, textvariable=var, width=60 if key == "url" else None,
-                      font=self.app.bold_font if key == "status" else None).grid(row=i, column=1, sticky="w")
+        for i, (key, label) in enumerate((("done", "Downloaded"), ("size", "File size"), ("eta", "Time left"),
+                                          ("status", "Status"), ("conns", "Connections"),
+                                          ("resume", "Resume"))):
+            cell = ttk.Frame(stats)
+            cell.grid(row=i // 3, column=i % 3, sticky="w", padx=(0, 30), pady=4)
+            ttk.Label(cell, text=label, style="Muted.TLabel").pack(anchor="w")
+            var = tk.StringVar(value="—")
+            ttk.Label(cell, textvariable=var, style="Title.TLabel").pack(anchor="w")
             self.vars[key] = var
-        r = len(rows)
-        self.pbar = ttk.Progressbar(body, maximum=100, length=self.BAR_W)
-        self.pbar.grid(row=r, column=0, columnspan=2, sticky="ew", pady=(10, 4))
-        self.canvas = tk.Canvas(body, width=self.BAR_W, height=16, highlightthickness=1,
-                                highlightbackground="#bbb", bg="#e8e8e8")
-        self.canvas.grid(row=r + 1, column=0, columnspan=2, sticky="ew")
-        ttk.Label(body, text="Connections:").grid(row=r + 2, column=0, sticky="w", pady=(8, 2))
-        self.conn_tree = ttk.Treeview(body, columns=("n", "dl", "info"), show="headings", height=6)
-        for key, title, w in (("n", "N.", 40), ("dl", "Downloaded", 120), ("info", "Info", 300)):
-            self.conn_tree.heading(key, text=title)
+        for col in range(3):
+            stats.columnconfigure(col, weight=1)
+
+        self.details_open = False
+        self.details_btn = ttk.Button(body, text="Show connections ▾", command=self.toggle_details)
+        self.details_btn.pack(anchor="w", pady=(12, 0))
+        self.details = ttk.Frame(body)
+        self.conn_tree = ttk.Treeview(self.details, columns=("n", "dl", "info"), show="headings", height=6)
+        for key, title, w in (("n", "#", 50), ("dl", "Downloaded", 140), ("info", "State", 300)):
+            self.conn_tree.heading(key, text=title, anchor="w")
             self.conn_tree.column(key, width=w, anchor="w")
-        self.conn_tree.grid(row=r + 3, column=0, columnspan=2, sticky="ew")
-        btns = ttk.Frame(body)
-        btns.grid(row=r + 4, column=0, columnspan=2, sticky="e", pady=(10, 0))
-        self.toggle_btn = ttk.Button(btns, text="Pause", command=self.toggle)
-        self.toggle_btn.pack(side="left", padx=3)
-        ttk.Button(btns, text="Cancel", command=self.cancel).pack(side="left", padx=3)
-        ttk.Button(btns, text="Hide", command=self.destroy).pack(side="left", padx=3)
+        self.conn_tree.pack(fill="x", pady=(8, 0))
+
+        self.btns = ttk.Frame(body)
+        self.btns.pack(fill="x", pady=(18, 0))
+        ttk.Button(self.btns, text="Hide", command=self.destroy).pack(side="right", padx=(8, 0))
+        ttk.Button(self.btns, text="Cancel", command=self.cancel).pack(side="right", padx=(8, 0))
+        self.toggle_btn = ttk.Button(self.btns, text="Pause", style="Accent.TButton", command=self.toggle)
+        self.toggle_btn.pack(side="right")
+        ttk.Button(self.btns, text="Open folder", command=self.open_folder).pack(side="left")
+
         self.protocol("WM_DELETE_WINDOW", self.destroy)
+        self.bind("<Escape>", lambda e: self.destroy())
         center_on(self, app.root)
+        self.deiconify()
+        set_titlebar_dark(self, app.theme.dark)
         self.update_view()
+
+    def restyle(self):
+        try:
+            self.configure(bg=self.app.theme.c["bg"])
+            set_titlebar_dark(self, self.app.theme.dark)
+        except tk.TclError:
+            pass
+
+    def toggle_details(self):
+        self.details_open = not self.details_open
+        if self.details_open:
+            self.details.pack(fill="x", before=self.btns)
+            self.details_btn.configure(text="Hide connections ▴")
+        else:
+            self.details.pack_forget()
+            self.details_btn.configure(text="Show connections ▾")
 
     def destroy(self):
         self.app.progress_windows.pop(self.d.id, None)
@@ -910,6 +984,64 @@ class ProgressWindow(tk.Toplevel):
         self.app.manager.pause(self.d)
         self.destroy()
 
+    def open_folder(self):
+        folder = self.d.folder or os.path.dirname(self.d.path)
+        if os.path.isdir(folder):
+            open_path(folder)
+
+    def _draw_head(self):
+        c, t, d = self.app.theme.c, self.app.theme, self.d
+        cv = self.head
+        cv.configure(bg=c["bg"])
+        cv.delete("all")
+        color = CATEGORY_COLORS.get(d.category, CATEGORY_COLORS["Other"])
+        rounded_rect(cv, 0, 6, 46, 52, 10, fill=color, outline="")
+        cv.create_text(23, 29, text=(extension_of(d.filename) or "file")[:4].upper(), fill="#ffffff",
+                       font=t.font_badge)
+        from .widgets import ellipsize
+        w = max(200, cv.winfo_width() - 62)
+        cv.create_text(62, 19, text=ellipsize(t.font_title, d.filename, w), anchor="w", fill=c["text"],
+                       font=t.font_title)
+        cv.create_text(62, 41, text=ellipsize(t.font_small, d.url, w), anchor="w", fill=c["muted"],
+                       font=t.font_small)
+
+    def _draw_bar(self):
+        c, d = self.app.theme.c, self.d
+        cv = self.bar
+        cv.configure(bg=c["bg"])
+        cv.delete("all")
+        w = max(10, cv.winfo_width() if cv.winfo_width() > 10 else self.WIDTH)
+        h = 26
+        rounded_rect(cv, 0, 0, w, h, 8, fill=c["track"], outline="")
+        segs = d.segment_snapshot()
+        rows = []
+        if d.size > 0 and segs:
+            for i, (start, end, pos, active) in enumerate(segs):
+                x0 = start * w / d.size
+                x1 = pos * w / d.size
+                if x1 - x0 >= 1:
+                    color = c["accent"] if d.status in ACTIVE_STATES else c["paused"]
+                    cv.create_rectangle(x0, 3, x1, h - 3, fill=color, outline="")
+                if active and pos <= end:  # the "head" of a running connection
+                    cv.create_rectangle(max(x0, x1 - 2), 3, x1, h - 3, fill=c["success"], outline="")
+                state = "Complete" if pos > end else ("Receiving data…" if active else "Waiting")
+                rows.append((str(i + 1), human_size(pos - start), state))
+        elif d.size > 0:
+            x1 = d.progress * w / 100
+            if x1 > 0:
+                rounded_rect(cv, 0, 0, x1, h, 8, fill=c["accent"], outline="")
+            if d.is_active:
+                rows.append(("1", human_size(d.downloaded), "Receiving data…"))
+        children = self.conn_tree.get_children()
+        for i, row in enumerate(rows):
+            if str(i) in children:
+                self.conn_tree.item(str(i), values=row)
+            else:
+                self.conn_tree.insert("", "end", iid=str(i), values=row)
+        for iid in children:
+            if int(iid) >= len(rows):
+                self.conn_tree.delete(iid)
+
     def update_view(self):
         if not self.winfo_exists():
             return
@@ -918,76 +1050,42 @@ class ProgressWindow(tk.Toplevel):
             self.destroy()
             return
         pct = d.progress
-        self.title(f"{pct:.0f}% {d.filename}")
-        self.vars["url"].set(d.url if len(d.url) < 90 else d.url[:87] + "...")
-        status = d.status if d.status != ERROR else f"Error: {d.error}"
-        if d.status == DOWNLOADING:
-            status = "Receiving data..."
-        self.vars["status"].set(status)
-        self.vars["size"].set(human_size(d.size))
-        done = human_size(d.downloaded)
-        self.vars["done"].set(f"{done} ({pct:.2f}%)" if d.size > 0 else done)
+        self.title(f"{pct:.0f}% · {d.filename}")
+        self.pct_lbl.configure(text=f"{pct:.1f}%" if d.size > 0 else human_size(d.downloaded))
         active = d.status in ACTIVE_STATES
-        self.vars["speed"].set(human_speed(d.speed) if active else "")
-        self.vars["eta"].set(human_time(d.eta) if active and d.eta is not None else "")
-        if d.probed:
-            self.vars["resume"].set("Yes" if d.resumable else "No")
-        self.pbar["value"] = pct
-        self.toggle_btn.config(text="Pause" if d.is_active else "Resume")
-        self._draw_segments()
+        self.speed_lbl.configure(text=human_speed(d.speed) if active else "")
+        status = {DOWNLOADING: "Downloading", ERROR: "Failed"}.get(d.status, d.status)
+        self.vars["status"].set(status if d.status != ERROR else f"Failed: {d.error}"[:40])
+        self.vars["size"].set(human_size(d.size))
+        self.vars["done"].set(human_size(d.downloaded))
+        self.vars["eta"].set(human_time(d.eta) if active and d.eta is not None else "—")
+        self.vars["conns"].set(str(d.active_connections) if active else "—")
+        self.vars["resume"].set(("Yes" if d.resumable else "No") if d.probed else "—")
+        self.toggle_btn.configure(text="Pause" if d.is_active else "Resume")
+        self._draw_head()
+        self._draw_bar()
         self.after(400, self.update_view)
-
-    def _draw_segments(self):
-        d = self.d
-        c = self.canvas
-        c.delete("all")
-        w = max(1, c.winfo_width() - 2) if c.winfo_width() > 10 else self.BAR_W
-        segs = d.segment_snapshot()
-        rows = []
-        if d.size > 0 and segs:
-            for i, (start, end, pos, active) in enumerate(segs):
-                x0 = start * w / d.size
-                x1 = pos * w / d.size
-                if x1 > x0:
-                    c.create_rectangle(x0, 0, x1, 18, fill=ACCENT if active else "#4f8fe8", width=0)
-                state = "Complete" if pos > end else ("Receiving data..." if active else "Waiting")
-                rows.append((str(i + 1), human_size(pos - start), state))
-        elif d.size > 0:
-            c.create_rectangle(0, 0, d.progress * w / 100, 18, fill=ACCENT, width=0)
-            if d.is_active:
-                rows.append(("1", human_size(d.downloaded), "Receiving data..."))
-        children = self.conn_tree.get_children()
-        for i, row in enumerate(rows):
-            iid = str(i)
-            if iid in children:
-                self.conn_tree.item(iid, values=row)
-            else:
-                self.conn_tree.insert("", "end", iid=iid, values=row)
-        for iid in children:
-            if int(iid) >= len(rows):
-                self.conn_tree.delete(iid)
 
 
 class CompleteDialog(Dialog):
     def __init__(self, app, d):
         super().__init__(app, "Download complete")
         self.d = d
-        b = self.body
-        ttk.Label(b, text="Download complete", style="Big.TLabel").grid(row=0, column=0, columnspan=2,
-                                                                       sticky="w", pady=(0, 8))
-        info = [("File", d.filename), ("Size", human_size(d.size)), ("Saved to", d.saved_path or ""),
-                ("Address", d.url if len(d.url) < 80 else d.url[:77] + "...")]
-        for i, (k, v) in enumerate(info, start=1):
-            ttk.Label(b, text=k + ":").grid(row=i, column=0, sticky="nw", padx=(0, 8))
-            ttk.Label(b, text=v, wraplength=460).grid(row=i, column=1, sticky="w")
+        c, t = app.theme.c, app.theme
+        head = tk.Canvas(self.body, width=480, height=64, highlightthickness=0, bd=0, bg=c["bg"])
+        head.pack(fill="x")
+        head.create_oval(2, 8, 50, 56, fill=c["success"], outline="")
+        head.create_line(15, 32, 23, 40, 38, 24, fill="#ffffff", width=4, capstyle="round", joinstyle="round")
+        head.create_text(66, 22, text="Download complete", anchor="w", fill=c["text"], font=t.font_h1)
+        head.create_text(66, 46, text=f"{d.filename}  ·  {human_size(d.size)}", anchor="w", fill=c["muted"],
+                         font=t.font)
+        ttk.Label(self.body, text=d.saved_path or "", style="Muted.TLabel", wraplength=480).pack(
+            anchor="w", pady=(10, 0))
         self.dont_show = tk.BooleanVar(value=False)
-        ttk.Checkbutton(b, text="Don't show this dialog again", variable=self.dont_show).grid(
-            row=6, column=0, columnspan=2, sticky="w", pady=(10, 0))
-        btns = ttk.Frame(b)
-        btns.grid(row=7, column=0, columnspan=2, sticky="e", pady=(10, 0))
-        ttk.Button(btns, text="Open", command=self.open_file).pack(side="left", padx=3)
-        ttk.Button(btns, text="Open folder", command=self.open_folder).pack(side="left", padx=3)
-        ttk.Button(btns, text="Close", command=self.close).pack(side="left", padx=3)
+        ttk.Checkbutton(self.body, text="Don't show this again", variable=self.dont_show).pack(anchor="w",
+                                                                                              pady=(12, 0))
+        self.button_row(self.body, [("Close", self.close, False), ("Show in folder", self.open_folder, False),
+                                    ("Open file", self.open_file, True)]).pack(fill="x", pady=(16, 0))
         self.finish_layout()
 
     def close(self):
@@ -1008,19 +1106,16 @@ class CompleteDialog(Dialog):
 
 class DeleteDialog(Dialog):
     def __init__(self, app, items):
-        super().__init__(app, "Delete downloads", modal=True)
+        title = f"Delete {len(items)} downloads?" if len(items) > 1 else "Delete download?"
+        sub = "They will be removed from the list." if len(items) > 1 else \
+            f"“{items[0].filename}” will be removed from the list."
+        super().__init__(app, "Delete", modal=True, heading=title, subheading=sub)
         self.items = items
-        b = self.body
-        text = f"Remove {len(items)} download(s) from the list?" if len(items) > 1 else \
-            f"Remove '{items[0].filename}' from the list?"
-        ttk.Label(b, text=text, wraplength=420).pack(anchor="w")
         self.delete_files = tk.BooleanVar(value=False)
-        ttk.Checkbutton(b, text="Also delete the file(s) from disk", variable=self.delete_files).pack(
-            anchor="w", pady=(10, 0))
-        btns = ttk.Frame(b)
-        btns.pack(anchor="e", pady=(12, 0))
-        ttk.Button(btns, text="Delete", command=self.ok).pack(side="left", padx=3)
-        ttk.Button(btns, text="Cancel", command=self.destroy).pack(side="left", padx=3)
+        ttk.Checkbutton(self.body, text="Also delete the file(s) from disk", variable=self.delete_files).pack(
+            anchor="w", pady=(14, 0))
+        self.button_row(self.body, [("Cancel", self.destroy, False), ("Delete", self.ok, True)]).pack(
+            fill="x", pady=(18, 0))
         self.finish_layout()
 
     def ok(self):
@@ -1035,34 +1130,33 @@ class DeleteDialog(Dialog):
 
 class PropertiesDialog(Dialog):
     def __init__(self, app, d):
-        super().__init__(app, "Properties")
+        super().__init__(app, "Properties", heading="Properties", subheading=d.filename)
         self.d = d
-        b = self.body
-        b.columnconfigure(1, weight=1)
-        ttk.Label(b, text="Address:").grid(row=0, column=0, sticky="w", pady=3)
+        grid = ttk.Frame(self.body)
+        grid.pack(fill="x", pady=(14, 0))
+        grid.columnconfigure(1, weight=1)
+        ttk.Label(grid, text="Address", style="Muted.TLabel").grid(row=0, column=0, sticky="w", pady=6,
+                                                                   padx=(0, 14))
         self.url_var = tk.StringVar(value=d.url)
         state = "normal" if d.status != COMPLETED else "readonly"
-        ttk.Entry(b, textvariable=self.url_var, width=80, state=state).grid(row=0, column=1, sticky="ew")
+        ttk.Entry(grid, textvariable=self.url_var, width=80, state=state).grid(row=0, column=1, sticky="ew")
         info = [
-            ("File", d.filename), ("Saved to", d.saved_path or d.path), ("Size", human_size(d.size)),
-            ("Status", d.status + (f" - {d.error}" if d.error else "")),
-            ("Resume capability", "Yes" if d.resumable else ("No" if d.probed else "Unknown")),
-            ("Added", datetime.datetime.fromtimestamp(d.added).strftime("%Y-%m-%d %H:%M:%S")),
+            ("Saved to", d.saved_path or d.path), ("Size", human_size(d.size)),
+            ("Status", d.status + (f" – {d.error}" if d.error else "")),
+            ("Resume", "Yes" if d.resumable else ("No" if d.probed else "Unknown")),
+            ("Added", datetime.datetime.fromtimestamp(d.added).strftime("%d %b %Y, %H:%M:%S")),
         ]
         if d.finished_at:
-            info.append(("Finished", datetime.datetime.fromtimestamp(d.finished_at).strftime("%Y-%m-%d %H:%M:%S")))
+            info.append(("Finished", datetime.datetime.fromtimestamp(d.finished_at).strftime("%d %b %Y, %H:%M:%S")))
         if d.headers.get("Referer"):
             info.append(("Referer", d.headers["Referer"]))
         for i, (k, v) in enumerate(info, start=1):
-            ttk.Label(b, text=k + ":").grid(row=i, column=0, sticky="nw", pady=1)
-            ttk.Label(b, text=v, wraplength=560).grid(row=i, column=1, sticky="w", pady=1)
-        ttk.Label(b, text="Tip: if a link expired, paste a fresh address above and press Save, "
-                          "then Resume.", foreground="#666").grid(row=20, column=0, columnspan=2, sticky="w",
-                                                                  pady=(8, 0))
-        btns = ttk.Frame(b)
-        btns.grid(row=21, column=0, columnspan=2, sticky="e", pady=(10, 0))
-        ttk.Button(btns, text="Save", command=self.save).pack(side="left", padx=3)
-        ttk.Button(btns, text="Close", command=self.destroy).pack(side="left", padx=3)
+            ttk.Label(grid, text=k, style="Muted.TLabel").grid(row=i, column=0, sticky="nw", pady=4, padx=(0, 14))
+            ttk.Label(grid, text=v, wraplength=560).grid(row=i, column=1, sticky="w", pady=4)
+        ttk.Label(self.body, text="Link expired? Paste a fresh address above, press Save, then Resume — "
+                                  "the progress is kept.", style="Muted.TLabel").pack(anchor="w", pady=(12, 0))
+        self.button_row(self.body, [("Close", self.destroy, False), ("Save", self.save, True)]).pack(
+            fill="x", pady=(16, 0))
         self.finish_layout()
 
     def save(self):
@@ -1080,10 +1174,10 @@ class PropertiesDialog(Dialog):
 
 class OptionsDialog(Dialog):
     def __init__(self, app):
-        super().__init__(app, "Options", modal=True)
+        super().__init__(app, "Settings", modal=True, heading="Settings")
         s = app.settings
         nb = ttk.Notebook(self.body)
-        nb.pack(fill="both", expand=True)
+        nb.pack(fill="both", expand=True, pady=(14, 0))
         self.v = {}
 
         def var(key, kind=tk.StringVar):
@@ -1091,74 +1185,79 @@ class OptionsDialog(Dialog):
             self.v[key] = v
             return v
 
+        def page(title):
+            f = ttk.Frame(nb, padding=16)
+            f.columnconfigure(1, weight=1)
+            nb.add(f, text=title)
+            return f
+
         # General
-        g = ttk.Frame(nb, padding=10)
-        g.columnconfigure(1, weight=1)
-        nb.add(g, text="General")
-        ttk.Label(g, text="Download folder:").grid(row=0, column=0, sticky="w", pady=3)
+        g = page("General")
+        ttk.Label(g, text="Download folder").grid(row=0, column=0, sticky="w", pady=6, padx=(0, 12))
         ttk.Entry(g, textvariable=var("download_dir"), width=50).grid(row=0, column=1, sticky="ew")
-        ttk.Button(g, text="Browse...", command=self._browse).grid(row=0, column=2, padx=(6, 0))
-        checks = [("use_category_folders", "Save into category sub-folders (Video, Music, Programs...)"),
-                  ("show_progress_window", "Show progress window when a download starts"),
-                  ("show_complete_dialog", "Show 'Download complete' dialog"),
+        ttk.Button(g, text="Browse…", command=self._browse).grid(row=0, column=2, padx=(8, 0))
+        ttk.Label(g, text="Appearance").grid(row=1, column=0, sticky="w", pady=6)
+        tf = ttk.Frame(g)
+        tf.grid(row=1, column=1, sticky="w")
+        theme = var("theme")
+        for value, text in (("system", "Use system setting"), ("light", "Light"), ("dark", "Dark")):
+            ttk.Radiobutton(tf, text=text, value=value, variable=theme).pack(side="left", padx=(0, 14))
+        checks = [("use_category_folders", "Sort files into category folders (Video, Music, Programs…)"),
+                  ("show_progress_window", "Show the progress window when a download starts"),
+                  ("show_complete_dialog", "Show a notice when a download finishes"),
                   ("clipboard_monitor", "Watch the clipboard for download links")]
-        for i, (key, text) in enumerate(checks, start=1):
-            ttk.Checkbutton(g, text=text, variable=var(key, tk.BooleanVar)).grid(row=i, column=0, columnspan=3,
-                                                                                 sticky="w", pady=2)
+        for i, (key, text) in enumerate(checks, start=2):
+            ttk.Checkbutton(g, text=text, variable=var(key, tk.BooleanVar)).grid(
+                row=i, column=0, columnspan=3, sticky="w", pady=4)
 
         # Connection
-        c = ttk.Frame(nb, padding=10)
-        c.columnconfigure(1, weight=1)
-        nb.add(c, text="Connection")
-        spins = [("max_connections", "Connections per download:", 1, 32),
-                 ("max_simultaneous", "Downloads at the same time (queue):", 1, 20),
-                 ("speed_limit_kb", "Speed limit in KB/s (0 = unlimited):", 0, 1000000),
-                 ("max_retries", "Retries per connection:", 0, 100),
-                 ("timeout", "Timeout (seconds):", 5, 300)]
+        cpage = page("Connection")
+        spins = [("max_connections", "Connections per download", 1, 32),
+                 ("max_simultaneous", "Downloads at the same time (queue)", 1, 20),
+                 ("speed_limit_kb", "Speed limit in KB/s (0 = unlimited)", 0, 1000000),
+                 ("max_retries", "Retries per connection", 0, 100),
+                 ("timeout", "Timeout (seconds)", 5, 300)]
         for i, (key, text, lo, hi) in enumerate(spins):
-            ttk.Label(c, text=text).grid(row=i, column=0, sticky="w", pady=3)
-            ttk.Spinbox(c, from_=lo, to=hi, textvariable=var(key, tk.IntVar), width=10).grid(row=i, column=1,
-                                                                                              sticky="w")
+            ttk.Label(cpage, text=text).grid(row=i, column=0, sticky="w", pady=5, padx=(0, 12))
+            ttk.Spinbox(cpage, from_=lo, to=hi, textvariable=var(key, tk.IntVar), width=10).grid(
+                row=i, column=1, sticky="w")
         r = len(spins)
-        ttk.Label(c, text="Proxy:").grid(row=r, column=0, sticky="w", pady=(10, 3))
-        pf = ttk.Frame(c)
-        pf.grid(row=r, column=1, sticky="w", pady=(10, 3))
+        ttk.Label(cpage, text="Proxy").grid(row=r, column=0, sticky="w", pady=(12, 5))
+        pf = ttk.Frame(cpage)
+        pf.grid(row=r, column=1, sticky="w", pady=(12, 5))
         mode = var("proxy_mode")
-        for value, text in (("system", "System"), ("none", "No proxy"), ("manual", "Manual:")):
-            ttk.Radiobutton(pf, text=text, value=value, variable=mode).pack(side="left", padx=(0, 6))
-        ttk.Entry(pf, textvariable=var("proxy"), width=26).pack(side="left")
-        ttk.Label(c, text="User-Agent:").grid(row=r + 1, column=0, sticky="w", pady=3)
-        ttk.Entry(c, textvariable=var("user_agent"), width=50).grid(row=r + 1, column=1, sticky="ew")
-        ttk.Checkbutton(c, text="Verify HTTPS certificates (recommended)",
+        for value, text in (("system", "System"), ("none", "None"), ("manual", "Manual")):
+            ttk.Radiobutton(pf, text=text, value=value, variable=mode).pack(side="left", padx=(0, 10))
+        ttk.Entry(pf, textvariable=var("proxy"), width=24).pack(side="left")
+        ttk.Label(cpage, text="User-Agent").grid(row=r + 1, column=0, sticky="w", pady=5)
+        ttk.Entry(cpage, textvariable=var("user_agent"), width=50).grid(row=r + 1, column=1, sticky="ew")
+        ttk.Checkbutton(cpage, text="Verify HTTPS certificates (recommended)",
                         variable=var("verify_ssl", tk.BooleanVar)).grid(row=r + 2, column=0, columnspan=2,
-                                                                        sticky="w", pady=3)
+                                                                        sticky="w", pady=5)
 
         # Browser
-        br = ttk.Frame(nb, padding=10)
-        br.columnconfigure(1, weight=1)
-        nb.add(br, text="Browser")
+        br = page("Browser")
         ttk.Checkbutton(br, text="Enable browser integration", variable=var("browser_integration", tk.BooleanVar)
-                        ).grid(row=0, column=0, columnspan=2, sticky="w", pady=2)
-        ttk.Checkbutton(br, text="Start browser downloads immediately (don't show the dialog)",
+                        ).grid(row=0, column=0, columnspan=2, sticky="w", pady=4)
+        ttk.Checkbutton(br, text="Start browser downloads right away (skip the dialog)",
                         variable=var("browser_skip_dialog", tk.BooleanVar)).grid(row=1, column=0, columnspan=2,
-                                                                                 sticky="w", pady=2)
-        ttk.Label(br, text="Local port:").grid(row=2, column=0, sticky="w", pady=3)
+                                                                                 sticky="w", pady=4)
+        ttk.Label(br, text="Local port").grid(row=2, column=0, sticky="w", pady=6, padx=(0, 12))
         ttk.Spinbox(br, from_=1024, to=65535, textvariable=var("browser_port", tk.IntVar), width=8).grid(
             row=2, column=1, sticky="w")
-        ttk.Label(br, text="Capture these file types:").grid(row=3, column=0, columnspan=2, sticky="w", pady=(8, 2))
+        ttk.Label(br, text="Catch these file types").grid(row=3, column=0, columnspan=2, sticky="w", pady=(10, 4))
         self.ext_text = tk.Text(br, height=4, width=60, wrap="word")
+        app.theme.style_text(self.ext_text)
         self.ext_text.insert("1.0", s["capture_extensions"])
         self.ext_text.grid(row=4, column=0, columnspan=2, sticky="ew")
-        ttk.Label(br, text="Ignore files smaller than (KB):").grid(row=5, column=0, sticky="w", pady=3)
+        ttk.Label(br, text="Ignore files smaller than (KB)").grid(row=5, column=0, sticky="w", pady=6)
         ttk.Spinbox(br, from_=0, to=10000000, textvariable=var("capture_min_size_kb", tk.IntVar), width=10).grid(
             row=5, column=1, sticky="w")
-        ttk.Button(br, text="How to install the browser extension...", command=app.browser_help).grid(
-            row=6, column=0, columnspan=2, sticky="w", pady=(10, 0))
+        ttk.Button(br, text="How to install the browser extension…", command=app.browser_help).grid(
+            row=6, column=0, columnspan=2, sticky="w", pady=(12, 0))
 
-        btns = ttk.Frame(self.body)
-        btns.pack(anchor="e", pady=(10, 0))
-        ttk.Button(btns, text="OK", command=self.save).pack(side="left", padx=3)
-        ttk.Button(btns, text="Cancel", command=self.destroy).pack(side="left", padx=3)
+        self.button_row(self.body, [("Cancel", self.destroy, False), ("Save", self.save, True)]).pack(
+            fill="x", pady=(16, 0))
         self.finish_layout()
 
     def _browse(self):
@@ -1168,7 +1267,7 @@ class OptionsDialog(Dialog):
 
     def save(self):
         s = self.app.settings
-        old_port, old_enabled = s["browser_port"], s["browser_integration"]
+        old_port, old_enabled, old_theme = s["browser_port"], s["browser_integration"], s["theme"]
         try:
             for key, v in self.v.items():
                 s[key] = v.get()
@@ -1182,33 +1281,32 @@ class OptionsDialog(Dialog):
         if old_port != s["browser_port"] or old_enabled != s["browser_integration"]:
             self.app.start_server()
         self.destroy()
+        if old_theme != s["theme"]:
+            self.app.theme.apply(s["theme"])
 
 
 class SchedulerDialog(Dialog):
     def __init__(self, app):
-        super().__init__(app, "Scheduler")
+        super().__init__(app, "Scheduler", heading="Scheduler",
+                         subheading="Downloads added with “Download later” wait in the queue. "
+                                    "The scheduler starts the queue every day at the time you choose.")
         s = app.settings
-        b = self.body
         self.enabled = tk.BooleanVar(value=s["scheduler_enabled"])
         self.start_t = tk.StringVar(value=s["scheduler_start"])
         self.stop_t = tk.StringVar(value=s["scheduler_stop"])
         self.shutdown = tk.BooleanVar(value=s["scheduler_shutdown"])
-        ttk.Label(b, text="Downloads added with 'Download Later' wait in the queue.\n"
-                          "The scheduler starts the queue every day at the chosen time.",
-                  foreground="#555").grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 8))
-        ttk.Checkbutton(b, text="Enable scheduler", variable=self.enabled).grid(row=1, column=0, columnspan=2,
-                                                                                 sticky="w")
-        ttk.Label(b, text="Start queue at (HH:MM, 24h):").grid(row=2, column=0, sticky="w", pady=3)
-        ttk.Entry(b, textvariable=self.start_t, width=8).grid(row=2, column=1, sticky="w")
-        ttk.Label(b, text="Stop queue at (optional):").grid(row=3, column=0, sticky="w", pady=3)
-        ttk.Entry(b, textvariable=self.stop_t, width=8).grid(row=3, column=1, sticky="w")
-        ttk.Checkbutton(b, text="Shut down the computer when the queue is finished",
-                        variable=self.shutdown).grid(row=4, column=0, columnspan=2, sticky="w", pady=(6, 0))
-        btns = ttk.Frame(b)
-        btns.grid(row=5, column=0, columnspan=2, sticky="e", pady=(12, 0))
-        ttk.Button(btns, text="Start queue now", command=self.start_now).pack(side="left", padx=3)
-        ttk.Button(btns, text="OK", command=self.save).pack(side="left", padx=3)
-        ttk.Button(btns, text="Cancel", command=self.destroy).pack(side="left", padx=3)
+        g = ttk.Frame(self.body)
+        g.pack(fill="x", pady=(14, 0))
+        ttk.Checkbutton(g, text="Enable scheduler", variable=self.enabled).grid(row=0, column=0, columnspan=2,
+                                                                                 sticky="w", pady=4)
+        ttk.Label(g, text="Start queue at (HH:MM)").grid(row=1, column=0, sticky="w", pady=6, padx=(0, 14))
+        ttk.Entry(g, textvariable=self.start_t, width=8).grid(row=1, column=1, sticky="w")
+        ttk.Label(g, text="Stop queue at (optional)").grid(row=2, column=0, sticky="w", pady=6)
+        ttk.Entry(g, textvariable=self.stop_t, width=8).grid(row=2, column=1, sticky="w")
+        ttk.Checkbutton(g, text="Shut down the computer when the queue is finished",
+                        variable=self.shutdown).grid(row=3, column=0, columnspan=2, sticky="w", pady=(8, 0))
+        self.button_row(self.body, [("Start queue now", self.start_now, False), ("Cancel", self.destroy, False),
+                                    ("Save", self.save, True)]).pack(fill="x", pady=(18, 0))
         self.finish_layout()
 
     @staticmethod
@@ -1219,7 +1317,8 @@ class SchedulerDialog(Dialog):
         except ValueError:
             return False
 
-    def _normalize(self, t):
+    @staticmethod
+    def _normalize(t):
         return datetime.datetime.strptime(t, "%H:%M").strftime("%H:%M")
 
     def save(self):

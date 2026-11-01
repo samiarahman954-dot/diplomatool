@@ -1,0 +1,2 @@
+# Optional: modern Windows 11 style theme (the app still runs without it)
+sv-ttk>=2.6

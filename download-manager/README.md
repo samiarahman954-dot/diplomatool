@@ -1,8 +1,8 @@
 # SwiftGet Download Manager
 
 একটা multi-connection download manager, ব্যক্তিগত ব্যবহারের জন্য বানানো। IDM-এর মত মূল ফিচারগুলো আছে, তবে
-কোডটা পুরোপুরি নতুন করে লেখা (IDM-এর কোনো কোড, ডিজাইন বা নাম ব্যবহার করা হয়নি)। পুরোটা Python
-standard library দিয়ে লেখা, তাই চালাতে বাড়তি কোনো package লাগে না।
+কোডটা পুরোপুরি নতুন করে লেখা (IDM-এর কোনো কোড, ডিজাইন বা নাম ব্যবহার করা হয়নি)। Download engine শুধু Python
+standard library দিয়ে লেখা। দেখতে Windows 11 এর মত modern করার জন্য ঐচ্ছিক `sv-ttk` theme ব্যবহার করা হয়েছে।
 
 *A multi-connection download manager for personal use, written from scratch in pure Python (standard library only).*
 
@@ -20,6 +20,7 @@ standard library দিয়ে লেখা, তাই চালাতে ব�
 | **Queue + Scheduler** | "Download Later" দিলে ফাইল queue-তে অপেক্ষা করে। নির্দিষ্ট সময়ে queue শুরু বা বন্ধ করা যায়, আর শেষ হলে PC shutdown-ও করা যায় |
 | **Speed limiter** | পুরো অ্যাপের জন্য একটা speed limit (Downloads ▸ Speed limiter) |
 | **Batch download** | একসাথে অনেক link দেওয়া যায়, আর `file[01-50].jpg` এর মত pattern নিজে থেকে বড় হয়ে যায় |
+| **Modern UI** | Light/Dark mode (☾ বাটন বা Settings থেকে), card-style list যেখানে প্রতিটা ফাইলের নিজের progress bar আছে, sidebar-এ গোনা সংখ্যা, search box |
 | **Progress window** | প্রতিটা connection-এর অবস্থা, segment map, speed আর বাকি সময় দেখায় |
 | **Expired link refresh** | Properties থেকে নতুন link বসিয়ে আগের progress রেখেই resume করা যায় |
 | **Proxy, User-Agent, cookies/referer** | browser থেকে আসা download-এর cookies আর referer সাথে যায়, তাই login লাগে এমন সাইটেও কাজ করে |
@@ -40,6 +41,7 @@ standard library দিয়ে লেখা, তাই চালাতে ব�
 ### উপায় ৩ — build ছাড়াই সরাসরি চালান
 ```bash
 cd download-manager
+pip install -r requirements.txt   # ঐচ্ছিক: modern theme
 python run.py
 ```
 
@@ -52,7 +54,8 @@ python run.py
 5. SwiftGet বন্ধ থাকলে browser আগের মত নিজেই ফাইল নামাবে।
 
 ## ব্যবহার (Usage tips)
-- **Ctrl+N** — নতুন URL, **Ctrl+V** (main window-এ) — clipboard-এর link যোগ করে, **Ctrl+B** — batch, **Del** — delete।
+- **Ctrl+F** — search, **Ctrl+N** — নতুন URL, **Ctrl+V** (main window-এ) — clipboard-এর link যোগ করে, **Ctrl+B** — batch, **Del** — delete।
+- প্রতিটা card-এর ডানদিকের গোল বাটন: চলতি download হলে pause, থেমে থাকলে resume, শেষ হলে folder খোলে।
 - কোনো download-এ double-click করলে: চলতি download হলে progress window খোলে, শেষ হয়ে গেলে ফাইলটা খোলে।
 - Right-click মেনুতে আছে Open, Open folder, Redownload, Copy address, Properties।
 - Settings আর download list সেভ হয় `%APPDATA%\SwiftGet`-এ।
@@ -64,7 +67,9 @@ download-manager/
 ├── run.py                 # entry point
 ├── swiftget/
 │   ├── engine.py          # segmented downloader, queue, scheduler, persistence
-│   ├── gui.py             # Tkinter UI
+│   ├── gui.py             # main window + dialogs
+│   ├── widgets.py         # custom-drawn download cards & sidebar
+│   ├── theme.py           # light / dark theme, fonts, colours
 │   ├── server.py          # 127.0.0.1 API for the browser extension
 │   ├── config.py          # settings
 │   └── utils.py

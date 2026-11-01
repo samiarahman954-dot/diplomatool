@@ -39,6 +39,7 @@ DEFAULTS = {
     "verify_ssl": True,
     "show_complete_dialog": True,
     "show_progress_window": True,
+    "theme": "system",              # system | light | dark
     "clipboard_monitor": True,
     "browser_integration": True,
     "browser_port": 9614,
