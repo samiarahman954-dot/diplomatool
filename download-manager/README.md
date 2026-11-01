@@ -41,6 +41,24 @@ standard library দিয়ে লেখা। দেখতে Windows 11 এ�
 
 Install না করে চালাতে চাইলে **SwiftGet-portable** artifact-ও আছে।
 
+### Digital signature
+GitHub-এ যে `SwiftGet.exe`, `SwiftGet-Setup.exe` আর uninstaller তৈরি হয়, তিনটাতেই digital signature থাকে। ফাইলে
+right-click করে **Properties → Digital Signatures** খুললে signer হিসেবে "SwiftGet" দেখা যাবে। এতে বোঝা যায় build-এর পর
+ফাইলে কেউ হাত দেয়নি।
+
+- এখনকার signature একটা **self-signed** certificate দিয়ে করা। প্রতিটা build নতুন certificate বানায়, আর তার private key
+  build শেষ হলেই মুছে যায়।
+- Windows self-signed certificate চেনে না, তাই SmartScreen-এর "Unknown publisher" সতর্কবার্তা তবুও আসবে। নিজের PC-তে
+  তাড়াতাড়ি সরাতে: ডাউনলোড করা Setup ফাইলে right-click → **Properties** → নিচে **Unblock** টিক দিন → OK।
+- **আসল certificate দিয়ে sign করতে** (যাতে সতর্কবার্তা পুরো চলে যায়): CA-এর কাছ থেকে code-signing certificate কিনুন
+  (`.pfx`)। তারপর GitHub repo-র **Settings → Secrets and variables → Actions**-এ দুটো secret যোগ করুন:
+  - `SIGN_PFX_BASE64`: `.pfx` ফাইলের base64। PowerShell-এ বের করতে:
+    `[Convert]::ToBase64String([IO.File]::ReadAllBytes("cert.pfx"))`
+  - `SIGN_PFX_PASSWORD`: `.pfx`-এর password
+
+  এরপর থেকে প্রতিটা build নিজে থেকেই সেই certificate দিয়ে sign হবে, কোড বদলাতে হবে না। খেয়াল রাখবেন, অনেক নতুন
+  certificate এখন hardware token বা cloud-এ থাকে, `.pfx` হিসেবে দেয় না। সেক্ষেত্রে build-এর sign করার ধাপটা বদলাতে হবে।
+
 ### নিজের PC-তে build করুন
 1. [python.org](https://www.python.org/downloads/) থেকে Python 3.10 বা তার নতুন version install করুন ("Add to PATH" টিক দিয়ে),
    আর [Inno Setup 6](https://jrsoftware.org/isinfo.php) install করুন।

@@ -30,6 +30,11 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 CloseApplications=force
 RestartApplications=no
+#ifdef SIGN
+; the "swiftsign" tool is passed on the command line: ISCC /DSIGN "/Sswiftsign=cmd /c sign.cmd $f"
+SignTool=swiftsign
+SignedUninstaller=yes
+#endif
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
