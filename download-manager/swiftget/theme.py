@@ -71,6 +71,11 @@ class Theme:
     def __init__(self, root, mode="system"):
         self.root = root
         self.listeners = []
+        # Hand-drawn parts are laid out for 96 DPI and scaled by this (fonts scale by themselves).
+        try:
+            self.scale = max(1.0, round(root.winfo_fpixels("1i") / 96.0, 2))
+        except tk.TclError:
+            self.scale = 1.0
         self._make_fonts()
         self.apply(mode)
 

@@ -92,12 +92,23 @@ class DownloadList(tk.Canvas):
         self.selected = {d.id for d in self.items}
         self.redraw()
 
+    # ---------------------------------------------------- DPI (logical units)
+    @property
+    def k(self):
+        return self.theme.scale
+
+    def _logical_w(self):
+        return self.winfo_width() / self.k
+
+    def _logical_h(self):
+        return self.winfo_height() / self.k
+
     # -------------------------------------------------------------- scrolling
     def _content_h(self):
         return len(self.items) * self.ROW_H + 8
 
     def _clamp(self):
-        h = self.winfo_height()
+        h = self._logical_h()
         self.offset = max(0, min(self.offset, max(0, self._content_h() - h)))
 
     def scroll_by(self, dy):
@@ -110,7 +121,7 @@ class DownloadList(tk.Canvas):
 
     def _yview(self, *args):
         total = max(1, self._content_h())
-        h = self.winfo_height()
+        h = self._logical_h()
         if args[0] == "moveto":
             self.offset = int(float(args[1]) * total)
         elif args[0] == "scroll":
@@ -121,7 +132,7 @@ class DownloadList(tk.Canvas):
 
     def _update_scrollbar(self):
         total = max(1, self._content_h())
-        h = max(1, self.winfo_height())
+        h = max(1, self._logical_h())
         first = self.offset / total
         last = min(1.0, (self.offset + h) / total)
         self.vsb.set(first, last)
@@ -133,13 +144,14 @@ class DownloadList(tk.Canvas):
 
     # ------------------------------------------------------------- hit tests
     def _row_at(self, y):
-        idx = int((y + self.offset - 4) // self.ROW_H)
+        idx = int((y / self.k + self.offset - 4) // self.ROW_H)
         return idx if 0 <= idx < len(self.items) else None
 
     def _button_at(self, x, y, idx):
         if idx is None:
             return False
-        w = self.winfo_width()
+        w = self._logical_w()
+        x, y = x / self.k, y / self.k
         cy = 4 + idx * self.ROW_H - self.offset + self.ROW_H / 2
         cx = w - self.PAD_X - 30
         return (x - cx) ** 2 + (y - cy) ** 2 <= 17 ** 2
@@ -214,8 +226,8 @@ class DownloadList(tk.Canvas):
         top = 4 + nxt * self.ROW_H
         if top < self.offset:
             self.offset = top
-        elif top + self.ROW_H > self.offset + self.winfo_height():
-            self.offset = top + self.ROW_H - self.winfo_height()
+        elif top + self.ROW_H > self.offset + self._logical_h():
+            self.offset = top + self.ROW_H - self._logical_h()
         self._clamp()
         self.redraw()
 
@@ -224,18 +236,19 @@ class DownloadList(tk.Canvas):
         c = self.theme.c
         self.configure(bg=c["bg"])
         self.delete("all")
-        w, h = self.winfo_width(), self.winfo_height()
+        w, h = self._logical_w(), self._logical_h()
         if w < 50:
             return
         self._clamp()
         if not self.items:
             self._draw_empty(w, h)
-            self._update_scrollbar()
-            return
-        first = max(0, int(self.offset // self.ROW_H) - 1)
-        last = min(len(self.items), int((self.offset + h) // self.ROW_H) + 2)
-        for idx in range(first, last):
-            self._draw_row(idx, self.items[idx], w)
+        else:
+            first = max(0, int(self.offset // self.ROW_H) - 1)
+            last = min(len(self.items), int((self.offset + h) // self.ROW_H) + 2)
+            for idx in range(first, last):
+                self._draw_row(idx, self.items[idx], w)
+        if self.k != 1.0:
+            self.scale("all", 0, 0, self.k, self.k)
         self._update_scrollbar()
 
     def _draw_empty(self, w, h):
@@ -332,21 +345,21 @@ class DownloadList(tk.Canvas):
         bar_y = y0 + 54
         show_bar = d.status not in (COMPLETED,) and (d.size > 0 or active)
         name_y = y0 + (22 if show_bar else 26)
-        self.create_text(tx, name_y, text=ellipsize(t.font_bold, d.filename, text_w), anchor="w",
+        self.create_text(tx, name_y, text=ellipsize(t.font_bold, d.filename, text_w * self.k), anchor="w",
                          fill=c["text"], font=t.font_bold)
         status, tone = self._status_line(d)
-        self.create_text(tx, name_y + 19, text=ellipsize(t.font_small, status, text_w), anchor="w",
+        self.create_text(tx, name_y + 19, text=ellipsize(t.font_small, status, text_w * self.k), anchor="w",
                          fill=c["error"] if tone == "error" else c["muted"], font=t.font_small)
 
         # progress bar
         if show_bar:
             bx0, bx1 = tx, x1 - right_w + 40
-            self.create_line(bx0, bar_y, bx1, bar_y, fill=c["track"], width=4, capstyle="round")
+            self.create_line(bx0, bar_y, bx1, bar_y, fill=c["track"], width=4 * self.k, capstyle="round")
             frac = d.progress / 100.0 if d.size > 0 else 0
             if frac > 0:
                 color = {DOWNLOADING: c["accent"], CONNECTING: c["accent"], ERROR: c["error"]}.get(
                     d.status, c["paused"])
-                self.create_line(bx0, bar_y, bx0 + max(4, (bx1 - bx0) * frac), bar_y, fill=color, width=4,
+                self.create_line(bx0, bar_y, bx0 + max(4, (bx1 - bx0) * frac), bar_y, fill=color, width=4 * self.k,
                                  capstyle="round")
 
 
@@ -354,7 +367,7 @@ class Sidebar(tk.Canvas):
     ITEM_H = 36
 
     def __init__(self, master, app, entries):
-        super().__init__(master, highlightthickness=0, bd=0, width=220)
+        super().__init__(master, highlightthickness=0, bd=0, width=int(220 * app.theme.scale))
         self.app = app
         self.theme = app.theme
         self.entries = entries  # list of (key, label, color) or ("-", header, None)
@@ -373,6 +386,7 @@ class Sidebar(tk.Canvas):
             self.redraw()
 
     def _key_at(self, y):
+        y = y / self.theme.scale
         for key, y0, y1 in self._hits:
             if y0 <= y < y1:
                 return key
@@ -398,7 +412,8 @@ class Sidebar(tk.Canvas):
         c, t = self.theme.c, self.theme
         self.configure(bg=c["sidebar"])
         self.delete("all")
-        w = self.winfo_width()
+        k = self.theme.scale
+        w = self.winfo_width() / k
         # logo
         self.create_image(22, 30, image=self.app.logo, anchor="w")
         self.create_text(60, 30, text="SwiftGet", anchor="w", fill=c["text"], font=t.font_h1)
@@ -427,3 +442,5 @@ class Sidebar(tk.Canvas):
                                  font=t.font_small)
             self._hits.append((key, y0, y1))
             y = y1
+        if k != 1.0:
+            self.scale("all", 0, 0, k, k)

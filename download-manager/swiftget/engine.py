@@ -145,7 +145,10 @@ class Download:
         self.finished_at = None
         self.saved_path = None
         self.from_queue = False
+        self.part_name = None          # temp file name, unique per download
         # runtime only
+        self._gen = 0                  # bumped on every start; stale connections check it
+        self._restart = False          # "resume" was pressed while the old run was still stopping
         self._lock = threading.Lock()
         self._stop = threading.Event()
         self._stop_status = PAUSED
@@ -173,7 +176,7 @@ class Download:
 
     @property
     def part_path(self):
-        return os.path.join(self.folder, self.filename + ".swg")
+        return os.path.join(self.folder, self.part_name or (self.filename + ".swg"))
 
     @property
     def downloaded(self):
@@ -209,8 +212,11 @@ class Download:
     # ----- control --------------------------------------------------------
     def start(self):
         if self._thread and self._thread.is_alive():
+            if self._stop.is_set():
+                self._restart = True  # start again as soon as the old run has stopped
             return
-        self._stop.clear()
+        self._gen += 1
+        self._stop = threading.Event()  # fresh flag: connections of an older run keep seeing theirs set
         self._stop_status = PAUSED
         self.error = ""
         self.status = CONNECTING
@@ -220,6 +226,7 @@ class Download:
         self._thread.start()
 
     def stop(self, new_status=PAUSED):
+        self._restart = False
         self._stop_status = new_status
         self._stop.set()
         if not (self._thread and self._thread.is_alive()) and self.status != COMPLETED:
@@ -238,6 +245,7 @@ class Download:
                 os.remove(self.part_path)
             except OSError:
                 pass
+        self.part_name = None
         self.probed = False
         self.size = -1
         self.resumable = False
@@ -254,6 +262,8 @@ class Download:
                 self._probe()
             if self.folder is None:
                 self.folder = self.manager.auto_folder(self.filename)
+            if not self.part_name:
+                self.part_name = f"{self.filename}.{self.id[:8]}.swg"
             os.makedirs(self.folder, exist_ok=True)
             if self._stop.is_set():
                 raise _Stopped()
@@ -276,6 +286,9 @@ class Download:
         finally:
             self.speed = 0.0
             self.active_connections = 0
+            if self._restart and self.status != COMPLETED:
+                self._restart = False
+                self.status = QUEUED  # the manager starts it again within half a second
             self.manager._on_download_finished(self)
 
     def _request(self, start=None, end=None):
@@ -349,10 +362,12 @@ class Download:
         max_retries = int(self.settings["max_retries"])
         last_error = [None]
         threads = []
+        gen, stop = self._gen, self._stop
 
         def launch(seg):
             seg.active = True
-            t = threading.Thread(target=self._segment_worker, args=(seg, last_error, max_retries), daemon=True)
+            t = threading.Thread(target=self._segment_worker, args=(seg, last_error, max_retries, gen, stop),
+                                 daemon=True)
             threads.append(t)
             t.start()
 
@@ -383,8 +398,9 @@ class Download:
             self._update_speed()
             self._stop.wait(0.25)
 
+        deadline = time.monotonic() + 3  # a connection stuck in a slow read is ignored via self._gen
         for t in threads:
-            t.join(timeout=10)
+            t.join(timeout=max(0.0, deadline - time.monotonic()))
 
     def _split_largest(self):
         with self._lock:
@@ -401,9 +417,15 @@ class Download:
             self.segments.sort(key=lambda s: s.start)
             return new_seg
 
-    def _segment_worker(self, seg, last_error, max_retries):
+    def _segment_worker(self, seg, last_error, max_retries, gen, stop):
+        """Download one part. `gen`/`stop` belong to the run that started this connection;
+        if the user pauses and resumes, this connection becomes stale and must not touch
+        the part any more (a new connection takes over)."""
+        def current():
+            return gen == self._gen and not stop.is_set()
+
         try:
-            while not self._stop.is_set() and not seg.done:
+            while current() and not seg.done:
                 try:
                     with self._lock:
                         start, end = seg.pos, seg.end
@@ -414,12 +436,14 @@ class Download:
                             raise DownloadError("Server does not support resuming anymore")
                         with open(self.part_path, "r+b") as f:
                             f.seek(start)
-                            while not self._stop.is_set():
+                            while current():
                                 chunk = resp.read(CHUNK_SIZE)
                                 if not chunk:
                                     break
-                                self.manager.limiter.consume(len(chunk), self._stop)
+                                self.manager.limiter.consume(len(chunk), stop)
                                 with self._lock:
+                                    if not current():
+                                        return
                                     allowed = seg.end - seg.pos + 1
                                     if allowed <= 0:
                                         break
@@ -429,24 +453,28 @@ class Download:
                                 # below pos + 2*MIN_SPLIT, which is > CHUNK_SIZE.
                                 f.write(chunk)
                                 with self._lock:
+                                    if gen != self._gen:
+                                        return
                                     seg.pos += len(chunk)
                                     self._bytes += len(chunk)
                                     seg.failures = 0
                                 if seg.done:
                                     break
-                    if not seg.done and not self._stop.is_set():
+                    if not seg.done and current():
                         raise DownloadError("Connection closed before the part was complete")
                 except Exception as exc:  # noqa: BLE001
-                    if self._stop.is_set():
+                    if not current():
                         break
                     last_error[0] = exc
                     if seg.failures < 10 ** 6:
                         seg.failures += 1
                     if seg.failures > max_retries:
                         break
-                    self._stop.wait(min(1.5 ** seg.failures, 20))
+                    stop.wait(min(1.5 ** seg.failures, 20))
         finally:
-            seg.active = False
+            with self._lock:
+                if gen == self._gen:
+                    seg.active = False
 
     def _download_single(self):
         self.active_connections = 1
@@ -514,6 +542,7 @@ class Download:
             "resumable": self.resumable, "probed": self.probed, "segments": segs,
             "status": status, "error": self.error, "added": self.added,
             "finished_at": self.finished_at, "saved_path": self.saved_path,
+            "part_name": self.part_name,
         }
 
     @classmethod
@@ -531,6 +560,8 @@ class Download:
         d.added = data.get("added", time.time())
         d.finished_at = data.get("finished_at")
         d.saved_path = data.get("saved_path")
+        # downloads saved by version 1.0.0 used "<name>.swg"
+        d.part_name = data["part_name"] if "part_name" in data else data.get("filename", "download") + ".swg"
         return d
 
 
@@ -656,24 +687,35 @@ class DownloadManager:
         self._mark_dirty()
 
     def remove(self, d, delete_file=False):
+        """Remove from the list right away; stopping and deleting files happens in the
+        background so the window never freezes on a slow connection."""
+        was_completed = d.status == COMPLETED
         d.stop(PAUSED)
-        d.join(10)
         with self._lock:
             if d in self.downloads:
                 self.downloads.remove(d)
+        self._mark_dirty()
+        paths = []
         if delete_file:
-            paths = []
             if d.folder:
                 paths.append(d.part_path)
-            if d.status == COMPLETED and d.saved_path:
+            if was_completed and d.saved_path:
                 paths.append(d.saved_path)
+
+        def cleanup():
+            d.join(30)
             for p in paths:
-                try:
-                    if os.path.exists(p):
-                        os.remove(p)
-                except OSError:
-                    pass
-        self._mark_dirty()
+                for _ in range(10):  # Windows: a closing connection may still hold the file briefly
+                    try:
+                        if os.path.exists(p):
+                            os.remove(p)
+                        break
+                    except OSError:
+                        time.sleep(0.5)
+
+        t = threading.Thread(target=cleanup, name=f"remove-{d.id}", daemon=True)
+        t.start()
+        return t
 
     def remove_completed(self):
         with self._lock:

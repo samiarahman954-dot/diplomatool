@@ -158,6 +158,64 @@ class EngineTests(unittest.TestCase):
         self.assertTrue(wait_for(self.finished(d)))
         self.assert_file_ok(d)
 
+    def test_quick_pause_resume_cycles(self):
+        # Pause and resume again right away, several times, while connections are mid-read.
+        srv = self.server(delay=0.05)
+        d = self.manager.add(srv.url(), connections=6)
+        self.assertTrue(wait_for(lambda: d.downloaded > 256 * 1024))
+        for _ in range(4):
+            self.manager.pause(d)
+            time.sleep(0.05)
+            self.manager.resume(d)
+            time.sleep(0.4)
+        srv.httpd.delay = 0
+        for _ in range(600):
+            self.manager.tick()
+            if d.status in (engine.COMPLETED, engine.ERROR) and not d.is_active:
+                break
+            time.sleep(0.05)
+        self.assert_file_ok(d)
+
+    def test_stalled_connection_then_resume(self):
+        # A connection is stuck in a slow read when the user pauses and resumes.
+        srv = self.server(delay=1.5)
+        d = self.manager.add(srv.url(), connections=4)
+        self.assertTrue(wait_for(lambda: d.downloaded > 0))
+        self.manager.pause(d)
+        self.assertTrue(wait_for(lambda: not d._thread.is_alive(), timeout=20))
+        srv.httpd.delay = 0
+        self.manager.resume(d)
+        for _ in range(600):
+            self.manager.tick()
+            if d.status in (engine.COMPLETED, engine.ERROR) and not d.is_active:
+                break
+            time.sleep(0.05)
+        time.sleep(2)  # let any old connection finish its read
+        self.assert_file_ok(d)
+
+    def test_same_file_twice_at_once(self):
+        srv = self.server(delay=0.002)
+        d1 = self.manager.add(srv.url(), connections=4)
+        d2 = self.manager.add(srv.url(), connections=4)
+        self.assertTrue(wait_for(self.finished(d1)))
+        self.assertTrue(wait_for(self.finished(d2)))
+        self.assert_file_ok(d1)
+        self.assert_file_ok(d2)
+        self.assertNotEqual(d1.saved_path, d2.saved_path)
+
+    def test_delete_while_downloading(self):
+        srv = self.server(delay=0.3)
+        d = self.manager.add(srv.url(), connections=4)
+        self.assertTrue(wait_for(lambda: d.downloaded > 0))
+        part = d.part_path
+        self.assertTrue(os.path.exists(part))
+        t0 = time.time()
+        cleanup = self.manager.remove(d, delete_file=True)
+        self.assertLess(time.time() - t0, 0.5)  # the window must not freeze
+        self.assertIsNone(self.manager.get(d.id))
+        cleanup.join(40)
+        self.assertFalse(os.path.exists(part))
+
     def test_resume_after_restart(self):
         srv = self.server(delay=0.004)
         d = self.manager.add(srv.url(), connections=4)
@@ -303,6 +361,13 @@ class ServerTests(unittest.TestCase):
             kind, payload = app.manager.events.get(timeout=2)
             self.assertEqual(kind, "browser_add")
             self.assertEqual(payload["url"], "https://example.com/a.zip")
+            # switched off in Settings -> refused, so the browser downloads the file itself
+            settings["browser_integration"] = False
+            with self.assertRaises(urllib.error.HTTPError) as ctx:
+                opener.open(req)
+            self.assertEqual(ctx.exception.code, 403)
+            with opener.open(f"http://127.0.0.1:{port}/config") as r:
+                self.assertFalse(json.loads(r.read())["enabled"])
             srv.stop()
         finally:
             shutil.rmtree(tmp, ignore_errors=True)

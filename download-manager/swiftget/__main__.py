@@ -13,6 +13,25 @@ def _enable_dpi_awareness():
             pass
 
 
+def _single_instance_lock():
+    """Hold a lock file for the whole run so two copies never share the download list."""
+    from .config import app_data_dir
+
+    f = open(os.path.join(app_data_dir(), "instance.lock"), "a+")
+    try:
+        f.seek(0)
+        if sys.platform.startswith("win"):
+            import msvcrt
+            msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        f.close()
+        return None
+    return f
+
+
 def main(argv=None):
     import tkinter as tk
 
@@ -25,9 +44,11 @@ def main(argv=None):
     start_hidden = "--tray" in argv  # used by the Windows start-up entry
     argv = [a for a in argv if a != "--tray"]
     settings = Settings()
-    if settings["browser_integration"] and other_instance_running(int(settings["browser_port"]),
-                                                                  show=not start_hidden):
+    if other_instance_running(int(settings["browser_port"]), show=not start_hidden):
         return 0  # already running (the window was brought to front)
+    lock = _single_instance_lock()
+    if lock is None:
+        return 0  # another SwiftGet is starting up right now
 
     _enable_dpi_awareness()
     root = tk.Tk()

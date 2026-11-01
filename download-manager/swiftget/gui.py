@@ -10,7 +10,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 from . import APP_NAME, VERSION, autostart, engine
-from .engine import ACTIVE_STATES, COMPLETED, DOWNLOADING, ERROR, PAUSED, QUEUED, WAITING
+from .engine import ACTIVE_STATES, COMPLETED, DOWNLOADING, ERROR, QUEUED, WAITING
 from .server import IntegrationServer
 from .theme import CATEGORY_COLORS, Theme, set_titlebar_dark
 from .tray import Tray
@@ -125,10 +125,11 @@ class App:
                 root.iconbitmap(default=ico)
             except tk.TclError:
                 pass
-        root.geometry("1180x660")
-        root.minsize(860, 460)
-
         self.theme = Theme(root, settings["theme"])
+        k = self.theme.scale
+        sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
+        root.geometry(f"{min(int(1180 * k), int(sw * 0.9))}x{min(int(660 * k), int(sh * 0.85))}")
+        root.minsize(min(int(860 * k), sw), min(int(460 * k), sh))
         self._build()
         self.theme.listeners.append(self._on_theme_changed)
         self._on_theme_changed()
@@ -351,8 +352,9 @@ class App:
             all_items = self.manager.snapshot()
             items = [d for d in all_items if self._matches(d)]
             items.sort(key=lambda d: d.added, reverse=True)  # newest first
-            self.list.set_items(items)
-            self.sidebar.set_counts(self._counts(all_items))
+            if self.root.winfo_viewable():
+                self.list.set_items(items)
+                self.sidebar.set_counts(self._counts(all_items))
 
             self.title_lbl.configure(text=FILTER_TITLES.get(self.filter, "Downloads"))
             n = len(items)
@@ -373,12 +375,12 @@ class App:
             self.status_left.configure(text="     ".join(parts))
 
             c = self.theme.c
-            if self.server and self.server.httpd:
-                text, dot = f"Browser integration on  ·  port {self.server.port}", c["success"]
-            elif self.server and self.server.error:
-                text, dot = f"Port {self.server.port} is busy", c["error"]
-            else:
+            if not self.settings["browser_integration"]:
                 text, dot = "Browser integration off", c["paused"]
+            elif self.server and self.server.httpd:
+                text, dot = f"Browser integration on  ·  port {self.server.port}", c["success"]
+            else:
+                text, dot = f"Port {self.server.port if self.server else ''} is busy", c["error"]
             self.status_right.configure(text=text)
             self.status_dot.delete("all")
             self.status_dot.create_oval(1, 1, 9, 9, fill=dot, outline="")
@@ -479,6 +481,7 @@ class App:
 
     def _shutdown_computer(self):
         engine.shutdown_computer()
+        self.show_window()
         if messagebox.askyesno(APP_NAME, "All scheduled downloads are finished.\n\n"
                                "The computer will shut down in about 60 seconds.\n"
                                "Do you want to CANCEL the shutdown?", parent=self.root):
@@ -612,9 +615,10 @@ class App:
         if self.server:
             self.server.stop()
             self.server = None
-        if self.settings["browser_integration"]:
-            self.server = IntegrationServer(self, int(self.settings["browser_port"]))
-            self.server.start()
+        # Always listen (also used to bring an already running SwiftGet to the front);
+        # the browser_integration setting decides whether browser downloads are accepted.
+        self.server = IntegrationServer(self, int(self.settings["browser_port"]))
+        self.server.start()
 
     def browser_help(self):
         ext_dir = extension_dir()
@@ -770,7 +774,7 @@ class AddDialog(Dialog):
         ttk.Spinbox(opts, from_=1, to=32, textvariable=self.conn_var, width=5).pack(side="left")
 
         # info card
-        self.info = tk.Canvas(self.body, height=64, highlightthickness=0, bd=0)
+        self.info = tk.Canvas(self.body, height=int(64 * app.theme.scale), highlightthickness=0, bd=0)
         self.info.pack(fill="x", pady=(14, 0))
         self.info.bind("<Configure>", lambda e: self._draw_info())
         self.info_state = ("idle", "Enter an address to see the file details.", "")
@@ -792,7 +796,8 @@ class AddDialog(Dialog):
         cv = self.info
         cv.configure(bg=c["bg"])
         cv.delete("all")
-        w = cv.winfo_width()
+        k = t.scale
+        w = cv.winfo_width() / k
         state, line1, line2 = self.info_state
         rounded_rect(cv, 1, 1, w - 1, 63, 10, fill=c["surface"], outline=c["border"])
         name = self.name_var.get() or "file"
@@ -806,6 +811,8 @@ class AddDialog(Dialog):
                        font=t.font_bold if state == "ok" else t.font)
         if line2:
             cv.create_text(66, 44, text=line2, anchor="w", fill=c["muted"], font=t.font_small)
+        if k != 1.0:
+            cv.scale("all", 0, 0, k, k)
 
     def _set_info(self, state, line1, line2=""):
         self.info_state = (state, line1, line2)
@@ -962,7 +969,8 @@ class ProgressWindow(tk.Toplevel):
         body = ttk.Frame(self, padding=(22, 18, 22, 18))
         body.pack(fill="both", expand=True)
 
-        self.head = tk.Canvas(body, width=self.WIDTH, height=58, highlightthickness=0, bd=0)
+        k = app.theme.scale
+        self.head = tk.Canvas(body, width=int(self.WIDTH * k), height=int(58 * k), highlightthickness=0, bd=0)
         self.head.pack(fill="x")
 
         big = ttk.Frame(body)
@@ -972,7 +980,7 @@ class ProgressWindow(tk.Toplevel):
         self.speed_lbl = ttk.Label(big, text="", style="Title.TLabel")
         self.speed_lbl.pack(side="right", anchor="s", pady=(0, 6))
 
-        self.bar = tk.Canvas(body, width=self.WIDTH, height=26, highlightthickness=0, bd=0)
+        self.bar = tk.Canvas(body, width=int(self.WIDTH * k), height=int(26 * k), highlightthickness=0, bd=0)
         self.bar.pack(fill="x", pady=(6, 0))
         ttk.Label(body, text="Each blue block is one connection downloading its own part of the file.",
                   style="Muted.TLabel").pack(anchor="w", pady=(4, 0))
@@ -1062,18 +1070,22 @@ class ProgressWindow(tk.Toplevel):
         cv.create_text(23, 29, text=(extension_of(d.filename) or "file")[:4].upper(), fill="#ffffff",
                        font=t.font_badge)
         from .widgets import ellipsize
-        w = max(200, cv.winfo_width() - 62)
+        k = t.scale
+        w = max(200, cv.winfo_width() - 62 * k)  # real pixels, for measuring text
         cv.create_text(62, 19, text=ellipsize(t.font_title, d.filename, w), anchor="w", fill=c["text"],
                        font=t.font_title)
         cv.create_text(62, 41, text=ellipsize(t.font_small, d.url, w), anchor="w", fill=c["muted"],
                        font=t.font_small)
+        if k != 1.0:
+            cv.scale("all", 0, 0, k, k)
 
     def _draw_bar(self):
         c, d = self.app.theme.c, self.d
         cv = self.bar
         cv.configure(bg=c["bg"])
         cv.delete("all")
-        w = max(10, cv.winfo_width() if cv.winfo_width() > 10 else self.WIDTH)
+        k = self.app.theme.scale
+        w = max(10, cv.winfo_width() / k if cv.winfo_width() > 10 else self.WIDTH)
         h = 26
         rounded_rect(cv, 0, 0, w, h, 8, fill=c["track"], outline="")
         segs = d.segment_snapshot()
@@ -1095,6 +1107,8 @@ class ProgressWindow(tk.Toplevel):
                 rounded_rect(cv, 0, 0, x1, h, 8, fill=c["accent"], outline="")
             if d.is_active:
                 rows.append(("1", human_size(d.downloaded), "Receiving data…"))
+        if k != 1.0:
+            cv.scale("all", 0, 0, k, k)
         children = self.conn_tree.get_children()
         for i, row in enumerate(rows):
             if str(i) in children:
@@ -1135,13 +1149,16 @@ class CompleteDialog(Dialog):
         super().__init__(app, "Download complete")
         self.d = d
         c, t = app.theme.c, app.theme
-        head = tk.Canvas(self.body, width=480, height=64, highlightthickness=0, bd=0, bg=c["bg"])
+        k = t.scale
+        head = tk.Canvas(self.body, width=int(480 * k), height=int(64 * k), highlightthickness=0, bd=0, bg=c["bg"])
         head.pack(fill="x")
         head.create_oval(2, 8, 50, 56, fill=c["success"], outline="")
         head.create_line(15, 32, 23, 40, 38, 24, fill="#ffffff", width=4, capstyle="round", joinstyle="round")
         head.create_text(66, 22, text="Download complete", anchor="w", fill=c["text"], font=t.font_h1)
         head.create_text(66, 46, text=f"{d.filename}  ·  {human_size(d.size)}", anchor="w", fill=c["muted"],
                          font=t.font)
+        if k != 1.0:
+            head.scale("all", 0, 0, k, k)
         ttk.Label(self.body, text=d.saved_path or "", style="Muted.TLabel", wraplength=480).pack(
             anchor="w", pady=(10, 0))
         self.dont_show = tk.BooleanVar(value=False)
@@ -1333,7 +1350,7 @@ class OptionsDialog(Dialog):
 
     def save(self):
         s = self.app.settings
-        old_port, old_enabled, old_theme = s["browser_port"], s["browser_integration"], s["theme"]
+        old_port, old_theme = s["browser_port"], s["theme"]
         try:
             for key, v in self.v.items():
                 s[key] = v.get()
@@ -1344,7 +1361,7 @@ class OptionsDialog(Dialog):
         s.save()
         self.app.manager.apply_settings()
         self.app.limit_var.set(int(s["speed_limit_kb"] or 0))
-        if old_port != s["browser_port"] or old_enabled != s["browser_integration"]:
+        if old_port != s["browser_port"]:
             self.app.start_server()
         self.destroy()
         if autostart.supported():

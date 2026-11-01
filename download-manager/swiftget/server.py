@@ -68,6 +68,9 @@ class _Handler(BaseHTTPRequestHandler):
             self._send(400, {"error": "invalid json"})
             return
         if self.path == "/download":
+            if not app.settings["browser_integration"]:
+                self._send(403, {"error": "browser integration is turned off"})
+                return
             url = str(data.get("url") or "")
             if not url.lower().startswith(("http://", "https://", "ftp://")):
                 self._send(400, {"error": "unsupported url"})
