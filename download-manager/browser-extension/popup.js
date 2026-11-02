@@ -1,9 +1,10 @@
+const ext = globalThis.browser || globalThis.chrome;
 const statusEl = document.getElementById("status");
 const interceptEl = document.getElementById("intercept");
 const portEl = document.getElementById("port");
 
 async function refresh() {
-  const s = await chrome.storage.local.get({ port: 9614, intercept: true });
+  const s = await ext.storage.local.get({ port: 9614, intercept: true });
   interceptEl.checked = s.intercept;
   portEl.value = s.port;
   try {
@@ -17,11 +18,11 @@ async function refresh() {
   }
 }
 
-interceptEl.addEventListener("change", () => chrome.storage.local.set({ intercept: interceptEl.checked }));
+interceptEl.addEventListener("change", () => ext.storage.local.set({ intercept: interceptEl.checked }));
 portEl.addEventListener("change", async () => {
   const port = parseInt(portEl.value, 10);
   if (port >= 1024 && port <= 65535) {
-    await chrome.storage.local.set({ port });
+    await ext.storage.local.set({ port });
     refresh();
   }
 });

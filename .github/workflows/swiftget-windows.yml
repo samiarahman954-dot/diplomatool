@@ -36,6 +36,30 @@ jobs:
           --icon assets/swiftget.ico --add-data "assets/swiftget.ico;assets"
           --collect-data sv_ttk --hidden-import pystray._win32 run.py
 
+      # Firefox add-on (.xpi). If the repository has the secrets AMO_JWT_ISSUER and
+      # AMO_JWT_SECRET (free API keys from addons.mozilla.org), Mozilla signs it so it can be
+      # installed permanently; otherwise it is unsigned (Firefox "temporary add-on").
+      - name: Build Firefox add-on
+        env:
+          AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+          AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+        run: |
+          python tools/build_firefox.py dist/SwiftGet-firefox.xpi
+          if ($env:AMO_JWT_ISSUER -and $env:AMO_JWT_SECRET) {
+            $src = Join-Path $env:RUNNER_TEMP "ffsrc"
+            Expand-Archive dist/SwiftGet-firefox.xpi -DestinationPath $src -Force
+            npx --yes web-ext@8 sign --source-dir $src --channel unlisted `
+              --api-key $env:AMO_JWT_ISSUER --api-secret $env:AMO_JWT_SECRET --artifacts-dir ff-signed
+            $signed = Get-ChildItem ff-signed -Filter *.xpi -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($signed) {
+              Copy-Item $signed.FullName dist/SwiftGet-firefox.xpi -Force
+              Write-Output "Firefox add-on signed by Mozilla"
+            } else {
+              Write-Output "::warning::Mozilla signing failed (each version can be signed once); using the unsigned add-on"
+            }
+          }
+          exit 0
+
       # Code signing. If the repository has the secrets SIGN_PFX_BASE64 (a .pfx file encoded
       # as base64) and SIGN_PFX_PASSWORD, that certificate is used. Otherwise a fresh
       # self-signed "SwiftGet" certificate is made for this build; its private key only
@@ -100,6 +124,8 @@ jobs:
           New-Item -ItemType Directory -Force portable | Out-Null
           Copy-Item -Recurse dist/SwiftGet portable/SwiftGet
           Copy-Item -Recurse browser-extension portable/SwiftGet/browser-extension
+          New-Item -ItemType Directory -Force portable/SwiftGet/firefox | Out-Null
+          Copy-Item dist/SwiftGet-firefox.xpi portable/SwiftGet/firefox/
           Copy-Item README.md portable/SwiftGet/
           if (Test-Path SwiftGet-certificate.cer) { Copy-Item SwiftGet-certificate.cer dist-installer/ }
 
@@ -124,12 +150,13 @@ jobs:
           $version = python -c "import swiftget; print(swiftget.VERSION)"
           $tag = "swiftget-v$version"
           Compress-Archive -Path portable/SwiftGet -DestinationPath SwiftGet-portable.zip -Force
-          $files = @("dist-installer/SwiftGet-Setup.exe", "SwiftGet-portable.zip")
+          $files = @("dist-installer/SwiftGet-Setup.exe", "SwiftGet-portable.zip", "dist/SwiftGet-firefox.xpi")
           $notes = @"
           SwiftGet Download Manager $version
 
           Install: download SwiftGet-Setup.exe, right-click > Properties > Unblock > OK, then run it and click Next > Install > Finish.
           The welcome screen then shows how to add the browser extension (one time).
+          Firefox: use SwiftGet-firefox.xpi (see the README for the steps).
 
           SwiftGet-portable.zip is the same app without installing.
           "@

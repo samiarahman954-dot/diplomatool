@@ -82,6 +82,34 @@ python run.py
    সেটা **Options ▸ Browser** থেকে বদলাতে পারবেন।
 5. SwiftGet বন্ধ থাকলে browser আগের মত নিজেই ফাইল নামাবে।
 
+## Firefox add-on
+
+Firefox-এর জন্য আলাদা ফাইল আছে: **`SwiftGet-firefox.xpi`**। এটা পাবেন Release পেজে, অথবা install করার পর
+`C:\Program Files\SwiftGet\firefox\` folder-এ। Start Menu-তে **"SwiftGet Firefox add-on folder"** shortcut-ও আছে।
+
+**Mozilla-র sign করা `.xpi` হলে (স্থায়ী install):**
+1. Firefox-এ `about:addons` খুলুন → ⚙ (gear) → **Install Add-on From File…** চাপুন।
+2. `SwiftGet-firefox.xpi` বেছে নিন, তারপর **Add** চাপুন।
+
+**sign না করা `.xpi` হলে (সাময়িক):** সাধারণ Firefox শুধু Mozilla-র sign করা add-on স্থায়ীভাবে install করতে দেয়।
+1. Firefox-এ `about:debugging#/runtime/this-firefox` খুলুন।
+2. **Load Temporary Add-on…** চাপুন, তারপর `SwiftGet-firefox.xpi` বেছে নিন।
+3. এভাবে বসানো add-on Firefox বন্ধ করলে চলে যায়, তাই প্রতিবার Firefox খোলার পর আবার বসাতে হবে।
+
+**স্থায়ী করার উপায় (ফ্রি, একবার করলেই হবে):**
+1. [addons.mozilla.org](https://addons.mozilla.org)-এ একটা ফ্রি অ্যাকাউন্ট খুলুন।
+2. [API key পেজ](https://addons.mozilla.org/developers/addon/api/key/) থেকে key বানান। সেখানে দুটো মান পাবেন:
+   **JWT issuer** আর **JWT secret**।
+3. GitHub repo-র **Settings → Secrets and variables → Actions**-এ দুটো secret বসান:
+   - `AMO_JWT_ISSUER`
+   - `AMO_JWT_SECRET`
+4. পরের build-এ Mozilla নিজে থেকে add-on sign করে দেবে ("unlisted", মানে Mozilla-র add-on store-এ দেখা যাবে না)।
+   এরপর উপরের স্থায়ী install-এর নিয়মে বসান।
+   - খেয়াল রাখবেন: একই version Mozilla একবারই sign করে, তাই নতুন sign-এর জন্য version বাড়াতে হয়।
+
+**অন্য উপায়:** Firefox Developer Edition বা ESR-এ `about:config` খুলে `xpinstall.signatures.required` মান `false` করলে
+sign ছাড়াই স্থায়ী install করা যায়। সাধারণ Firefox-এ এই অপশন কাজ করে না।
+
 ## ব্যবহার (Usage tips)
 - **Ctrl+F** — search, **Ctrl+N** — নতুন URL, **Ctrl+V** (main window-এ) — clipboard-এর link যোগ করে, **Ctrl+B** — batch, **Del** — delete।
 - প্রতিটা card-এর ডানদিকের গোল বাটন: চলতি download হলে pause, থেমে থাকলে resume, শেষ হলে folder খোলে।
@@ -107,6 +135,7 @@ download-manager/
 ├── browser-extension/     # Chrome/Edge Manifest V3 extension
 ├── tests/test_engine.py   # python -m unittest discover -s tests
 ├── tools/make_icons.py    # regenerates the icons
+├── tools/build_firefox.py # packages SwiftGet-firefox.xpi
 ├── installer/swiftget.iss # Inno Setup script -> SwiftGet-Setup.exe
 └── build_windows.bat
 ```

@@ -80,6 +80,14 @@ def resource_path(*parts):
     return os.path.join(base, *parts)
 
 
+def firefox_addon_dir():
+    exe_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, "frozen", False) else __file__))
+    for c in (os.path.join(exe_dir, "firefox"), os.path.join(os.path.dirname(exe_dir), "dist")):
+        if os.path.exists(os.path.join(c, "SwiftGet-firefox.xpi")):
+            return c
+    return os.path.join(exe_dir, "firefox")
+
+
 def extension_dir():
     candidates = []
     exe_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, "frozen", False) else __file__))
@@ -629,6 +637,10 @@ class App:
             "2. Turn on 'Developer mode'\n"
             "3. Click 'Load unpacked' and choose this folder:\n"
             f"   {ext_dir}\n\n"
+            "Firefox: open about:addons › ⚙ › 'Install Add-on From File…' and pick "
+            f"SwiftGet-firefox.xpi in:\n   {firefox_addon_dir()}\n"
+            "(if Firefox says the add-on is not verified, use about:debugging › This Firefox › "
+            "'Load Temporary Add-on…' with the same file — see the README).\n\n"
             "Downloads of the file types in Settings › Browser are then caught automatically, "
             "and you can right-click any link › 'Download with SwiftGet'.",
             parent=self.root)
@@ -1465,6 +1477,7 @@ class WelcomeDialog(Dialog):
         row.pack(fill="x", pady=(10, 0))
         ttk.Button(row, text="Copy address", command=self.copy_address).pack(side="left")
         ttk.Button(row, text="Open extension folder", command=self.open_folder).pack(side="left", padx=(8, 0))
+        ttk.Button(row, text="Firefox…", command=app.browser_help).pack(side="left", padx=(8, 0))
         self.copied = ttk.Label(row, text="", style="Muted.TLabel")
         self.copied.pack(side="left", padx=(10, 0))
 

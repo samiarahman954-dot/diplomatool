@@ -1,16 +1,18 @@
-// SwiftGet browser integration (Chrome / Edge / Brave, Manifest V3).
-// Catches downloads of the file types chosen in SwiftGet > Options > Browser
+// SwiftGet browser integration for Chrome / Edge / Brave (Manifest V3) and Firefox.
+// Catches downloads of the file types chosen in SwiftGet > Settings > Browser
 // and hands them to the desktop app, which listens on 127.0.0.1 only.
 
+// Firefox offers the promise-based `browser` namespace; Chrome's `chrome` (MV3) returns promises too.
+const ext = globalThis.browser || globalThis.chrome;
+const toolbar = ext.action || ext.browserAction;
 const DEFAULT_PORT = 9614;
 const bypass = new Set(); // URLs the browser should download itself (fallback)
 
 async function settings() {
-  const s = await chrome.storage.local.get({ port: DEFAULT_PORT, intercept: true });
-  return s;
+  return ext.storage.local.get({ port: DEFAULT_PORT, intercept: true });
 }
 
-async function api(path, options = {}) {
+async function callApp(path, options = {}) {
   const { port } = await settings();
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 2000);
@@ -25,13 +27,9 @@ async function api(path, options = {}) {
   }
 }
 
-async function appConfig() {
-  return api("/config");
-}
-
 async function cookiesFor(url) {
   try {
-    const list = await chrome.cookies.getAll({ url });
+    const list = await ext.cookies.getAll({ url });
     return list.map((c) => `${c.name}=${c.value}`).join("; ");
   } catch (e) {
     return "";
@@ -47,7 +45,7 @@ async function sendToApp({ url, filename, referrer, fileSize }) {
     userAgent: navigator.userAgent,
     fileSize: fileSize || -1,
   };
-  const res = await api("/download", {
+  const res = await callApp("/download", {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-SwiftGet": "1" },
     body: JSON.stringify(body),
@@ -65,14 +63,6 @@ function extensionOf(name) {
   return i >= 0 ? clean.slice(i + 1).toLowerCase() : "";
 }
 
-// Decide once the browser knows the real file name (Content-Disposition etc.)
-chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
-  handleDownload(item).finally(() => {
-    try { suggest(); } catch (e) { /* already cancelled */ }
-  });
-  return true; // we call suggest() asynchronously
-});
-
 async function handleDownload(item) {
   const url = item.finalUrl || item.url;
   if (!/^(https?|ftp):/i.test(url)) return; // blob:, data:, file: stay in the browser
@@ -83,47 +73,66 @@ async function handleDownload(item) {
   }
   const { intercept } = await settings();
   if (!intercept) return;
-  const cfg = await appConfig();
+  const cfg = await callApp("/config");
   if (!cfg || !cfg.enabled) return;
 
-  const name = baseName(item.filename) || baseName(new URL(url).pathname);
-  const ext = extensionOf(name) || extensionOf(url);
-  if (!cfg.extensions.includes(ext)) return;
+  let name = baseName(item.filename);
+  if (!name) {
+    try { name = baseName(decodeURIComponent(new URL(url).pathname)); } catch (e) { name = ""; }
+  }
+  const extName = extensionOf(name) || extensionOf(url);
+  if (!cfg.extensions.includes(extName)) return;
   const size = item.totalBytes > 0 ? item.totalBytes : item.fileSize;
   if (cfg.minSizeKb > 0 && size > 0 && size < cfg.minSizeKb * 1024) return;
 
   try {
-    await chrome.downloads.cancel(item.id);
-    await chrome.downloads.erase({ id: item.id });
-  } catch (e) { /* ignore */ }
+    await ext.downloads.cancel(item.id);
+  } catch (e) {
+    // Already finished (tiny file): remove what the browser saved.
+    try { await ext.downloads.removeFile(item.id); } catch (e2) { /* ignore */ }
+  }
+  try { await ext.downloads.erase({ id: item.id }); } catch (e) { /* ignore */ }
 
   const ok = await sendToApp({ url, filename: name, referrer: item.referrer, fileSize: size });
   if (!ok) {
     // SwiftGet refused or stopped - let the browser download it instead.
     bypass.add(url);
-    chrome.downloads.download({ url });
+    ext.downloads.download({ url });
   }
 }
 
-// Right-click menu
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.removeAll(() => {
-    chrome.contextMenus.create({
-      id: "swiftget-link",
-      title: "Download with SwiftGet",
-      contexts: ["link", "image", "video", "audio"],
+if (ext.downloads.onDeterminingFilename) {
+  // Chrome / Edge: decide once the browser knows the real file name (Content-Disposition etc.)
+  ext.downloads.onDeterminingFilename.addListener((item, suggest) => {
+    handleDownload(item).finally(() => {
+      try { suggest(); } catch (e) { /* already cancelled */ }
     });
+    return true; // suggest() is called asynchronously
   });
-});
+} else {
+  // Firefox: the file name is already known when the download is created.
+  ext.downloads.onCreated.addListener((item) => { handleDownload(item); });
+}
 
-chrome.contextMenus.onClicked.addListener(async (info) => {
+// Right-click menu (re-created whenever the background script starts)
+async function setupMenu() {
+  try { await ext.contextMenus.removeAll(); } catch (e) { /* ignore */ }
+  ext.contextMenus.create({
+    id: "swiftget-link",
+    title: "Download with SwiftGet",
+    contexts: ["link", "image", "video", "audio"],
+  });
+}
+setupMenu();
+
+ext.contextMenus.onClicked.addListener(async (info) => {
   if (info.menuItemId !== "swiftget-link") return;
   const url = info.linkUrl || info.srcUrl;
   if (!url) return;
   const ok = await sendToApp({ url, referrer: info.pageUrl });
-  if (!ok) {
-    chrome.action.setBadgeBackgroundColor({ color: "#c62828" });
-    chrome.action.setBadgeText({ text: "off" });
-    setTimeout(() => chrome.action.setBadgeText({ text: "" }), 4000);
+  if (!ok && toolbar) {
+    toolbar.setBadgeBackgroundColor({ color: "#c62828" });
+    toolbar.setBadgeText({ text: "off" });
+    setTimeout(() => toolbar.setBadgeText({ text: "" }), 4000);
   }
 });

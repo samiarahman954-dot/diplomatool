@@ -46,11 +46,13 @@ Name: "autostart"; Description: "&Start SwiftGet when Windows starts (recommende
 [Files]
 Source: "..\dist\SwiftGet\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\browser-extension\*"; DestDir: "{app}\browser-extension"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\dist\SwiftGet-firefox.xpi"; DestDir: "{app}\firefox"; Flags: ignoreversion
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExe}"
 Name: "{autoprograms}\{#MyAppName} browser extension folder"; Filename: "{app}\browser-extension"
+Name: "{autoprograms}\{#MyAppName} Firefox add-on folder"; Filename: "{app}\firefox"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExe}"; Tasks: desktopicon
 
 [Registry]
