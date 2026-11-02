@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write   # to publish the GitHub Release with the installer
 
 jobs:
   build:
@@ -114,3 +114,29 @@ jobs:
         with:
           name: SwiftGet-portable
           path: download-manager/portable
+
+      # Public download link that needs no GitHub login:
+      # https://github.com/<owner>/<repo>/releases/latest/download/SwiftGet-Setup.exe
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = python -c "import swiftget; print(swiftget.VERSION)"
+          $tag = "swiftget-v$version"
+          Compress-Archive -Path portable/SwiftGet -DestinationPath SwiftGet-portable.zip -Force
+          $files = @("dist-installer/SwiftGet-Setup.exe", "SwiftGet-portable.zip")
+          $notes = @"
+          SwiftGet Download Manager $version
+
+          Install: download SwiftGet-Setup.exe, right-click > Properties > Unblock > OK, then run it and click Next > Install > Finish.
+          The welcome screen then shows how to add the browser extension (one time).
+
+          SwiftGet-portable.zip is the same app without installing.
+          "@
+          gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag @files --clobber --repo $env:GITHUB_REPOSITORY
+          } else {
+            gh release create $tag @files --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA `
+              --title "SwiftGet $version" --notes $notes --latest
+          }
